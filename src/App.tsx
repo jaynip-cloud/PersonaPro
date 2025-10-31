@@ -16,6 +16,7 @@ import { GrowthOpportunities } from './pages/GrowthOpportunities';
 import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
 import { Placeholder } from './pages/Placeholder';
+import { DatabaseTest } from './pages/DatabaseTest';
 import { ToastProvider } from './components/ui/Toast';
 import { KeyboardShortcuts } from './components/ui/KeyboardShortcuts';
 
@@ -42,6 +43,7 @@ function App() {
             <Route path="insights" element={<InsightsDashboard />} />
             <Route path="company" element={<CompanyIntelligence />} />
             <Route path="company-data" element={<CompanyData />} />
+            <Route path="database-test" element={<DatabaseTest />} />
             </Route>
           </Routes>
           <KeyboardShortcuts />

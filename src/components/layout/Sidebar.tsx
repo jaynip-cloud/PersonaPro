@@ -22,6 +22,7 @@ const navigation = [
   { name: 'Pitch Generator', href: '/pitch', icon: FileText },
   { name: 'Projects', href: '/projects', icon: Briefcase },
   { name: 'Growth Opportunities', href: '/opportunities', icon: Target },
+  { name: 'Database Test', href: '/database-test', icon: Database },
   { name: 'Admin', href: '/admin', icon: Shield },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
