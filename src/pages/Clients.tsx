@@ -5,13 +5,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
-import { Search, Filter, Plus } from 'lucide-react';
+import { Search, Filter, Plus, MoreVertical, Edit, Trash2, Eye } from 'lucide-react';
 
 export const Clients: React.FC = () => {
   const { clients } = useApp();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'prospect'>('all');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const filteredClients = clients.filter(client => {
     const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -75,11 +76,13 @@ export const Clients: React.FC = () => {
             {filteredClients.map((client) => (
               <div
                 key={client.id}
-                onClick={() => navigate(`/clients/${client.id}`)}
-                className="group relative p-6 rounded-xl border border-border hover:border-primary/50 hover:shadow-lg cursor-pointer transition-all duration-200 bg-gradient-to-r from-background to-muted/20"
+                className="group relative p-6 rounded-xl border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-200 bg-gradient-to-r from-background to-muted/20"
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1">
+                  <div
+                    onClick={() => navigate(`/clients/${client.id}`)}
+                    className="flex items-center gap-4 flex-1 cursor-pointer"
+                  >
                     <Avatar name={client.name} size="lg" />
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">
@@ -109,6 +112,67 @@ export const Clients: React.FC = () => {
                     >
                       {client.status}
                     </Badge>
+
+                    <div className="relative">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === client.id ? null : client.id);
+                        }}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+
+                      {openMenuId === client.id && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setOpenMenuId(null)}
+                          />
+                          <div className="absolute right-0 top-full mt-2 w-48 bg-background border border-border rounded-lg shadow-lg z-20">
+                            <div className="p-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/clients/${client.id}`);
+                                  setOpenMenuId(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2 text-foreground"
+                              >
+                                <Eye className="h-4 w-4" />
+                                View Details
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/clients/${client.id}/edit`);
+                                  setOpenMenuId(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2 text-foreground"
+                              >
+                                <Edit className="h-4 w-4" />
+                                Edit Client
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Are you sure you want to delete this client?')) {
+                                    console.log('Delete client', client.id);
+                                  }
+                                  setOpenMenuId(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2 text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete Client
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

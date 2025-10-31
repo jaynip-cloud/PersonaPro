@@ -11,7 +11,7 @@ import { PersonaEditor } from '../components/persona/PersonaEditor';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download } from 'lucide-react';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockFinancialData, mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
@@ -48,7 +48,6 @@ export const ClientDetailNew: React.FC = () => {
     createdAt: '2025-06-15',
     location: 'San Francisco, CA',
     founded: '2018',
-    healthScore: 87,
     csm: 'John Williams',
   };
 
@@ -82,42 +81,24 @@ export const ClientDetailNew: React.FC = () => {
     }, 7000);
   };
 
-  const handleQuery = (query: string, mode: 'quick' | 'deep') => {
+  const handleQuery = async (query: string, mode: 'quick' | 'deep'): Promise<string> => {
     setIsProcessingQuery(true);
     const processingTime = mode === 'deep' ? 8000 : 3000;
 
-    setTimeout(() => {
-      const mockResponse: IntelligenceQuery = {
-        id: Date.now().toString(),
-        clientId: client.id,
-        query,
-        mode,
-        response: mode === 'deep'
-          ? `Based on comprehensive analysis of TechCorp Solutions:\n\nThe client demonstrates strong technical expertise and decision-making authority. Recent interactions indicate high satisfaction with current services, with particular interest in ML/AI capabilities. Communication patterns show consistent engagement and quick response times.\n\nKey behavioral patterns include preference for technical depth in discussions, data-driven decision making, and forward-thinking approach to technology adoption.`
-          : `TechCorp Solutions shows positive engagement trends. Recent sentiment is favorable (score: +0.78). Primary contact Sarah Mitchell is highly responsive with avg response time of 2 hours. Key opportunity identified for ML integration services.`,
-        keyFindings: mode === 'deep' ? [
-          'High technical competency with strong preference for scalable solutions',
-          'Decision velocity has increased 40% over past quarter',
-          'Active interest in ML/AI integration capabilities',
-          'Strong budget authority with established procurement process'
-        ] : undefined,
-        recommendedActions: mode === 'deep' ? [
-          { action: 'Schedule ML capabilities demo within next 2 weeks', severity: 'high' },
-          { action: 'Create proposal for Enterprise ML Integration', severity: 'high' },
-          { action: 'Follow up on Q4 roadmap discussion', severity: 'medium' }
-        ] : undefined,
-        tokensUsed: mode === 'deep' ? 2847 : 892,
-        cost: mode === 'deep' ? 0.0142 : 0.0045,
-        timestamp: new Date().toISOString()
-      };
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const response = mode === 'deep'
+          ? `Based on comprehensive analysis of TechCorp Solutions:\n\nThe client demonstrates strong technical expertise and decision-making authority. Recent interactions indicate high satisfaction with current services, with particular interest in ML/AI capabilities. Communication patterns show consistent engagement and quick response times.\n\nKey behavioral patterns include preference for technical depth in discussions, data-driven decision making, and forward-thinking approach to technology adoption.\n\nRecommendations:\n• Schedule ML capabilities demo within next 2 weeks\n• Create proposal for Enterprise ML Integration\n• Follow up on Q4 roadmap discussion`
+          : `TechCorp Solutions shows positive engagement trends. Recent sentiment is favorable (score: +0.78). Primary contact Sarah Mitchell is highly responsive with avg response time of 2 hours. Key opportunity identified for ML integration services.`;
 
-      setQueries(prev => [mockResponse, ...prev]);
-      setIsProcessingQuery(false);
-    }, processingTime);
+        setIsProcessingQuery(false);
+        resolve(response);
+      }, processingTime);
+    });
   };
 
   const tabs = [
-    { id: 'overview', label: 'Overview & Health', icon: Sparkles },
+    { id: 'overview', label: 'Overview', icon: Sparkles },
     { id: 'relationships', label: 'Relationships', icon: Users },
     { id: 'opportunities', label: 'Opportunities', icon: Target },
     { id: 'projects', label: 'Projects & Deals', icon: Briefcase },
@@ -176,21 +157,6 @@ export const ClientDetailNew: React.FC = () => {
           <div className="space-y-6">
             <FinancialOverview data={financialData} />
 
-            <IntelligenceAgent
-              clientId={client.id}
-              onQuery={handleQuery}
-              isProcessing={isProcessingQuery}
-            />
-
-            {queries.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-foreground">Recent Queries</h3>
-                {queries.slice(0, 1).map(query => (
-                  <QueryResult key={query.id} query={query} />
-                ))}
-              </div>
-            )}
-
             {personaMetrics && !isAnalyzing && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
@@ -232,6 +198,18 @@ export const ClientDetailNew: React.FC = () => {
                   <Button onClick={handleRunPersonaAnalysis} variant="primary">
                     Run Persona Analysis
                   </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {isAnalyzing && (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+                  <h3 className="text-lg font-semibold mb-2">Analyzing Client Data</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Processing interactions and generating persona insights...
+                  </p>
                 </CardContent>
               </Card>
             )}
@@ -495,35 +473,11 @@ export const ClientDetailNew: React.FC = () => {
 
         {activeTab === 'intelligence' && (
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Intelligence Chat</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <IntelligenceAgent
-                  clientId={client.id}
-                  onQuery={handleQuery}
-                  isProcessing={isProcessingQuery}
-                />
-
-                {queries.length > 0 && (
-                  <div className="mt-6 space-y-6">
-                    <h3 className="text-lg font-semibold">Query History</h3>
-                    {queries.map(query => (
-                      <div key={query.id}>
-                        <div className="mb-4 p-3 bg-muted rounded-lg">
-                          <p className="text-sm font-medium text-foreground">{query.query}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(query.timestamp).toLocaleString()} • {query.mode} mode
-                          </p>
-                        </div>
-                        <QueryResult query={query} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <IntelligenceAgent
+              clientId={client.id}
+              onQuery={handleQuery}
+              isProcessing={isProcessingQuery}
+            />
           </div>
         )}
 

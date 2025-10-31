@@ -17,12 +17,6 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshDat
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showCsmMenu, setShowCsmMenu] = useState(false);
 
-  const getHealthColor = (score?: number) => {
-    if (!score) return 'text-gray-400';
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
-  };
 
   return (
     <div className="bg-background border-b border-border">
@@ -82,13 +76,13 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshDat
             </Button>
 
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={onRefreshData}
               disabled={isRefreshing}
+              title="Refresh Data"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh Data
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
 
             <div className="relative">
@@ -134,22 +128,6 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshDat
           <Badge variant={client.status === 'active' ? 'success' : 'secondary'}>
             {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
           </Badge>
-          {client.healthScore !== undefined && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-muted rounded-full">
-              <span className="text-xs font-medium text-muted-foreground">Health Score:</span>
-              <div className="flex items-center gap-1">
-                <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${getHealthColor(client.healthScore)} bg-current`}
-                    style={{ width: `${client.healthScore}%` }}
-                  />
-                </div>
-                <span className={`text-xs font-bold ${getHealthColor(client.healthScore)}`}>
-                  {client.healthScore}%
-                </span>
-              </div>
-            </div>
-          )}
           {client.tags.map((tag) => (
             <Badge key={tag} variant="outline" className="text-xs">
               {tag}
