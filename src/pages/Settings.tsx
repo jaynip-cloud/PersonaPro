@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -12,12 +12,23 @@ import {
   Download,
   Save,
   CheckCircle,
-  Database
+  Database,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'api' | 'data-sources'>('profile');
   const [saved, setSaved] = useState(false);
+  const [openaiKey, setOpenaiKey] = useState('');
+  const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+
+  useEffect(() => {
+    const storedKey = localStorage.getItem('openai_key');
+    if (storedKey) {
+      setOpenaiKey(storedKey);
+    }
+  }, []);
 
   const [profile, setProfile] = useState({
     name: 'John Williams',
@@ -45,6 +56,9 @@ export const Settings: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
 
   const handleSave = () => {
+    if (activeTab === 'api' && openaiKey) {
+      localStorage.setItem('openai_key', openaiKey);
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -349,68 +363,91 @@ export const Settings: React.FC = () => {
                 <CardTitle>API Keys & Integrations</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-900">
-                      These are mock API keys for demonstration purposes only.
-                    </p>
-                  </div>
-
+                <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Production API Key
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        value="pk_live_1234567890abcdefghijklmnop"
-                        readOnly
-                        className="font-mono"
-                      />
-                      <Button variant="outline">
-                        Reveal
-                      </Button>
+                    <h3 className="text-lg font-medium text-foreground mb-4">OpenAI Configuration</h3>
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                      <p className="text-sm text-blue-900">
+                        Configure your OpenAI API key to enable AI-powered features like automatic data extraction in Knowledge Base.
+                      </p>
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Development API Key
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        value="pk_dev_abcdefghijklmnopqrstuvwxyz"
-                        readOnly
-                        className="font-mono"
-                      />
-                      <Button variant="outline">
-                        Reveal
-                      </Button>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        OpenAI API Key
+                      </label>
+                      <div className="flex gap-2">
+                        <Input
+                          type={showOpenaiKey ? 'text' : 'password'}
+                          value={openaiKey}
+                          onChange={(e) => setOpenaiKey(e.target.value)}
+                          placeholder="sk-..."
+                          className="font-mono"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowOpenaiKey(!showOpenaiKey)}
+                        >
+                          {showOpenaiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">OpenAI Platform</a>
+                      </p>
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Webhook Secret
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        value="whsec_1234567890abcdefghijklmnop"
-                        readOnly
-                        className="font-mono"
-                      />
-                      <Button variant="outline">
-                        Reveal
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-border">
-                    <Button variant="outline">
-                      Generate New Key
+                    <Button variant="primary" onClick={handleSave} disabled={saved} className="mt-4">
+                      {saved ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Saved!
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save API Key
+                        </>
+                      )}
                     </Button>
+                  </div>
+
+                  <div className="pt-6 border-t border-border">
+                    <h3 className="text-lg font-medium text-foreground mb-4">Other API Keys</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Production API Key
+                        </label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="password"
+                            value="pk_live_1234567890abcdefghijklmnop"
+                            readOnly
+                            className="font-mono"
+                          />
+                          <Button variant="outline">
+                            Reveal
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Development API Key
+                        </label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="password"
+                            value="pk_dev_abcdefghijklmnopqrstuvwxyz"
+                            readOnly
+                            className="font-mono"
+                          />
+                          <Button variant="outline">
+                            Reveal
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </CardContent>

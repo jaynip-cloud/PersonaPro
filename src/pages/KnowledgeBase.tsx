@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
+import { AIDataExtractor } from '../components/knowledge/AIDataExtractor';
 import {
   Building2,
   FileText,
@@ -14,11 +15,12 @@ import {
   Trash2,
   Save,
   CheckCircle,
-  Upload
+  Upload,
+  Sparkles
 } from 'lucide-react';
 
 export const KnowledgeBase: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'company' | 'services' | 'case-studies' | 'team'>('company');
+  const [activeTab, setActiveTab] = useState<'ai-extract' | 'company' | 'services' | 'case-studies' | 'team'>('ai-extract');
   const [saved, setSaved] = useState(false);
 
   const [companyInfo, setCompanyInfo] = useState({
@@ -103,7 +105,55 @@ export const KnowledgeBase: React.FC = () => {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const handleDataExtracted = (data: any) => {
+    if (data.companyInfo) {
+      setCompanyInfo({
+        ...companyInfo,
+        ...data.companyInfo
+      });
+    }
+
+    if (data.services && data.services.length > 0) {
+      const newServices = data.services.map((service: any, index: number) => ({
+        id: `extracted-${Date.now()}-${index}`,
+        name: service.name || '',
+        description: service.description || '',
+        budgetRange: service.budgetRange || '',
+        duration: service.duration || '',
+        tags: service.tags || []
+      }));
+      setServices([...services, ...newServices]);
+    }
+
+    if (data.caseStudies && data.caseStudies.length > 0) {
+      const newCaseStudies = data.caseStudies.map((study: any, index: number) => ({
+        id: `extracted-${Date.now()}-${index}`,
+        title: study.title || '',
+        client: study.client || '',
+        industry: study.industry || '',
+        results: study.results || [],
+        services: study.services || [],
+        duration: study.duration || ''
+      }));
+      setCaseStudies([...caseStudies, ...newCaseStudies]);
+    }
+
+    if (data.team && data.team.length > 0) {
+      const newTeamMembers = data.team.map((member: any, index: number) => ({
+        id: `extracted-${Date.now()}-${index}`,
+        name: member.name || '',
+        role: member.role || '',
+        specialization: member.specialization || '',
+        experience: member.experience || ''
+      }));
+      setTeamMembers([...teamMembers, ...newTeamMembers]);
+    }
+
+    setActiveTab('company');
+  };
+
   const tabs = [
+    { id: 'ai-extract', label: 'AI Extract', icon: Sparkles },
     { id: 'company', label: 'Company Profile', icon: Building2 },
     { id: 'services', label: 'Services', icon: Briefcase },
     { id: 'case-studies', label: 'Case Studies', icon: Award },
@@ -140,6 +190,10 @@ export const KnowledgeBase: React.FC = () => {
           );
         })}
       </div>
+
+      {activeTab === 'ai-extract' && (
+        <AIDataExtractor onDataExtracted={handleDataExtracted} />
+      )}
 
       {activeTab === 'company' && (
         <Card>
