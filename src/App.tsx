@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Clients } from './pages/Clients';
 import { ClientDetailNew } from './pages/ClientDetailNew';
 import { DataSources } from './pages/DataSources';
+import { InsightsDashboard } from './pages/InsightsDashboard';
 import { Placeholder } from './pages/Placeholder';
 
 function App() {
@@ -25,7 +26,7 @@ function App() {
             <Route path="reports" element={<Placeholder title="Reports" description="Generate and view reports" />} />
             <Route path="team" element={<Placeholder title="Team" description="Manage your team members" />} />
             <Route path="settings" element={<Placeholder title="Settings" description="Configure your application settings" />} />
-            <Route path="insights" element={<Placeholder title="Insights Dashboard" description="Analytics and insights overview" />} />
+            <Route path="insights" element={<InsightsDashboard />} />
             <Route path="company" element={<Placeholder title="Company Intelligence" description="Company match engine and intelligence" />} />
           </Route>
         </Routes>
