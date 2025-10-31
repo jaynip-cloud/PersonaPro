@@ -60,11 +60,13 @@ export const ClientDetailNew: React.FC = () => {
     setIsRefreshing(true);
     setTimeout(() => {
       setIsRefreshing(false);
-      if (!personaMetrics) {
-        handleRunPersonaAnalysis();
-      }
+      handleRunPersonaAnalysis();
     }, 2000);
   };
+
+  React.useEffect(() => {
+    handleRunPersonaAnalysis();
+  }, []);
 
   const handleRunPersonaAnalysis = () => {
     setIsAnalyzing(true);
@@ -155,24 +157,54 @@ export const ClientDetailNew: React.FC = () => {
       <div className="p-6">
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            <FinancialOverview data={financialData} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <FinancialOverview data={financialData} />
+              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={handleRunPersonaAnalysis}
+                      disabled={isAnalyzing}
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Run Persona Analysis
+                        </>
+                      )}
+                    </Button>
+                    {personaMetrics && (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          exportPersonaReportAsPDF(client, personaMetrics);
+                          showToast('success', 'Persona report exported successfully');
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export Report
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
             {personaMetrics && !isAnalyzing && (
               <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-foreground">Persona Analysis Results</h3>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      exportPersonaReportAsPDF(client, personaMetrics);
-                      showToast('success', 'Persona report exported successfully');
-                    }}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Report
-                  </Button>
-                </div>
-
                 <PersonaSummary
                   clientName={client.name}
                   company={client.company}
@@ -185,21 +217,6 @@ export const ClientDetailNew: React.FC = () => {
 
                 <ExplainabilityPanel evidence={evidence} />
               </div>
-            )}
-
-            {!personaMetrics && !isAnalyzing && (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">AI Persona Analysis</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Generate comprehensive persona insights from client interactions
-                  </p>
-                  <Button onClick={handleRunPersonaAnalysis} variant="primary">
-                    Run Persona Analysis
-                  </Button>
-                </CardContent>
-              </Card>
             )}
 
             {isAnalyzing && (
