@@ -11,7 +11,7 @@ import { PersonaEditor } from '../components/persona/PersonaEditor';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings } from 'lucide-react';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockFinancialData, mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
@@ -125,6 +125,20 @@ export const ClientDetailNew: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <div className="border-b border-border bg-background">
+        <div className="px-6 py-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/clients')}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Clients
+          </Button>
+        </div>
+      </div>
+
       <ClientHeader
         client={client}
         onRefreshData={handleRefreshData}
