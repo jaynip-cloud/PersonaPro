@@ -31,7 +31,6 @@ interface ClientFormData {
   founded: string;
   website: string;
   status: 'active' | 'inactive' | 'prospect' | 'churned';
-  tier: 'platinum' | 'gold' | 'silver' | 'bronze' | '';
   tags: string[];
   description: string;
   csm: string;
@@ -58,7 +57,6 @@ export const AddClient: React.FC = () => {
     founded: '',
     website: '',
     status: 'prospect',
-    tier: '',
     tags: [],
     description: '',
     csm: '',
@@ -303,23 +301,6 @@ export const AddClient: React.FC = () => {
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                     <option value="churned">Churned</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Client Tier
-                  </label>
-                  <select
-                    value={formData.tier}
-                    onChange={(e) => handleInputChange('tier', e.target.value as any)}
-                    className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="">Select Tier</option>
-                    <option value="platinum">Platinum</option>
-                    <option value="gold">Gold</option>
-                    <option value="silver">Silver</option>
-                    <option value="bronze">Bronze</option>
                   </select>
                 </div>
               </div>

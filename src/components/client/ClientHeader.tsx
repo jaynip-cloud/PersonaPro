@@ -17,16 +17,6 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshDat
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showCsmMenu, setShowCsmMenu] = useState(false);
 
-  const getTierColor = (tier?: string) => {
-    switch (tier) {
-      case 'platinum': return 'text-slate-700 bg-slate-100 border-slate-300';
-      case 'gold': return 'text-yellow-700 bg-yellow-100 border-yellow-300';
-      case 'silver': return 'text-gray-600 bg-gray-100 border-gray-300';
-      case 'bronze': return 'text-orange-700 bg-orange-100 border-orange-300';
-      default: return 'text-gray-600 bg-gray-100 border-gray-300';
-    }
-  };
-
   const getHealthColor = (score?: number) => {
     if (!score) return 'text-gray-400';
     if (score >= 80) return 'text-green-600';
@@ -144,11 +134,6 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshDat
           <Badge variant={client.status === 'active' ? 'success' : 'secondary'}>
             {client.status.charAt(0).toUpperCase() + client.status.slice(1)}
           </Badge>
-          {client.tier && (
-            <div className={`px-3 py-1 rounded-full text-xs font-semibold border ${getTierColor(client.tier)}`}>
-              {client.tier.charAt(0).toUpperCase() + client.tier.slice(1)} Tier
-            </div>
-          )}
           {client.healthScore !== undefined && (
             <div className="flex items-center gap-2 px-3 py-1 bg-muted rounded-full">
               <span className="text-xs font-medium text-muted-foreground">Health Score:</span>

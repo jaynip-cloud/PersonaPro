@@ -5,14 +5,13 @@ import {
   Users,
   TrendingUp,
   Briefcase,
-  BarChart3,
-  UsersRound,
   Settings,
   Sparkles,
   Database,
   FileText,
   Shield,
   Building2,
+  Target,
 } from 'lucide-react';
 
 const navigation = [
@@ -22,8 +21,7 @@ const navigation = [
   { name: 'Company Data', href: '/company-data', icon: Building2 },
   { name: 'Pitch Generator', href: '/pitch', icon: FileText },
   { name: 'Projects', href: '/projects', icon: Briefcase },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
-  { name: 'Team', href: '/team', icon: UsersRound },
+  { name: 'Growth Opportunities', href: '/opportunities', icon: Target },
   { name: 'Admin', href: '/admin', icon: Shield },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

@@ -48,7 +48,6 @@ export const ClientDetailNew: React.FC = () => {
     createdAt: '2025-06-15',
     location: 'San Francisco, CA',
     founded: '2018',
-    tier: 'platinum' as const,
     healthScore: 87,
     csm: 'John Williams',
   };
@@ -544,18 +543,6 @@ export const ClientDetailNew: React.FC = () => {
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
                       <option value="prospect">Prospect</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Account Tier
-                    </label>
-                    <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
-                      <option value="platinum">Platinum</option>
-                      <option value="gold">Gold</option>
-                      <option value="silver">Silver</option>
-                      <option value="bronze">Bronze</option>
                     </select>
                   </div>
 

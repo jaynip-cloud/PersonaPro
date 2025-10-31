@@ -11,6 +11,8 @@ import { InsightsDashboard } from './pages/InsightsDashboard';
 import { CompanyIntelligence } from './pages/CompanyIntelligence';
 import { CompanyData } from './pages/CompanyData';
 import { PitchGenerator } from './pages/PitchGenerator';
+import { Projects } from './pages/Projects';
+import { GrowthOpportunities } from './pages/GrowthOpportunities';
 import { Settings } from './pages/Settings';
 import { Admin } from './pages/Admin';
 import { Placeholder } from './pages/Placeholder';
@@ -32,10 +34,9 @@ function App() {
             <Route path="clients/:id/data-sources" element={<ClientDataSources />} />
             <Route path="clients/:id/intelligence" element={<Placeholder title="Client Intelligence" description="Deep dive into client insights and analytics" />} />
             <Route path="data-sources" element={<DataSources />} />
-            <Route path="projects" element={<Placeholder title="Projects" description="Manage your projects and deliverables" />} />
-            <Route path="reports" element={<Placeholder title="Reports" description="Generate and view reports" />} />
+            <Route path="projects" element={<Projects />} />
+            <Route path="opportunities" element={<GrowthOpportunities />} />
             <Route path="pitch" element={<PitchGenerator />} />
-            <Route path="team" element={<Placeholder title="Team" description="Manage your team members" />} />
             <Route path="settings" element={<Settings />} />
             <Route path="admin" element={<Admin />} />
             <Route path="insights" element={<InsightsDashboard />} />

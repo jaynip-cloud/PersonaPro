@@ -92,24 +92,9 @@ export const Clients: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-8">
-                    <div className="text-center">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                        Persona Score
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <div className="text-4xl font-bold bg-gradient-to-br from-primary to-primary/60 bg-clip-text text-transparent">
-                          {client.personaScore}
-                        </div>
-                        <div className="flex flex-col items-start">
-                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-primary to-chart-2 rounded-full"
-                              style={{ width: `${client.personaScore}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground mt-0.5">/ 100</span>
-                        </div>
-                      </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground mb-1">Persona Score</p>
+                      <p className="text-3xl font-bold text-primary">{client.personaScore}</p>
                     </div>
 
                     <div className="h-12 w-px bg-border" />
