@@ -315,3 +315,62 @@ export interface RelationshipMetrics {
   overallSentiment: number;
   responseRate: number;
 }
+
+export interface CompanyService {
+  id: string;
+  name: string;
+  description: string;
+  tags: string[];
+  budgetRange: {
+    min: number;
+    max: number;
+  };
+  proofUrls: string[];
+  caseStudyIds?: string[];
+}
+
+export interface CaseStudy {
+  id: string;
+  title: string;
+  client: string;
+  industry: string;
+  thumbnail: string;
+  services: string[];
+  results: string[];
+  metrics?: Array<{
+    label: string;
+    value: string;
+  }>;
+  description: string;
+  url?: string;
+}
+
+export interface CompanyProfile {
+  id: string;
+  name: string;
+  description: string;
+  valueProposition: string;
+  team: Array<{
+    name: string;
+    role: string;
+    specialization?: string;
+  }>;
+  services: CompanyService[];
+  caseStudies: CaseStudy[];
+}
+
+export interface ClientMatch {
+  client: Client;
+  matchScore: number;
+  confidence: number;
+  reasoning: {
+    primary: string;
+    secondary: string;
+  };
+  signals: Array<{
+    type: 'tags' | 'sentiment' | 'interactions' | 'health' | 'budget';
+    description: string;
+    weight: number;
+  }>;
+  recommendedService: string;
+}
