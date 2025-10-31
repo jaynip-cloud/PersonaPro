@@ -12,12 +12,11 @@ import {
   Download,
   Save,
   CheckCircle,
-  Database,
-  Building2
+  Database
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'api' | 'data-sources' | 'company'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'api' | 'data-sources'>('profile');
   const [saved, setSaved] = useState(false);
 
   const [profile, setProfile] = useState({
@@ -55,8 +54,7 @@ export const Settings: React.FC = () => {
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'privacy', label: 'Data Privacy', icon: Shield },
     { id: 'api', label: 'API Keys', icon: Key },
-    { id: 'data-sources', label: 'Data Sources', icon: Database },
-    { id: 'company', label: 'Company Data', icon: Building2 }
+    { id: 'data-sources', label: 'Data Sources', icon: Database }
   ];
 
   return (
@@ -468,82 +466,6 @@ export const Settings: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {activeTab === 'company' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Company Profile</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Company Name
-                    </label>
-                    <Input
-                      type="text"
-                      defaultValue="TechSolutions Inc."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Industry
-                    </label>
-                    <Input
-                      type="text"
-                      defaultValue="Software & Technology"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Company Description
-                    </label>
-                    <textarea
-                      className="w-full min-h-[100px] p-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                      defaultValue="We provide enterprise software solutions and consulting services to help businesses transform digitally."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Value Proposition
-                    </label>
-                    <textarea
-                      className="w-full min-h-[80px] p-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                      defaultValue="Accelerate digital transformation with AI-powered insights and proven methodologies."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Services Offered
-                    </label>
-                    <Input
-                      type="text"
-                      placeholder="e.g., Consulting, Development, AI Integration"
-                      defaultValue="Consulting, Custom Development, AI Integration, Data Analytics"
-                    />
-                  </div>
-
-                  <Button variant="primary" onClick={handleSave} disabled={saved}>
-                    {saved ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Saved!
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Company Profile
-                      </>
-                    )}
-                  </Button>
                 </div>
               </CardContent>
             </Card>

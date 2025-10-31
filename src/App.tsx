@@ -6,6 +6,7 @@ import { Clients } from './pages/Clients';
 import { AddClient } from './pages/AddClient';
 import { ClientDetailNew } from './pages/ClientDetailNew';
 import { Projects } from './pages/Projects';
+import { KnowledgeBase } from './pages/KnowledgeBase';
 import { Settings } from './pages/Settings';
 import { ToastProvider } from './components/ui/Toast';
 import { KeyboardShortcuts } from './components/ui/KeyboardShortcuts';
@@ -23,6 +24,7 @@ function App() {
             <Route path="clients/new" element={<AddClient />} />
             <Route path="clients/:id" element={<ClientDetailNew />} />
             <Route path="projects" element={<Projects />} />
+            <Route path="knowledge-base" element={<KnowledgeBase />} />
             <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>

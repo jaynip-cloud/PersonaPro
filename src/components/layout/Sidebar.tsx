@@ -3,21 +3,17 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
-  TrendingUp,
   Briefcase,
   Settings,
   Sparkles,
-  Database,
-  FileText,
-  Shield,
-  Building2,
-  Target,
+  BookOpen,
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Projects', href: '/projects', icon: Briefcase },
+  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
