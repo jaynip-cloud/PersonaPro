@@ -76,30 +76,54 @@ export const Clients: React.FC = () => {
               <div
                 key={client.id}
                 onClick={() => navigate(`/clients/${client.id}`)}
-                className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-accent cursor-pointer transition-colors"
+                className="group relative p-6 rounded-xl border border-border hover:border-primary/50 hover:shadow-lg cursor-pointer transition-all duration-200 bg-gradient-to-r from-background to-muted/20"
               >
-                <div className="flex items-center gap-4">
-                  <Avatar name={client.name} />
-                  <div>
-                    <p className="font-semibold text-foreground">{client.name}</p>
-                    <p className="text-sm text-muted-foreground">{client.company} • {client.role}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 flex-1">
+                    <Avatar name={client.name} size="lg" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">
+                        {client.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {client.company} • {client.role}
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-foreground">Persona Score</p>
-                    <p className="text-2xl font-bold text-primary">{client.personaScore}</p>
-                  </div>
-                  <Badge variant={client.status === 'active' ? 'success' : client.status === 'prospect' ? 'warning' : 'secondary'}>
-                    {client.status}
-                  </Badge>
-                  <div className="flex flex-wrap gap-1 max-w-xs">
-                    {client.tags.slice(0, 3).map((tag) => (
-                      <Badge key={tag} variant="outline" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
+                  <div className="flex items-center gap-8">
+                    <div className="text-center">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                        Persona Score
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <div className="text-4xl font-bold bg-gradient-to-br from-primary to-primary/60 bg-clip-text text-transparent">
+                          {client.personaScore}
+                        </div>
+                        <div className="flex flex-col items-start">
+                          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-primary to-chart-2 rounded-full"
+                              style={{ width: `${client.personaScore}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground mt-0.5">/ 100</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="h-12 w-px bg-border" />
+
+                    <Badge
+                      variant={
+                        client.status === 'active' ? 'success' :
+                        client.status === 'prospect' ? 'warning' :
+                        'secondary'
+                      }
+                      className="capitalize px-4 py-1.5 text-sm font-medium"
+                    >
+                      {client.status}
+                    </Badge>
                   </div>
                 </div>
               </div>
