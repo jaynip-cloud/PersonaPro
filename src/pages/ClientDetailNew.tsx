@@ -306,6 +306,163 @@ export const ClientDetailNew: React.FC = () => {
           </Card>
         )}
 
+        {activeTab === 'projects' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Active Projects</CardTitle>
+                    <Button variant="primary" size="sm">New Project</Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="p-4 border border-border rounded-lg">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="font-semibold text-foreground">Platform Migration</h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Migrate legacy systems to cloud-native architecture
+                          </p>
+                        </div>
+                        <Badge variant="warning">In Progress</Badge>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Progress</span>
+                          <span className="font-medium">67%</span>
+                        </div>
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-primary" style={{ width: '67%' }} />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-3">
+                          <span>Due: Dec 30, 2025</span>
+                          <span>Budget: $185,000</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 border border-border rounded-lg">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="font-semibold text-foreground">API Development</h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Build RESTful APIs for third-party integrations
+                          </p>
+                        </div>
+                        <Badge variant="success">On Track</Badge>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Progress</span>
+                          <span className="font-medium">45%</span>
+                        </div>
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-green-600" style={{ width: '45%' }} />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-3">
+                          <span>Due: Jan 20, 2026</span>
+                          <span>Budget: $75,000</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 border border-border rounded-lg">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="font-semibold text-foreground">Security Audit</h4>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Comprehensive security review and penetration testing
+                          </p>
+                        </div>
+                        <Badge variant="secondary">Completed</Badge>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Progress</span>
+                          <span className="font-medium">100%</span>
+                        </div>
+                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-green-600" style={{ width: '100%' }} />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-3">
+                          <span>Completed: Oct 15, 2025</span>
+                          <span>Budget: $42,000</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Deals Pipeline</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-foreground">
+                            Enterprise Platform Upgrade
+                          </span>
+                          <Badge variant="warning">Negotiation</Badge>
+                        </div>
+                        <p className="text-lg font-bold text-foreground">$95,000</p>
+                        <p className="text-xs text-muted-foreground mt-1">Close: Dec 15, 2025</p>
+                      </div>
+
+                      <div className="pt-4 border-t border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-foreground">
+                            Annual Support Renewal
+                          </span>
+                          <Badge variant="success">Proposal</Badge>
+                        </div>
+                        <p className="text-lg font-bold text-foreground">$48,000</p>
+                        <p className="text-xs text-muted-foreground mt-1">Close: Nov 30, 2025</p>
+                      </div>
+
+                      <div className="pt-4 border-t border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-foreground">
+                            ML Services Add-on
+                          </span>
+                          <Badge variant="secondary">Qualified</Badge>
+                        </div>
+                        <p className="text-lg font-bold text-foreground">$125,000</p>
+                        <p className="text-xs text-muted-foreground mt-1">Close: Jan 15, 2026</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Total Value</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold text-foreground mb-2">$268,000</p>
+                    <p className="text-sm text-muted-foreground">Weighted pipeline value</p>
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <span className="text-muted-foreground">Win Rate</span>
+                        <span className="font-semibold text-foreground">78%</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Avg Deal Size</span>
+                        <span className="font-semibold text-foreground">$89,333</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'intelligence' && (
           <div className="space-y-6">
             <Card>
@@ -335,6 +492,129 @@ export const ClientDetailNew: React.FC = () => {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Client Settings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Client Status
+                    </label>
+                    <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="prospect">Prospect</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Account Tier
+                    </label>
+                    <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+                      <option value="platinum">Platinum</option>
+                      <option value="gold">Gold</option>
+                      <option value="silver">Silver</option>
+                      <option value="bronze">Bronze</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Customer Success Manager
+                    </label>
+                    <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+                      <option>John Williams</option>
+                      <option>Sarah Johnson</option>
+                      <option>Michael Chen</option>
+                      <option>Emily Rodriguez</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Tags
+                    </label>
+                    <div className="flex flex-wrap gap-2 p-3 border border-border rounded-md bg-background min-h-[100px]">
+                      <Badge variant="secondary">decision-maker</Badge>
+                      <Badge variant="secondary">technical</Badge>
+                      <Badge variant="secondary">high-value</Badge>
+                      <Button variant="ghost" size="sm" className="h-6 text-xs">
+                        + Add Tag
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Notification Settings</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">Email Notifications</p>
+                      <p className="text-sm text-muted-foreground">Receive email updates about this client</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" defaultChecked />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">Sentiment Alerts</p>
+                      <p className="text-sm text-muted-foreground">Alert when sentiment drops below threshold</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" defaultChecked />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-foreground">Deal Updates</p>
+                      <p className="text-sm text-muted-foreground">Notifications for deal stage changes</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" defaultChecked />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Data Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Button variant="outline" className="w-full justify-start">
+                    Export Client Data
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    Archive Client
+                  </Button>
+                  <Button variant="destructive" className="w-full justify-start">
+                    Delete Client
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>
