@@ -374,3 +374,29 @@ export interface ClientMatch {
   }>;
   recommendedService: string;
 }
+
+export interface GeneratedPitch {
+  id: string;
+  clientId: string;
+  clientName: string;
+  clientCompany: string;
+  services: string[];
+  tone: 'formal' | 'casual';
+  length: 'short' | 'long';
+  elevatorPitch: string;
+  valuePoints: string[];
+  nextActions: string[];
+  confidence: number;
+  evidenceTags: string[];
+  variant: 'A' | 'B';
+  createdAt: string;
+  companyDescription?: string;
+}
+
+export interface PitchGeneratorInput {
+  clientId: string;
+  services: string[];
+  companyDescription: string;
+  tone: 'formal' | 'casual';
+  length: 'short' | 'long';
+}

@@ -7,6 +7,7 @@ import { ClientDetailNew } from './pages/ClientDetailNew';
 import { DataSources } from './pages/DataSources';
 import { InsightsDashboard } from './pages/InsightsDashboard';
 import { CompanyIntelligence } from './pages/CompanyIntelligence';
+import { PitchGenerator } from './pages/PitchGenerator';
 import { Placeholder } from './pages/Placeholder';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
             <Route path="issues" element={<Placeholder title="Issues & Prospects" description="Track issues and manage prospects" />} />
             <Route path="projects" element={<Placeholder title="Projects" description="Manage your projects and deliverables" />} />
             <Route path="reports" element={<Placeholder title="Reports" description="Generate and view reports" />} />
+            <Route path="pitch" element={<PitchGenerator />} />
             <Route path="team" element={<Placeholder title="Team" description="Manage your team members" />} />
             <Route path="settings" element={<Placeholder title="Settings" description="Configure your application settings" />} />
             <Route path="insights" element={<InsightsDashboard />} />

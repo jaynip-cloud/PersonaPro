@@ -11,12 +11,14 @@ import {
   Settings,
   Sparkles,
   Database,
+  FileText,
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Data Sources', href: '/data-sources', icon: Database },
+  { name: 'Pitch Generator', href: '/pitch', icon: FileText },
   { name: 'Forecasts', href: '/forecasts', icon: TrendingUp },
   { name: 'Issues & Prospects', href: '/issues', icon: AlertCircle },
   { name: 'Projects', href: '/projects', icon: Briefcase },
