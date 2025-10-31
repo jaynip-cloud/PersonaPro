@@ -13,6 +13,11 @@ export interface Client {
   personaScore: number;
   tags: string[];
   createdAt: string;
+  location?: string;
+  founded?: string;
+  tier?: 'platinum' | 'gold' | 'silver' | 'bronze';
+  healthScore?: number;
+  csm?: string;
 }
 
 export interface Persona {
@@ -81,6 +86,9 @@ export interface Document {
   url?: string;
   summary?: string;
   insights?: string[];
+  tags?: string[];
+  status?: 'processing' | 'completed' | 'failed';
+  source?: string;
 }
 
 export interface CallRecord {
@@ -241,4 +249,69 @@ export interface IngestionEvent {
   description: string;
   itemType: 'document' | 'profile' | 'contact' | 'transcript' | 'website' | 'interaction';
   itemId?: string;
+}
+
+export interface FinancialData {
+  clientId: string;
+  mrr: number;
+  totalRevenue: number;
+  activeDeals: number;
+  latestDeal?: {
+    name: string;
+    value: number;
+    stage: string;
+    closeDate: string;
+  };
+}
+
+export interface Contact {
+  id: string;
+  clientId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  department?: string;
+  isPrimary: boolean;
+  isDecisionMaker: boolean;
+  influenceLevel?: 'high' | 'medium' | 'low';
+  source?: string;
+  lastContact?: string;
+}
+
+export interface Opportunity {
+  id: string;
+  clientId: string;
+  title: string;
+  description: string;
+  value: number;
+  stage: 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'closed-won' | 'closed-lost';
+  probability: number;
+  expectedCloseDate: string;
+  createdAt: string;
+  source?: string;
+}
+
+export interface IntelligenceQuery {
+  id: string;
+  clientId: string;
+  query: string;
+  mode: 'quick' | 'deep';
+  response: string;
+  keyFindings?: string[];
+  recommendedActions?: Array<{
+    action: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+  }>;
+  tokensUsed: number;
+  cost: number;
+  timestamp: string;
+}
+
+export interface RelationshipMetrics {
+  clientId: string;
+  trustLevel: number;
+  communicationFrequency: 'daily' | 'weekly' | 'monthly' | 'sporadic';
+  overallSentiment: number;
+  responseRate: number;
 }

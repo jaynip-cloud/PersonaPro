@@ -1,4 +1,4 @@
-import { Client, Persona, Document, CallRecord, AgentRun, Recommendation, MeetingTranscript } from '../types';
+import { Client, Persona, Document, CallRecord, AgentRun, Recommendation, MeetingTranscript, FinancialData, Contact, Opportunity, RelationshipMetrics } from '../types';
 
 export const mockClients: Client[] = [
   {
@@ -15,6 +15,11 @@ export const mockClients: Client[] = [
     personaScore: 92,
     tags: ['decision-maker', 'technical', 'high-value'],
     createdAt: '2025-06-15',
+    location: 'San Francisco, CA',
+    founded: '2018',
+    tier: 'platinum',
+    healthScore: 87,
+    csm: 'John Williams',
   },
   {
     id: '2',
@@ -462,5 +467,76 @@ export const mockMeetingTranscripts: MeetingTranscript[] = [
     ],
     source: 'Fathom',
     createdAt: '2025-10-10'
+  }
+];
+
+export const mockFinancialData: FinancialData[] = [
+  {
+    clientId: '1',
+    mrr: 15000,
+    totalRevenue: 285000,
+    activeDeals: 3,
+    latestDeal: {
+      name: 'Enterprise Platform Upgrade',
+      value: 95000,
+      stage: 'negotiation',
+      closeDate: '2025-12-15'
+    }
+  }
+];
+
+export const mockContacts: Contact[] = [
+  {
+    id: 'c1',
+    clientId: '1',
+    name: 'Sarah Mitchell',
+    email: 'sarah.mitchell@techcorp.com',
+    phone: '+1 (555) 123-4567',
+    role: 'VP of Engineering',
+    department: 'Engineering',
+    isPrimary: true,
+    isDecisionMaker: true,
+    influenceLevel: 'high',
+    source: 'LinkedIn',
+    lastContact: '2025-10-28'
+  },
+  {
+    id: 'c2',
+    clientId: '1',
+    name: 'Michael Chen',
+    email: 'm.chen@techcorp.com',
+    phone: '+1 (555) 123-4568',
+    role: 'CTO',
+    department: 'Engineering',
+    isPrimary: false,
+    isDecisionMaker: true,
+    influenceLevel: 'high',
+    source: 'Website',
+    lastContact: '2025-10-15'
+  }
+];
+
+export const mockOpportunities: Opportunity[] = [
+  {
+    id: 'o1',
+    clientId: '1',
+    title: 'ML Integration Services',
+    description: 'Opportunity to provide machine learning integration services based on recent technical discussions',
+    value: 125000,
+    stage: 'qualified',
+    probability: 75,
+    expectedCloseDate: '2026-01-15',
+    createdAt: '2025-10-28',
+    source: 'AI Analysis'
+  }
+];
+
+export const mockRelationshipMetrics: RelationshipMetrics[] = [
+  {
+    clientId: '1',
+    trustLevel: 85,
+    communicationFrequency: 'weekly',
+    overallSentiment: 0.78,
+    responseRate: 92
   }
 ];

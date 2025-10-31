@@ -3,7 +3,7 @@ import { AppProvider } from './context/AppContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Clients } from './pages/Clients';
-import { ClientDetail } from './pages/ClientDetail';
+import { ClientDetailNew } from './pages/ClientDetailNew';
 import { DataSources } from './pages/DataSources';
 import { Placeholder } from './pages/Placeholder';
 
@@ -16,7 +16,7 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="clients" element={<Clients />} />
-            <Route path="clients/:id" element={<ClientDetail />} />
+            <Route path="clients/:id" element={<ClientDetailNew />} />
             <Route path="clients/:id/intelligence" element={<Placeholder title="Client Intelligence" description="Deep dive into client insights and analytics" />} />
             <Route path="data-sources" element={<DataSources />} />
             <Route path="forecasts" element={<Placeholder title="Forecasts" description="Sales forecasts and predictions" />} />
