@@ -49,64 +49,136 @@ export const CompanyData: React.FC = () => {
   const { showToast } = useToast();
 
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({
-    name: 'TechSolutions Inc.',
+    name: 'White Label IQ',
     description:
-      'We are a leading technology consulting firm specializing in digital transformation, cloud migration, and enterprise software development.',
+      'White Label IQ is a premier web development agency specializing in white-label web, ecommerce, and SaaS solutions. We partner with agencies and businesses to deliver high-quality digital products under their brand, enabling them to scale their service offerings without the overhead of in-house development teams.',
     valueProposition:
-      'We deliver enterprise-grade solutions with startup agility, combining technical expertise with business acumen to drive measurable ROI.',
-    founded: '2010',
-    size: '100-500 employees',
-    industries: ['Technology', 'Finance', 'Healthcare', 'Retail'],
-    locations: ['San Francisco, CA', 'New York, NY', 'Austin, TX']
+      'We provide turnkey white-label development services that empower agencies and businesses to deliver exceptional digital experiences to their clients. Our expertise spans custom web development, robust ecommerce platforms, and scalable SaaS applications, all delivered with precision and on schedule.',
+    founded: '2015',
+    size: '51-100 employees',
+    industries: ['Technology', 'Ecommerce', 'SaaS', 'Digital Agencies', 'Startups', 'Enterprise'],
+    locations: ['Remote-First', 'Global Team']
   });
 
   const [services, setServices] = useState<Service[]>([
     {
       id: '1',
-      name: 'Cloud Migration & Modernization',
-      category: 'Infrastructure',
-      description: 'End-to-end migration of legacy systems to modern cloud-native architectures',
-      budgetRange: { min: 75000, max: 200000 },
-      tags: ['AWS', 'Azure', 'GCP', 'Kubernetes', 'Docker'],
+      name: 'Custom Web Development',
+      category: 'Web Development',
+      description: 'Full-stack custom website development tailored to your brand and business needs, including responsive design, CMS integration, and performance optimization.',
+      budgetRange: { min: 15000, max: 75000 },
+      tags: ['React', 'Next.js', 'WordPress', 'Node.js', 'TypeScript', 'Tailwind CSS'],
       deliverables: [
-        'Migration strategy document',
-        'Cloud architecture design',
-        'Implementation and testing',
-        'Post-migration support'
+        'Custom website design and development',
+        'Responsive mobile-first implementation',
+        'CMS integration and training',
+        'SEO optimization',
+        'Performance testing and deployment',
+        '30-day post-launch support'
+      ],
+      timeline: '6-12 weeks'
+    },
+    {
+      id: '2',
+      name: 'Ecommerce Development',
+      category: 'Ecommerce',
+      description: 'Build and scale robust ecommerce platforms with custom shopping experiences, payment integration, and inventory management systems.',
+      budgetRange: { min: 25000, max: 150000 },
+      tags: ['Shopify', 'WooCommerce', 'Magento', 'Stripe', 'PayPal', 'Custom Carts'],
+      deliverables: [
+        'Custom ecommerce platform setup',
+        'Product catalog and inventory system',
+        'Payment gateway integration',
+        'Shopping cart and checkout flow',
+        'Admin dashboard',
+        'Analytics and reporting',
+        'Security implementation'
+      ],
+      timeline: '8-16 weeks'
+    },
+    {
+      id: '3',
+      name: 'SaaS Application Development',
+      category: 'SaaS',
+      description: 'End-to-end SaaS product development from MVP to scale, including architecture design, user management, and subscription billing.',
+      budgetRange: { min: 50000, max: 250000 },
+      tags: ['React', 'Vue', 'Node.js', 'PostgreSQL', 'AWS', 'Stripe Billing', 'Auth0'],
+      deliverables: [
+        'SaaS architecture and design',
+        'User authentication and authorization',
+        'Multi-tenant database design',
+        'Subscription and billing integration',
+        'Admin and user dashboards',
+        'API development',
+        'Scalable cloud infrastructure',
+        'Ongoing maintenance support'
       ],
       timeline: '3-6 months'
     },
     {
-      id: '2',
-      name: 'API Development & Integration',
-      category: 'Development',
-      description: 'Custom RESTful API development and third-party system integration',
-      budgetRange: { min: 40000, max: 120000 },
-      tags: ['REST', 'GraphQL', 'Microservices', 'OAuth', 'Webhooks'],
+      id: '4',
+      name: 'White Label Partnership',
+      category: 'Partnership',
+      description: 'Comprehensive white-label development services for agencies looking to expand their offerings without hiring in-house developers.',
+      budgetRange: { min: 10000, max: 50000 },
+      tags: ['Project Management', 'Client Communication', 'Custom Branding', 'Flexible Engagement'],
       deliverables: [
-        'API specification',
-        'Implementation',
-        'Documentation',
-        'Integration testing'
+        'Dedicated development team',
+        'Project management and reporting',
+        'Client communication (under your brand)',
+        'Quality assurance and testing',
+        'Documentation and handoff',
+        'Ongoing support options'
       ],
-      timeline: '2-4 months'
+      timeline: 'Flexible based on project scope'
+    },
+    {
+      id: '5',
+      name: 'Website Maintenance & Support',
+      category: 'Support',
+      description: 'Ongoing website maintenance, updates, security patches, and technical support to keep your digital properties running smoothly.',
+      budgetRange: { min: 500, max: 5000 },
+      tags: ['Maintenance', 'Security', 'Updates', 'Monitoring', 'Support'],
+      deliverables: [
+        'Regular security updates',
+        'Content updates and changes',
+        'Performance monitoring',
+        'Backup and disaster recovery',
+        'Technical support',
+        'Monthly reporting'
+      ],
+      timeline: 'Monthly retainer'
     }
   ]);
 
   const [team, setTeam] = useState<TeamMember[]>([
     {
       id: '1',
-      name: 'John Williams',
-      role: 'CSM Lead',
-      specialization: 'Enterprise Accounts',
-      bio: '15+ years experience in client success and account management'
+      name: 'Michael Chen',
+      role: 'Founder & CEO',
+      specialization: 'Product Strategy & Business Development',
+      bio: '12+ years building digital products and scaling white-label services. Former tech lead at Fortune 500 companies.'
     },
     {
       id: '2',
-      name: 'Sarah Johnson',
-      role: 'Technical Director',
-      specialization: 'Cloud Architecture',
-      bio: 'Former AWS Solutions Architect with 10+ years of cloud experience'
+      name: 'Sarah Rodriguez',
+      role: 'Head of Engineering',
+      specialization: 'Full-Stack Architecture',
+      bio: 'Expert in React, Node.js, and cloud infrastructure with 10+ years experience building scalable web applications.'
+    },
+    {
+      id: '3',
+      name: 'James Taylor',
+      role: 'Lead UX/UI Designer',
+      specialization: 'User Experience & Interface Design',
+      bio: 'Award-winning designer with 8+ years creating beautiful, conversion-focused digital experiences for brands.'
+    },
+    {
+      id: '4',
+      name: 'Emily Watson',
+      role: 'Client Success Manager',
+      specialization: 'Agency Partnerships',
+      bio: 'Dedicated to ensuring project success and client satisfaction. 6+ years managing white-label partnerships.'
     }
   ]);
 
