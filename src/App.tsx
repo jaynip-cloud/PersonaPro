@@ -8,14 +8,19 @@ import { DataSources } from './pages/DataSources';
 import { InsightsDashboard } from './pages/InsightsDashboard';
 import { CompanyIntelligence } from './pages/CompanyIntelligence';
 import { PitchGenerator } from './pages/PitchGenerator';
+import { Settings } from './pages/Settings';
+import { Admin } from './pages/Admin';
 import { Placeholder } from './pages/Placeholder';
+import { ToastProvider } from './components/ui/Toast';
+import { KeyboardShortcuts } from './components/ui/KeyboardShortcuts';
 
 function App() {
   return (
-    <AppProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<AppLayout />}>
+    <ToastProvider>
+      <AppProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<AppLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="clients" element={<Clients />} />
@@ -28,13 +33,16 @@ function App() {
             <Route path="reports" element={<Placeholder title="Reports" description="Generate and view reports" />} />
             <Route path="pitch" element={<PitchGenerator />} />
             <Route path="team" element={<Placeholder title="Team" description="Manage your team members" />} />
-            <Route path="settings" element={<Placeholder title="Settings" description="Configure your application settings" />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="admin" element={<Admin />} />
             <Route path="insights" element={<InsightsDashboard />} />
             <Route path="company" element={<CompanyIntelligence />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AppProvider>
+            </Route>
+          </Routes>
+          <KeyboardShortcuts />
+        </BrowserRouter>
+      </AppProvider>
+    </ToastProvider>
   );
 }
 

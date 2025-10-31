@@ -11,14 +11,17 @@ import { PersonaEditor } from '../components/persona/PersonaEditor';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft } from 'lucide-react';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockFinancialData, mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
+import { exportPersonaReportAsPDF } from '../utils/pdfExport';
+import { useToast } from '../components/ui/Toast';
 
 export const ClientDetailNew: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'opportunities' | 'projects' | 'intelligence' | 'settings'>('overview');
   const [personaMetrics, setPersonaMetrics] = useState<PersonaMetrics | null>(null);
@@ -191,6 +194,20 @@ export const ClientDetailNew: React.FC = () => {
 
             {personaMetrics && !isAnalyzing && (
               <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold text-foreground">Persona Analysis Results</h3>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      exportPersonaReportAsPDF(client, personaMetrics);
+                      showToast('success', 'Persona report exported successfully');
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Report
+                  </Button>
+                </div>
+
                 <PersonaSummary
                   clientName={client.name}
                   company={client.company}

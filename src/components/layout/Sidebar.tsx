@@ -12,6 +12,7 @@ import {
   Sparkles,
   Database,
   FileText,
+  Shield,
 } from 'lucide-react';
 
 const navigation = [
@@ -24,6 +25,7 @@ const navigation = [
   { name: 'Projects', href: '/projects', icon: Briefcase },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Team', href: '/team', icon: UsersRound },
+  { name: 'Admin', href: '/admin', icon: Shield },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
