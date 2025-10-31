@@ -5,11 +5,14 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
-import { Search, Filter, Plus, MoreVertical, Edit, Trash2, Eye } from 'lucide-react';
+import { Search, Filter, Plus, MoreVertical, Edit, Trash2, Eye, Users, FileText, Target } from 'lucide-react';
+import { PitchGenerator } from './PitchGenerator';
+import { GrowthOpportunities } from './GrowthOpportunities';
 
 export const Clients: React.FC = () => {
   const { clients } = useApp();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'list' | 'pitch' | 'opportunities'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'prospect'>('all');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -21,6 +24,12 @@ export const Clients: React.FC = () => {
     return matchesSearch && matchesFilter;
   });
 
+  const tabs = [
+    { id: 'list', label: 'Client List', icon: Users },
+    { id: 'pitch', label: 'Pitch Generator', icon: FileText },
+    { id: 'opportunities', label: 'Opportunities', icon: Target }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -28,13 +37,36 @@ export const Clients: React.FC = () => {
           <h1 className="text-3xl font-bold text-foreground">Clients</h1>
           <p className="text-muted-foreground mt-2">Manage and analyze your client relationships</p>
         </div>
-        <Button variant="primary" onClick={() => navigate('/clients/new')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Client
-        </Button>
+        {activeTab === 'list' && (
+          <Button variant="primary" onClick={() => navigate('/clients/new')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Client
+          </Button>
+        )}
       </div>
 
-      <Card>
+      <div className="flex gap-2 border-b border-border">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-primary text-primary font-medium'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === 'list' && (
+        <Card>
         <CardContent className="pt-6">
           <div className="flex gap-4 mb-6">
             <div className="relative flex-1">
@@ -180,6 +212,11 @@ export const Clients: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+      )}
+
+      {activeTab === 'pitch' && <PitchGenerator />}
+
+      {activeTab === 'opportunities' && <GrowthOpportunities />}
     </div>
   );
 };

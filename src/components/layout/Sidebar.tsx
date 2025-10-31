@@ -17,13 +17,7 @@ import {
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users },
-  { name: 'Data Sources', href: '/data-sources', icon: Database },
-  { name: 'Company Data', href: '/company-data', icon: Building2 },
-  { name: 'Pitch Generator', href: '/pitch', icon: FileText },
   { name: 'Projects', href: '/projects', icon: Briefcase },
-  { name: 'Growth Opportunities', href: '/opportunities', icon: Target },
-  { name: 'Database Test', href: '/database-test', icon: Database },
-  { name: 'Admin', href: '/admin', icon: Shield },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

@@ -11,11 +11,13 @@ import {
   Shield,
   Download,
   Save,
-  CheckCircle
+  CheckCircle,
+  Database,
+  Building2
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'api'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'api' | 'data-sources' | 'company'>('profile');
   const [saved, setSaved] = useState(false);
 
   const [profile, setProfile] = useState({
@@ -52,7 +54,9 @@ export const Settings: React.FC = () => {
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'privacy', label: 'Data Privacy', icon: Shield },
-    { id: 'api', label: 'API Keys', icon: Key }
+    { id: 'api', label: 'API Keys', icon: Key },
+    { id: 'data-sources', label: 'Data Sources', icon: Database },
+    { id: 'company', label: 'Company Data', icon: Building2 }
   ];
 
   return (
@@ -410,6 +414,136 @@ export const Settings: React.FC = () => {
                       Generate New Key
                     </Button>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'data-sources' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Data Sources & Integrations</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      Connect data sources to automatically sync client information and insights.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      { name: 'Salesforce', status: 'connected', logo: '☁️' },
+                      { name: 'HubSpot', status: 'connected', logo: '🧲' },
+                      { name: 'Gmail', status: 'not_connected', logo: '📧' },
+                      { name: 'LinkedIn', status: 'not_connected', logo: '💼' },
+                      { name: 'Zoom', status: 'not_connected', logo: '📹' },
+                      { name: 'Google Drive', status: 'connected', logo: '📁' },
+                    ].map((source) => (
+                      <div
+                        key={source.name}
+                        className="p-4 border border-border rounded-lg hover:border-primary/50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="text-2xl">{source.logo}</div>
+                            <div>
+                              <p className="font-medium text-foreground">{source.name}</p>
+                              <Badge
+                                variant={source.status === 'connected' ? 'success' : 'secondary'}
+                                className="text-xs"
+                              >
+                                {source.status === 'connected' ? 'Connected' : 'Not Connected'}
+                              </Badge>
+                            </div>
+                          </div>
+                          <Button
+                            variant={source.status === 'connected' ? 'outline' : 'primary'}
+                            size="sm"
+                          >
+                            {source.status === 'connected' ? 'Configure' : 'Connect'}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'company' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Company Profile</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Company Name
+                    </label>
+                    <Input
+                      type="text"
+                      defaultValue="TechSolutions Inc."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Industry
+                    </label>
+                    <Input
+                      type="text"
+                      defaultValue="Software & Technology"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Company Description
+                    </label>
+                    <textarea
+                      className="w-full min-h-[100px] p-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                      defaultValue="We provide enterprise software solutions and consulting services to help businesses transform digitally."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Value Proposition
+                    </label>
+                    <textarea
+                      className="w-full min-h-[80px] p-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                      defaultValue="Accelerate digital transformation with AI-powered insights and proven methodologies."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Services Offered
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="e.g., Consulting, Development, AI Integration"
+                      defaultValue="Consulting, Custom Development, AI Integration, Data Analytics"
+                    />
+                  </div>
+
+                  <Button variant="primary" onClick={handleSave} disabled={saved}>
+                    {saved ? (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Saved!
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Company Profile
+                      </>
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
