@@ -44,6 +44,7 @@ export const AddClient: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'basic' | 'contact' | 'business' | 'additional'>('basic');
+  const [completedTabs, setCompletedTabs] = useState<Set<string>>(new Set());
   const [newTag, setNewTag] = useState('');
 
   const [formData, setFormData] = useState<ClientFormData>({
@@ -115,16 +116,53 @@ export const AddClient: React.FC = () => {
     setFormData({ ...formData, tags: formData.tags.filter(tag => tag !== tagToRemove) });
   };
 
-  const handleSave = () => {
-    if (validateBasicInfo()) {
-      showToast('success', 'Client created successfully');
-      setTimeout(() => {
-        navigate('/clients');
-      }, 1000);
-    } else {
+  const handleNext = () => {
+    if (activeTab === 'basic' && !validateBasicInfo()) {
       showToast('error', 'Please fill in all required fields');
-      setActiveTab('basic');
+      return;
     }
+
+    setCompletedTabs(prev => new Set(prev).add(activeTab));
+
+    const tabOrder = ['basic', 'contact', 'business', 'additional'];
+    const currentIndex = tabOrder.indexOf(activeTab);
+    if (currentIndex < tabOrder.length - 1) {
+      setActiveTab(tabOrder[currentIndex + 1] as any);
+    }
+  };
+
+  const handlePrevious = () => {
+    const tabOrder = ['basic', 'contact', 'business', 'additional'];
+    const currentIndex = tabOrder.indexOf(activeTab);
+    if (currentIndex > 0) {
+      setActiveTab(tabOrder[currentIndex - 1] as any);
+    }
+  };
+
+  const handleSave = () => {
+    if (completedTabs.size < 3) {
+      showToast('error', 'Please complete all sections before saving');
+      return;
+    }
+
+    if (!validateBasicInfo()) {
+      showToast('error', 'Please fix errors in basic information');
+      setActiveTab('basic');
+      return;
+    }
+
+    showToast('success', 'Client created successfully');
+    setTimeout(() => {
+      navigate('/clients');
+    }, 1000);
+  };
+
+  const isTabComplete = (tabId: string) => {
+    return completedTabs.has(tabId);
+  };
+
+  const canSave = () => {
+    return completedTabs.size >= 3 && activeTab === 'additional';
   };
 
   const tabs = [
@@ -149,31 +187,48 @@ export const AddClient: React.FC = () => {
           </Button>
           <h1 className="text-3xl font-bold text-foreground">Add New Client</h1>
           <p className="text-muted-foreground mt-1">
-            Enter client information to create a new record
+            Complete all steps to create a new client
           </p>
         </div>
-        <Button variant="primary" onClick={handleSave} size="lg">
-          <Save className="h-4 w-4 mr-2" />
-          Save Client
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-sm font-medium text-foreground">
+              Step {['basic', 'contact', 'business', 'additional'].indexOf(activeTab) + 1} of 4
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {completedTabs.size} sections completed
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="border-b border-border">
         <div className="flex gap-8">
-          {tabs.map((tab) => {
+          {tabs.map((tab, index) => {
             const Icon = tab.icon;
+            const isComplete = isTabComplete(tab.id);
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 pb-4 pt-2 border-b-2 transition-colors ${
+                className={`flex items-center gap-2 pb-4 pt-2 border-b-2 transition-colors relative ${
                   activeTab === tab.id
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Icon className="h-4 w-4" />
-                <span className="text-sm font-medium">{tab.label}</span>
+                <div className="flex items-center gap-2">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
+                    isComplete
+                      ? 'bg-green-500 text-white'
+                      : activeTab === tab.id
+                      ? 'bg-primary text-white'
+                      : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {isComplete ? '✓' : index + 1}
+                  </div>
+                  <span className="text-sm font-medium">{tab.label}</span>
+                </div>
               </button>
             );
           })}
@@ -316,6 +371,13 @@ export const AddClient: React.FC = () => {
                   className="w-full min-h-[100px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
               </div>
+
+              <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-border">
+                <Button variant="primary" onClick={handleNext}>
+                  Next: Contact Details
+                  <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -420,6 +482,17 @@ export const AddClient: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              <div className="flex justify-between pt-6 mt-6 border-t border-border">
+                <Button variant="outline" onClick={handlePrevious}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Previous
+                </Button>
+                <Button variant="primary" onClick={handleNext}>
+                  Next: Business Info
+                  <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -488,6 +561,17 @@ export const AddClient: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              <div className="flex justify-between pt-6 mt-6 border-t border-border">
+                <Button variant="outline" onClick={handlePrevious}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Previous
+                </Button>
+                <Button variant="primary" onClick={handleNext}>
+                  Next: Additional Info
+                  <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -552,19 +636,55 @@ export const AddClient: React.FC = () => {
                   className="w-full min-h-[150px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
               </div>
+
+              <div className="flex justify-between pt-6 mt-6 border-t border-border">
+                <Button variant="outline" onClick={handlePrevious}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Previous
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleSave}
+                  disabled={!canSave()}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Client
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="flex justify-end gap-3 pt-6 border-t border-border">
-        <Button variant="outline" onClick={() => navigate('/clients')}>
-          Cancel
+      <div className="hidden flex justify-between pt-6 border-t border-border">
+        <Button
+          variant="outline"
+          onClick={handlePrevious}
+          disabled={activeTab === 'basic'}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Previous
         </Button>
-        <Button variant="primary" onClick={handleSave}>
-          <Save className="h-4 w-4 mr-2" />
-          Save Client
-        </Button>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => navigate('/clients')}>
+            Cancel
+          </Button>
+          {activeTab !== 'additional' ? (
+            <Button variant="primary" onClick={handleNext}>
+              Next
+              <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              onClick={handleSave}
+              disabled={!canSave()}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Client
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
