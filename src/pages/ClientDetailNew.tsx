@@ -11,7 +11,7 @@ import { PersonaEditor } from '../components/persona/PersonaEditor';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2 } from 'lucide-react';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockFinancialData, mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
@@ -23,7 +23,7 @@ export const ClientDetailNew: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'opportunities' | 'projects' | 'intelligence' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'opportunities' | 'projects' | 'intelligence' | 'pitch' | 'growth' | 'settings'>('overview');
   const [personaMetrics, setPersonaMetrics] = useState<PersonaMetrics | null>(null);
   const [evidence, setEvidence] = useState<EvidenceSnippet[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -103,6 +103,8 @@ export const ClientDetailNew: React.FC = () => {
     { id: 'overview', label: 'Overview', icon: Sparkles },
     { id: 'relationships', label: 'Relationships', icon: Users },
     { id: 'opportunities', label: 'Opportunities', icon: Target },
+    { id: 'pitch', label: 'Pitch Generator', icon: FileText },
+    { id: 'growth', label: 'Growth Opportunities', icon: TrendingUp },
     { id: 'projects', label: 'Projects & Deals', icon: Briefcase },
     { id: 'intelligence', label: 'Intelligence & Assets', icon: MessageSquare },
     { id: 'settings', label: 'Settings & Admin', icon: Settings },
@@ -495,6 +497,265 @@ export const ClientDetailNew: React.FC = () => {
               onQuery={handleQuery}
               isProcessing={isProcessingQuery}
             />
+          </div>
+        )}
+
+        {activeTab === 'pitch' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>AI Pitch Generator</CardTitle>
+                  <Badge variant="secondary" className="gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    AI-Powered
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-900">
+                      Generate personalized pitches based on client intelligence, persona insights, and company knowledge base.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Pitch Type
+                    </label>
+                    <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+                      <option>Service Upsell</option>
+                      <option>New Product Introduction</option>
+                      <option>Renewal Proposal</option>
+                      <option>Partnership Opportunity</option>
+                      <option>Custom Pitch</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Target Services
+                    </label>
+                    <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" multiple>
+                      <option>AI Consulting</option>
+                      <option>Custom Development</option>
+                      <option>Data Analytics</option>
+                      <option>ML Integration</option>
+                      <option>Cloud Migration</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      Tone & Style
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button variant="outline" size="sm">Professional</Button>
+                      <Button variant="outline" size="sm">Casual</Button>
+                      <Button variant="outline" size="sm">Technical</Button>
+                    </div>
+                  </div>
+
+                  <Button variant="primary" className="w-full">
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate Pitch
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Generated Pitches</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 border border-border rounded-lg">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h4 className="font-semibold text-foreground">ML Services Upsell Pitch</h4>
+                        <p className="text-xs text-muted-foreground mt-1">Generated on Oct 28, 2025</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Based on TechCorp's recent platform migration success and Sarah's interest in ML capabilities, we've identified an opportunity to introduce our ML Integration services...
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">Professional Tone</Badge>
+                      <Badge variant="secondary">ML Integration</Badge>
+                      <Badge variant="secondary">92% Fit Score</Badge>
+                    </div>
+                  </div>
+
+                  <div className="p-4 border border-border rounded-lg">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h4 className="font-semibold text-foreground">Annual Support Renewal</h4>
+                        <p className="text-xs text-muted-foreground mt-1">Generated on Oct 25, 2025</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Sarah, as your support contract approaches renewal, I wanted to highlight the value we've delivered over the past year...
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">Casual Tone</Badge>
+                      <Badge variant="secondary">Support Services</Badge>
+                      <Badge variant="secondary">88% Fit Score</Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'growth' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>AI-Identified Growth Opportunities</CardTitle>
+                  <Button variant="primary" size="sm" onClick={handleRunPersonaAnalysis}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Refresh Analysis
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-6">
+                  <p className="text-sm text-green-900 font-medium mb-2">
+                    3 High-Priority Opportunities Identified
+                  </p>
+                  <p className="text-sm text-green-800">
+                    Based on client intelligence, market trends, and persona analysis
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="p-5 border-2 border-green-200 bg-green-50/50 rounded-lg">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-semibold text-foreground">ML Platform Integration</h4>
+                          <Badge variant="success">High Priority</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Client has expressed strong interest in ML capabilities during recent calls. Their recent platform migration sets the perfect foundation for ML integration.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 mt-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Estimated Value</p>
+                        <p className="text-lg font-bold text-green-600">$125,000</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Win Probability</p>
+                        <p className="text-lg font-bold text-foreground">78%</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Timeline</p>
+                        <p className="text-lg font-bold text-foreground">Q1 2026</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <Button variant="primary" size="sm">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Generate Pitch
+                      </Button>
+                      <Button variant="outline" size="sm">View Details</Button>
+                    </div>
+                  </div>
+
+                  <div className="p-5 border border-border rounded-lg">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-semibold text-foreground">Enterprise Support Upgrade</h4>
+                          <Badge variant="warning">Medium Priority</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Current support tier shows high utilization. Client team size has grown 40% this year. Upgrade would provide 24/7 coverage and dedicated support engineer.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 mt-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Estimated Value</p>
+                        <p className="text-lg font-bold text-foreground">$48,000/yr</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Win Probability</p>
+                        <p className="text-lg font-bold text-foreground">65%</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Timeline</p>
+                        <p className="text-lg font-bold text-foreground">Q4 2025</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <Button variant="primary" size="sm">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Generate Pitch
+                      </Button>
+                      <Button variant="outline" size="sm">View Details</Button>
+                    </div>
+                  </div>
+
+                  <div className="p-5 border border-border rounded-lg">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-semibold text-foreground">Training & Certification Program</h4>
+                          <Badge variant="secondary">Low Priority</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          With new team members joining, structured training program could accelerate onboarding and improve platform adoption. Includes certification for 10 users.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 mt-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Estimated Value</p>
+                        <p className="text-lg font-bold text-foreground">$15,000</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Win Probability</p>
+                        <p className="text-lg font-bold text-foreground">45%</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Timeline</p>
+                        <p className="text-lg font-bold text-foreground">Q1 2026</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <Button variant="primary" size="sm">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Generate Pitch
+                      </Button>
+                      <Button variant="outline" size="sm">View Details</Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
