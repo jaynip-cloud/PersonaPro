@@ -15,43 +15,69 @@ import {
   Trash2,
   Save,
   CheckCircle,
-  Upload,
-  Sparkles
+  Sparkles,
+  Newspaper,
+  Code,
+  Phone,
+  Linkedin,
+  Twitter,
+  Facebook,
+  Youtube,
+  Globe,
+  Mail,
+  MapPin
 } from 'lucide-react';
 
+type TabType = 'ai-extract' | 'company' | 'contact' | 'social' | 'services' | 'case-studies' | 'team' | 'blogs' | 'press' | 'careers' | 'technology';
+
 export const KnowledgeBase: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'ai-extract' | 'company' | 'services' | 'case-studies' | 'team'>('ai-extract');
+  const [activeTab, setActiveTab] = useState<TabType>('ai-extract');
   const [saved, setSaved] = useState(false);
 
   const [companyInfo, setCompanyInfo] = useState({
     name: 'TechSolutions Inc.',
+    canonicalUrl: 'https://techsolutions.com',
     industry: 'Software & Technology',
     description: 'We provide enterprise software solutions and consulting services to help businesses transform digitally.',
     valueProposition: 'Accelerate digital transformation with AI-powered insights and proven methodologies.',
     founded: '2015',
     location: 'San Francisco, CA',
     size: '50-100 employees',
-    website: 'https://techsolutions.com',
     mission: 'To empower businesses with cutting-edge technology solutions that drive measurable results.',
     vision: 'To be the leading provider of AI-powered business transformation services globally.'
   });
+
+  const [contactInfo, setContactInfo] = useState({
+    email: 'contact@techsolutions.com',
+    phone: '+1 (555) 123-4567',
+    address: '123 Tech Street, San Francisco, CA 94105'
+  });
+
+  const [socialProfiles, setSocialProfiles] = useState({
+    linkedin: 'https://linkedin.com/company/techsolutions',
+    twitter: 'https://twitter.com/techsolutions',
+    facebook: '',
+    instagram: '',
+    youtube: ''
+  });
+
+  const [leadership, setLeadership] = useState([
+    {
+      id: '1',
+      name: 'Sarah Johnson',
+      role: 'CEO & Founder',
+      bio: 'AI Strategy, Business Development',
+      experience: '15 years'
+    }
+  ]);
 
   const [services, setServices] = useState([
     {
       id: '1',
       name: 'AI Consulting',
       description: 'Strategic AI implementation and integration services',
-      budgetRange: '$50,000 - $200,000',
-      duration: '3-6 months',
-      tags: ['AI', 'Strategy', 'Consulting']
-    },
-    {
-      id: '2',
-      name: 'Custom Development',
-      description: 'Tailored software solutions built to your specifications',
-      budgetRange: '$100,000 - $500,000',
-      duration: '6-12 months',
-      tags: ['Development', 'Custom', 'Enterprise']
+      tags: ['AI', 'Strategy', 'Consulting'],
+      pricing: '$50,000 - $200,000'
     }
   ]);
 
@@ -61,44 +87,46 @@ export const KnowledgeBase: React.FC = () => {
       title: 'Fortune 500 Digital Transformation',
       client: 'Global Retail Corp',
       industry: 'Retail',
-      results: ['40% increase in operational efficiency', 'Reduced costs by $2M annually', '99.9% system uptime'],
-      services: ['AI Consulting', 'Custom Development'],
-      duration: '12 months'
-    },
-    {
-      id: '2',
-      title: 'Healthcare AI Implementation',
-      client: 'MediCare Systems',
-      industry: 'Healthcare',
-      results: ['50% faster patient processing', 'Improved accuracy by 35%', 'Enhanced patient satisfaction'],
-      services: ['AI Integration', 'Data Analytics'],
-      duration: '8 months'
+      challenge: 'Legacy systems hindering growth',
+      solution: 'AI-powered modernization',
+      results: ['40% increase in operational efficiency', 'Reduced costs by $2M annually'],
+      url: ''
     }
   ]);
 
-  const [teamMembers, setTeamMembers] = useState([
+  const [blogs, setBlogs] = useState([
     {
       id: '1',
-      name: 'Sarah Johnson',
-      role: 'CEO & Founder',
-      specialization: 'AI Strategy, Business Development',
-      experience: '15 years'
-    },
-    {
-      id: '2',
-      name: 'Michael Chen',
-      role: 'CTO',
-      specialization: 'Machine Learning, System Architecture',
-      experience: '12 years'
-    },
-    {
-      id: '3',
-      name: 'Emily Rodriguez',
-      role: 'Head of Consulting',
-      specialization: 'Digital Transformation, Process Optimization',
-      experience: '10 years'
+      title: 'The Future of AI in Enterprise',
+      url: 'https://techsolutions.com/blog/future-ai',
+      date: '2024-01-15',
+      summary: 'Exploring upcoming AI trends',
+      author: 'Sarah Johnson'
     }
   ]);
+
+  const [pressNews, setPressNews] = useState([
+    {
+      id: '1',
+      title: 'TechSolutions Raises $10M Series A',
+      date: '2024-02-01',
+      summary: 'Funding to accelerate AI product development',
+      source: 'TechCrunch',
+      url: ''
+    }
+  ]);
+
+  const [careers, setCareers] = useState({
+    hiring: true,
+    openPositions: ['Senior AI Engineer', 'Product Manager'],
+    culture: 'Innovative, collaborative, remote-friendly environment'
+  });
+
+  const [technology, setTechnology] = useState({
+    stack: ['React', 'Node.js', 'Python', 'TensorFlow'],
+    partners: ['AWS', 'Microsoft Azure'],
+    integrations: ['Salesforce', 'Slack', 'Jira']
+  });
 
   const handleSave = () => {
     setSaved(true);
@@ -106,11 +134,38 @@ export const KnowledgeBase: React.FC = () => {
   };
 
   const handleDataExtracted = (data: any) => {
+    console.log('Extracted data:', data);
+
     if (data.companyInfo) {
-      setCompanyInfo({
-        ...companyInfo,
+      setCompanyInfo(prev => ({
+        ...prev,
         ...data.companyInfo
-      });
+      }));
+    }
+
+    if (data.contactInfo) {
+      setContactInfo(prev => ({
+        ...prev,
+        ...data.contactInfo
+      }));
+    }
+
+    if (data.socialProfiles) {
+      setSocialProfiles(prev => ({
+        ...prev,
+        ...data.socialProfiles
+      }));
+    }
+
+    if (data.leadership && data.leadership.length > 0) {
+      const newLeadership = data.leadership.map((member: any, index: number) => ({
+        id: `extracted-${Date.now()}-${index}`,
+        name: member.name || '',
+        role: member.role || '',
+        bio: member.bio || member.specialization || '',
+        experience: member.experience || ''
+      }));
+      setLeadership(newLeadership);
     }
 
     if (data.services && data.services.length > 0) {
@@ -118,11 +173,10 @@ export const KnowledgeBase: React.FC = () => {
         id: `extracted-${Date.now()}-${index}`,
         name: service.name || '',
         description: service.description || '',
-        budgetRange: service.budgetRange || '',
-        duration: service.duration || '',
-        tags: service.tags || []
+        tags: service.tags || [],
+        pricing: service.pricing || service.budgetRange || ''
       }));
-      setServices([...services, ...newServices]);
+      setServices(newServices);
     }
 
     if (data.caseStudies && data.caseStudies.length > 0) {
@@ -131,22 +185,52 @@ export const KnowledgeBase: React.FC = () => {
         title: study.title || '',
         client: study.client || '',
         industry: study.industry || '',
+        challenge: study.challenge || '',
+        solution: study.solution || '',
         results: study.results || [],
-        services: study.services || [],
-        duration: study.duration || ''
+        url: study.url || ''
       }));
-      setCaseStudies([...caseStudies, ...newCaseStudies]);
+      setCaseStudies(newCaseStudies);
     }
 
-    if (data.team && data.team.length > 0) {
-      const newTeamMembers = data.team.map((member: any, index: number) => ({
+    if (data.blogs && data.blogs.length > 0) {
+      const newBlogs = data.blogs.map((blog: any, index: number) => ({
         id: `extracted-${Date.now()}-${index}`,
-        name: member.name || '',
-        role: member.role || '',
-        specialization: member.specialization || '',
-        experience: member.experience || ''
+        title: blog.title || '',
+        url: blog.url || '',
+        date: blog.date || '',
+        summary: blog.summary || '',
+        author: blog.author || ''
       }));
-      setTeamMembers([...teamMembers, ...newTeamMembers]);
+      setBlogs(newBlogs);
+    }
+
+    if (data.pressNews && data.pressNews.length > 0) {
+      const newPress = data.pressNews.map((press: any, index: number) => ({
+        id: `extracted-${Date.now()}-${index}`,
+        title: press.title || '',
+        date: press.date || '',
+        summary: press.summary || '',
+        source: press.source || '',
+        url: press.url || ''
+      }));
+      setPressNews(newPress);
+    }
+
+    if (data.careers) {
+      setCareers({
+        hiring: data.careers.hiring || false,
+        openPositions: data.careers.openPositions || [],
+        culture: data.careers.culture || ''
+      });
+    }
+
+    if (data.technology) {
+      setTechnology({
+        stack: data.technology.stack || [],
+        partners: data.technology.partners || [],
+        integrations: data.technology.integrations || []
+      });
     }
 
     setActiveTab('company');
@@ -154,10 +238,16 @@ export const KnowledgeBase: React.FC = () => {
 
   const tabs = [
     { id: 'ai-extract', label: 'AI Extract', icon: Sparkles },
-    { id: 'company', label: 'Company Profile', icon: Building2 },
+    { id: 'company', label: 'Company', icon: Building2 },
+    { id: 'contact', label: 'Contact', icon: Phone },
+    { id: 'social', label: 'Social', icon: Globe },
     { id: 'services', label: 'Services', icon: Briefcase },
     { id: 'case-studies', label: 'Case Studies', icon: Award },
-    { id: 'team', label: 'Team', icon: Users }
+    { id: 'team', label: 'Leadership', icon: Users },
+    { id: 'blogs', label: 'Blogs', icon: FileText },
+    { id: 'press', label: 'Press', icon: Newspaper },
+    { id: 'careers', label: 'Careers', icon: Users },
+    { id: 'technology', label: 'Technology', icon: Code }
   ];
 
   return (
@@ -166,19 +256,19 @@ export const KnowledgeBase: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Knowledge Base</h1>
           <p className="text-muted-foreground mt-2">
-            Manage your company information, services, case studies, and team
+            Comprehensive company intelligence powered by AI
           </p>
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-border">
+      <div className="flex gap-2 border-b border-border overflow-x-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
+              onClick={() => setActiveTab(tab.id as TabType)}
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'border-primary text-primary font-medium'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -211,6 +301,17 @@ export const KnowledgeBase: React.FC = () => {
                     type="text"
                     value={companyInfo.name}
                     onChange={(e) => setCompanyInfo({ ...companyInfo, name: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Website URL
+                  </label>
+                  <Input
+                    type="url"
+                    value={companyInfo.canonicalUrl}
+                    onChange={(e) => setCompanyInfo({ ...companyInfo, canonicalUrl: e.target.value })}
                   />
                 </div>
 
@@ -255,17 +356,6 @@ export const KnowledgeBase: React.FC = () => {
                     type="text"
                     value={companyInfo.size}
                     onChange={(e) => setCompanyInfo({ ...companyInfo, size: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Website
-                  </label>
-                  <Input
-                    type="url"
-                    value={companyInfo.website}
-                    onChange={(e) => setCompanyInfo({ ...companyInfo, website: e.target.value })}
                   />
                 </div>
               </div>
@@ -332,6 +422,157 @@ export const KnowledgeBase: React.FC = () => {
         </Card>
       )}
 
+      {activeTab === 'contact' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Contact Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <Mail className="h-4 w-4 inline mr-2" />
+                  Email
+                </label>
+                <Input
+                  type="email"
+                  value={contactInfo.email}
+                  onChange={(e) => setContactInfo({ ...contactInfo, email: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <Phone className="h-4 w-4 inline mr-2" />
+                  Phone
+                </label>
+                <Input
+                  type="tel"
+                  value={contactInfo.phone}
+                  onChange={(e) => setContactInfo({ ...contactInfo, phone: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <MapPin className="h-4 w-4 inline mr-2" />
+                  Address
+                </label>
+                <Input
+                  type="text"
+                  value={contactInfo.address}
+                  onChange={(e) => setContactInfo({ ...contactInfo, address: e.target.value })}
+                />
+              </div>
+
+              <Button variant="primary" onClick={handleSave} disabled={saved}>
+                {saved ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Saved!
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Contact Info
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'social' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Social Media Profiles</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <Linkedin className="h-4 w-4 inline mr-2" />
+                  LinkedIn
+                </label>
+                <Input
+                  type="url"
+                  value={socialProfiles.linkedin}
+                  onChange={(e) => setSocialProfiles({ ...socialProfiles, linkedin: e.target.value })}
+                  placeholder="https://linkedin.com/company/..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <Twitter className="h-4 w-4 inline mr-2" />
+                  Twitter/X
+                </label>
+                <Input
+                  type="url"
+                  value={socialProfiles.twitter}
+                  onChange={(e) => setSocialProfiles({ ...socialProfiles, twitter: e.target.value })}
+                  placeholder="https://twitter.com/..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <Facebook className="h-4 w-4 inline mr-2" />
+                  Facebook
+                </label>
+                <Input
+                  type="url"
+                  value={socialProfiles.facebook}
+                  onChange={(e) => setSocialProfiles({ ...socialProfiles, facebook: e.target.value })}
+                  placeholder="https://facebook.com/..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <Globe className="h-4 w-4 inline mr-2" />
+                  Instagram
+                </label>
+                <Input
+                  type="url"
+                  value={socialProfiles.instagram}
+                  onChange={(e) => setSocialProfiles({ ...socialProfiles, instagram: e.target.value })}
+                  placeholder="https://instagram.com/..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <Youtube className="h-4 w-4 inline mr-2" />
+                  YouTube
+                </label>
+                <Input
+                  type="url"
+                  value={socialProfiles.youtube}
+                  onChange={(e) => setSocialProfiles({ ...socialProfiles, youtube: e.target.value })}
+                  placeholder="https://youtube.com/..."
+                />
+              </div>
+
+              <Button variant="primary" onClick={handleSave} disabled={saved}>
+                {saved ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Saved!
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Social Profiles
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {activeTab === 'services' && (
         <div className="space-y-4">
           <div className="flex justify-end">
@@ -360,14 +601,11 @@ export const KnowledgeBase: React.FC = () => {
                           </Badge>
                         ))}
                       </div>
-                      <div className="flex gap-6 text-sm text-muted-foreground">
-                        <div>
-                          <span className="font-medium">Budget:</span> {service.budgetRange}
+                      {service.pricing && (
+                        <div className="text-sm text-muted-foreground">
+                          <span className="font-medium">Pricing:</span> {service.pricing}
                         </div>
-                        <div>
-                          <span className="font-medium">Duration:</span> {service.duration}
-                        </div>
-                      </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm">
@@ -417,7 +655,21 @@ export const KnowledgeBase: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mb-4">
+                  {study.challenge && (
+                    <div className="mb-3">
+                      <h4 className="text-sm font-medium text-foreground mb-1">Challenge:</h4>
+                      <p className="text-sm text-muted-foreground">{study.challenge}</p>
+                    </div>
+                  )}
+
+                  {study.solution && (
+                    <div className="mb-3">
+                      <h4 className="text-sm font-medium text-foreground mb-1">Solution:</h4>
+                      <p className="text-sm text-muted-foreground">{study.solution}</p>
+                    </div>
+                  )}
+
+                  <div className="mb-3">
                     <h4 className="text-sm font-medium text-foreground mb-2">Results:</h4>
                     <ul className="space-y-1">
                       {study.results.map((result, idx) => (
@@ -429,16 +681,11 @@ export const KnowledgeBase: React.FC = () => {
                     </ul>
                   </div>
 
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex flex-wrap gap-2">
-                      {study.services.map((service, idx) => (
-                        <Badge key={idx} variant="secondary">
-                          {service}
-                        </Badge>
-                      ))}
-                    </div>
-                    <span className="text-muted-foreground">Duration: {study.duration}</span>
-                  </div>
+                  {study.url && (
+                    <a href={study.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                      View Full Case Study →
+                    </a>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -451,12 +698,12 @@ export const KnowledgeBase: React.FC = () => {
           <div className="flex justify-end">
             <Button variant="primary">
               <Plus className="h-4 w-4 mr-2" />
-              Add Team Member
+              Add Leader
             </Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {teamMembers.map((member) => (
+            {leadership.map((member) => (
               <Card key={member.id}>
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
@@ -479,20 +726,219 @@ export const KnowledgeBase: React.FC = () => {
                   </div>
 
                   <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="font-medium text-foreground">Specialization:</span>
-                      <p className="text-muted-foreground">{member.specialization}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-foreground">Experience:</span>
-                      <span className="text-muted-foreground ml-2">{member.experience}</span>
-                    </div>
+                    {member.bio && (
+                      <div>
+                        <span className="font-medium text-foreground">Bio:</span>
+                        <p className="text-muted-foreground">{member.bio}</p>
+                      </div>
+                    )}
+                    {member.experience && (
+                      <div>
+                        <span className="font-medium text-foreground">Experience:</span>
+                        <span className="text-muted-foreground ml-2">{member.experience}</span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
         </div>
+      )}
+
+      {activeTab === 'blogs' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4">
+            {blogs.map((blog) => (
+              <Card key={blog.id}>
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-foreground mb-2">
+                        {blog.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {blog.summary}
+                      </p>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        {blog.date && <span>{blog.date}</span>}
+                        {blog.author && <span>By {blog.author}</span>}
+                        {blog.url && (
+                          <a href={blog.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            Read More →
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'press' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4">
+            {pressNews.map((press) => (
+              <Card key={press.id}>
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-foreground mb-2">
+                        {press.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {press.summary}
+                      </p>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        {press.date && <span>{press.date}</span>}
+                        {press.source && <span>Source: {press.source}</span>}
+                        {press.url && (
+                          <a href={press.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                            Read Article →
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'careers' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Careers & Hiring</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={careers.hiring}
+                  onChange={(e) => setCareers({ ...careers, hiring: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                <label className="text-sm font-medium text-foreground">
+                  Currently Hiring
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Open Positions
+                </label>
+                <div className="space-y-2">
+                  {careers.openPositions.map((position, idx) => (
+                    <Badge key={idx} variant="secondary" className="mr-2">
+                      {position}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Company Culture
+                </label>
+                <textarea
+                  className="w-full min-h-[80px] p-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  value={careers.culture}
+                  onChange={(e) => setCareers({ ...careers, culture: e.target.value })}
+                />
+              </div>
+
+              <Button variant="primary" onClick={handleSave} disabled={saved}>
+                {saved ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Saved!
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Careers Info
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'technology' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Technology & Partners</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Technology Stack
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {technology.stack.map((tech, idx) => (
+                    <Badge key={idx} variant="secondary">
+                      {tech}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Partners
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {technology.partners.map((partner, idx) => (
+                    <Badge key={idx} variant="secondary">
+                      {partner}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Integrations
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {technology.integrations.map((integration, idx) => (
+                    <Badge key={idx} variant="secondary">
+                      {integration}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <Button variant="primary" onClick={handleSave} disabled={saved}>
+                {saved ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Saved!
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Technology Info
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

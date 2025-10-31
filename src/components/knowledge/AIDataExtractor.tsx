@@ -2,38 +2,22 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Badge } from '../ui/Badge';
-import { Plus, Trash2, Sparkles, Loader2, AlertCircle, CheckCircle, Link, FileText } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, CheckCircle, Link } from 'lucide-react';
 
 interface AIDataExtractorProps {
   onDataExtracted: (data: any) => void;
 }
 
 export const AIDataExtractor: React.FC<AIDataExtractorProps> = ({ onDataExtracted }) => {
-  const [urls, setUrls] = useState<string[]>(['']);
+  const [url, setUrl] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  const addUrlField = () => {
-    setUrls([...urls, '']);
-  };
-
-  const removeUrlField = (index: number) => {
-    setUrls(urls.filter((_, i) => i !== index));
-  };
-
-  const updateUrl = (index: number, value: string) => {
-    const newUrls = [...urls];
-    newUrls[index] = value;
-    setUrls(newUrls);
-  };
+  const [crawlStats, setCrawlStats] = useState<string | null>(null);
 
   const handleExtract = async () => {
-    const validUrls = urls.filter(url => url.trim() !== '');
-
-    if (validUrls.length === 0) {
-      setError('Please enter at least one URL');
+    if (!url.trim()) {
+      setError('Please enter a URL');
       return;
     }
 
@@ -51,6 +35,8 @@ export const AIDataExtractor: React.FC<AIDataExtractorProps> = ({ onDataExtracte
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+      setCrawlStats('Starting deep crawl of website (up to 50 pages, depth 3)...');
+
       const response = await fetch(`${supabaseUrl}/functions/v1/extract-company-data`, {
         method: 'POST',
         headers: {
@@ -58,10 +44,12 @@ export const AIDataExtractor: React.FC<AIDataExtractorProps> = ({ onDataExtracte
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          urls: validUrls,
+          url: url.trim(),
           openaiKey: openaiKey,
         }),
       });
+
+      setCrawlStats('Processing crawled data with AI...');
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -71,9 +59,11 @@ export const AIDataExtractor: React.FC<AIDataExtractorProps> = ({ onDataExtracte
       const data = await response.json();
       onDataExtracted(data);
       setSuccess(true);
-      setUrls(['']);
+      setCrawlStats('Successfully extracted comprehensive company data!');
+      setUrl('');
     } catch (err: any) {
       setError(err.message || 'Failed to extract data');
+      setCrawlStats(null);
       console.error('Error extracting data:', err);
     } finally {
       setLoading(false);
@@ -85,56 +75,56 @@ export const AIDataExtractor: React.FC<AIDataExtractorProps> = ({ onDataExtracte
       <CardHeader>
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
-          <CardTitle>AI-Powered Data Extraction</CardTitle>
+          <CardTitle>AI-Powered Deep Website Crawling</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-900">
-              Add URLs from your company website, LinkedIn, social media, or documents.
-              AI will automatically extract company details, services, team information, case studies, and more.
+            <p className="text-sm text-blue-900 font-medium mb-2">
+              Deep Website Crawling with AI
+            </p>
+            <p className="text-sm text-blue-900 mb-2">
+              Enter your company's root domain. The system will:
+            </p>
+            <ul className="text-xs text-blue-800 ml-4 space-y-1">
+              <li>• Crawl up to depth 3 (home → section → page → article)</li>
+              <li>• Extract company details, services, team, blog posts, news</li>
+              <li>• Find and collect social media profiles automatically</li>
+              <li>• Respect robots.txt and throttle requests (1 req/sec)</li>
+              <li>• Stay within same domain and subdomains only</li>
+            </ul>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Company Website URL
+            </label>
+            <div className="relative">
+              <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com"
+                className="pl-10"
+                disabled={loading}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Enter the homepage URL - the crawler will discover and extract from all relevant pages
             </p>
           </div>
 
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-foreground">
-              URLs to Analyze
-            </label>
-            {urls.map((url, index) => (
-              <div key={index} className="flex gap-2">
-                <div className="flex-1 relative">
-                  <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="url"
-                    value={url}
-                    onChange={(e) => updateUrl(index, e.target.value)}
-                    placeholder="https://example.com or https://linkedin.com/company/..."
-                    className="pl-10"
-                  />
-                </div>
-                {urls.length > 1 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeUrlField(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+          {crawlStats && loading && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+              <Loader2 className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5 animate-spin" />
+              <div>
+                <p className="text-sm text-blue-900 font-medium">{crawlStats}</p>
+                <p className="text-xs text-blue-700 mt-1">This may take 1-2 minutes depending on site size...</p>
               </div>
-            ))}
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={addUrlField}
-            className="w-full"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Another URL
-          </Button>
+            </div>
+          )}
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
@@ -147,7 +137,7 @@ export const AIDataExtractor: React.FC<AIDataExtractorProps> = ({ onDataExtracte
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
               <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-green-900">
-                Data extracted successfully! Check the tabs above to review the information.
+                Data extracted successfully! Check the tabs above to review all the information.
               </p>
             </div>
           )}
@@ -161,30 +151,38 @@ export const AIDataExtractor: React.FC<AIDataExtractorProps> = ({ onDataExtracte
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Extracting Data...
+                Crawling & Extracting...
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
-                Extract Company Data
+                Start Deep Crawl & Extract
               </>
             )}
           </Button>
 
           <div className="pt-4 border-t border-border">
-            <h4 className="text-sm font-medium text-foreground mb-2">What can be extracted:</h4>
+            <h4 className="text-sm font-medium text-foreground mb-2">Comprehensive Extraction Includes:</h4>
             <div className="grid grid-cols-2 gap-2">
               {[
-                'Company profile',
-                'Services offered',
-                'Team members',
-                'Case studies',
-                'Blog posts',
-                'Contact info',
-                'Social profiles',
-                'Mission & vision'
+                'Company profile & details',
+                'Services & products',
+                'Leadership team',
+                'Case studies & portfolio',
+                'Blog articles & content',
+                'Press & news',
+                'Contact information',
+                'Social media profiles',
+                'Technology stack',
+                'Partners & integrations',
+                'Career opportunities',
+                'Pricing information',
+                'Legal & compliance',
+                'Mission & vision',
+                'Company culture',
+                'Industry verticals'
               ].map((item, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div key={idx} className="flex items-center gap-2 text-xs text-muted-foreground">
                   <CheckCircle className="h-3 w-3 text-green-600" />
                   {item}
                 </div>
