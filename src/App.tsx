@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import { AppLayout } from './components/layout/AppLayout';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { Dashboard } from './pages/Dashboard';
 import { Clients } from './pages/Clients';
@@ -14,42 +16,110 @@ import { KnowledgeBase } from './pages/KnowledgeBase';
 import { PitchGenerator } from './pages/PitchGenerator';
 import { GrowthOpportunities } from './pages/GrowthOpportunities';
 import { Settings } from './pages/Settings';
+import { SignUp } from './pages/auth/SignUp';
+import { SignIn } from './pages/auth/SignIn';
+import { ForgotPassword } from './pages/auth/ForgotPassword';
+import { Onboarding } from './pages/onboarding/Onboarding';
 import { ToastProvider } from './components/ui/Toast';
 import { KeyboardShortcuts } from './components/ui/KeyboardShortcuts';
 
 function App() {
   return (
     <ToastProvider>
-      <AppProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<AppLayout />}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="home" element={<HomePage />} />
+      <AuthProvider>
+        <AppProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" index element={<Navigate to="/auth/signin" replace />} />
+              <Route path="/auth/signup" element={<SignUp />} />
+              <Route path="/auth/signin" element={<SignIn />} />
+              <Route path="/auth/forgot-password" element={<ForgotPassword />} />
 
-              <Route path="clients" element={<Clients />} />
-              <Route path="clients/new" element={<AddClient />} />
-              <Route path="clients/:id" element={<ClientDetailNew />} />
-              <Route path="clients/:id/edit" element={<AddClient />} />
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute>
+                    <Onboarding />
+                  </ProtectedRoute>
+                }
+              />
 
-              <Route path="projects" element={<Projects />} />
-              <Route path="projects/new" element={<NewProject />} />
-              <Route path="projects/:id" element={<ProjectDetail />} />
+              <Route path="/" element={<AppLayout />}>
+                <Route
+                  path="dashboard"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="home" element={<HomePage />} />
 
-              <Route path="pitch-generator" element={<PitchGenerator />} />
-              <Route path="growth-opportunities" element={<GrowthOpportunities />} />
+                <Route
+                  path="clients"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <Clients />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="clients/new"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <AddClient />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="clients/:id"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <ClientDetailNew />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="clients/:id/edit" element={<AddClient />} />
 
-              <Route path="knowledge-base" element={<KnowledgeBase />} />
+                <Route
+                  path="projects"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <Projects />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="projects/new"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <NewProject />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="projects/:id"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <ProjectDetail />
+                    </ProtectedRoute>
+                  }
+                />
 
-              <Route path="settings" element={<Settings />} />
+                <Route path="pitch-generator" element={<PitchGenerator />} />
+                <Route path="growth-opportunities" element={<GrowthOpportunities />} />
 
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Route>
-          </Routes>
-          <KeyboardShortcuts />
-        </BrowserRouter>
-      </AppProvider>
+                <Route path="knowledge-base" element={<KnowledgeBase />} />
+
+                <Route path="settings" element={<Settings />} />
+
+                <Route path="*" element={<Navigate to="/auth/signin" replace />} />
+              </Route>
+            </Routes>
+            <KeyboardShortcuts />
+          </BrowserRouter>
+        </AppProvider>
+      </AuthProvider>
     </ToastProvider>
   );
 }
