@@ -12,6 +12,7 @@ export const SignUp: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,6 +27,27 @@ export const SignUp: React.FC = () => {
 
     if (password.length < 8) {
       setError('Password must be at least 8 characters long');
+      return;
+    }
+
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
+      setError('Password must contain uppercase, lowercase, number, and special character');
+      return;
+    }
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid work email address');
+      return;
+    }
+
+    if (!acceptTerms) {
+      setError('You must accept the Terms of Service to continue');
       return;
     }
 
@@ -71,7 +93,7 @@ export const SignUp: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Full Name
+                  Full Name <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -88,7 +110,7 @@ export const SignUp: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Email Address
+                  Work Email <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -101,11 +123,14 @@ export const SignUp: React.FC = () => {
                     required
                   />
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use your company email address
+                </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Password
+                  Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -120,13 +145,13 @@ export const SignUp: React.FC = () => {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Must be at least 8 characters long
+                  At least 8 characters with uppercase, lowercase, number, and special character
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Confirm Password
+                  Confirm Password <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -141,18 +166,36 @@ export const SignUp: React.FC = () => {
                 </div>
               </div>
 
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="acceptTerms"
+                  checked={acceptTerms}
+                  onChange={(e) => setAcceptTerms(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  required
+                />
+                <label htmlFor="acceptTerms" className="text-sm text-foreground">
+                  I agree to the{' '}
+                  <a href="#" className="text-primary hover:underline">
+                    Terms of Service
+                  </a>
+                  {' '}and{' '}
+                  <a href="#" className="text-primary hover:underline">
+                    Privacy Policy
+                  </a>
+                  {' '}<span className="text-red-500">*</span>
+                </label>
+              </div>
+
               <Button
                 type="submit"
                 variant="primary"
                 className="w-full"
-                disabled={loading}
+                disabled={loading || !acceptTerms}
               >
                 {loading ? 'Creating Account...' : 'Create Account'}
               </Button>
-
-              <p className="text-xs text-muted-foreground text-center">
-                By creating an account, you agree to our Terms of Service and Privacy Policy
-              </p>
             </form>
           </CardContent>
         </Card>
