@@ -33,7 +33,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    console.log('AuthContext: Initializing auth state...');
     authService.getSession().then((session) => {
+      console.log('AuthContext: Initial session:', session?.user?.email);
       setUser(session?.user ?? null);
       if (session?.user) {
         loadUserData(session.user);
@@ -43,7 +45,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('AuthContext: Auth state changed:', event, session?.user?.email);
       setUser(session?.user ?? null);
       if (session?.user) {
         await loadUserData(session.user);
@@ -64,7 +67,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
+    console.log('AuthContext.signIn called');
     await authService.signIn(email, password);
+    console.log('AuthContext.signIn completed');
   };
 
   const signOut = async () => {

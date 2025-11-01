@@ -72,12 +72,21 @@ export const authService = {
   },
 
   async signIn(email: string, password: string) {
+    console.log('authService.signIn called with email:', email);
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    if (error) throw error;
+    console.log('Supabase signIn response:', { user: data?.user?.id, session: !!data?.session, error });
+
+    if (error) {
+      console.error('Supabase signIn error:', error);
+      throw error;
+    }
+
+    console.log('Sign in successful');
     return data;
   },
 

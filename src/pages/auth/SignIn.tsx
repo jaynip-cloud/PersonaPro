@@ -19,9 +19,12 @@ export const SignIn: React.FC = () => {
     setLoading(true);
 
     try {
+      console.log('Starting sign in process for:', email);
       await signIn(email, password);
+      console.log('Sign in successful, navigating to dashboard...');
       navigate('/dashboard');
     } catch (err: any) {
+      console.error('Sign in error:', err);
       setError(err.message || 'Invalid email or password');
     } finally {
       setLoading(false);
