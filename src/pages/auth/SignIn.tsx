@@ -42,13 +42,14 @@ export const SignIn: React.FC = () => {
           </p>
         </div>
 
-        {process.env.NODE_ENV === 'development' && (
-          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md mb-4 text-sm">
-            <strong>Admin Credentials:</strong>
-            <br />
-            Create an account via Sign Up or use existing Supabase Auth users
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md mb-4 text-sm">
+          <strong className="block mb-2">Test Admin Credentials:</strong>
+          <div className="space-y-1 font-mono text-xs">
+            <div>📧 Email: <span className="font-semibold">admin@gmail.com</span></div>
+            <div>📧 Email: <span className="font-semibold">demo@gmail.com</span></div>
+            <div className="text-blue-600 mt-2">⚠️ Passwords are set in Supabase Dashboard</div>
           </div>
-        )}
+        </div>
 
         <Card>
           <CardContent className="pt-6">
