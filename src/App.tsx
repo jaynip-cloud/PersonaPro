@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import { AppLayout } from './components/layout/AppLayout';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { Dashboard } from './pages/Dashboard';
 import { Clients } from './pages/Clients';
@@ -29,24 +30,81 @@ function App() {
         <AppProvider>
           <BrowserRouter>
             <Routes>
+              <Route path="/" index element={<Navigate to="/auth/signin" replace />} />
               <Route path="/auth/signup" element={<SignUp />} />
               <Route path="/auth/signin" element={<SignIn />} />
               <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-              <Route path="/onboarding" element={<Onboarding />} />
+
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute>
+                    <Onboarding />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route path="/" element={<AppLayout />}>
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="dashboard" element={<Dashboard />} />
+                <Route
+                  path="dashboard"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="home" element={<HomePage />} />
 
-                <Route path="clients" element={<Clients />} />
-                <Route path="clients/new" element={<AddClient />} />
-                <Route path="clients/:id" element={<ClientDetailNew />} />
+                <Route
+                  path="clients"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <Clients />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="clients/new"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <AddClient />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="clients/:id"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <ClientDetailNew />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="clients/:id/edit" element={<AddClient />} />
 
-                <Route path="projects" element={<Projects />} />
-                <Route path="projects/new" element={<NewProject />} />
-                <Route path="projects/:id" element={<ProjectDetail />} />
+                <Route
+                  path="projects"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <Projects />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="projects/new"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <NewProject />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="projects/:id"
+                  element={
+                    <ProtectedRoute requireOnboarding>
+                      <ProjectDetail />
+                    </ProtectedRoute>
+                  }
+                />
 
                 <Route path="pitch-generator" element={<PitchGenerator />} />
                 <Route path="growth-opportunities" element={<GrowthOpportunities />} />
@@ -55,7 +113,7 @@ function App() {
 
                 <Route path="settings" element={<Settings />} />
 
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<Navigate to="/auth/signin" replace />} />
               </Route>
             </Routes>
             <KeyboardShortcuts />
