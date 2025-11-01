@@ -8,6 +8,7 @@ import { AddClient } from './pages/AddClient';
 import { ClientDetail } from './pages/ClientDetail';
 import { ClientDetailNew } from './pages/ClientDetailNew';
 import { Projects } from './pages/Projects';
+import { ProjectDetail } from './pages/ProjectDetail';
 import { KnowledgeBase } from './pages/KnowledgeBase';
 import { PitchGenerator } from './pages/PitchGenerator';
 import { GrowthOpportunities } from './pages/GrowthOpportunities';
@@ -32,6 +33,7 @@ function App() {
               <Route path="clients/:id/edit" element={<AddClient />} />
 
               <Route path="projects" element={<Projects />} />
+              <Route path="projects/:id" element={<ProjectDetail />} />
 
               <Route path="pitch-generator" element={<PitchGenerator />} />
               <Route path="growth-opportunities" element={<GrowthOpportunities />} />
