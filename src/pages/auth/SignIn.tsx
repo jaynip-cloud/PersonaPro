@@ -44,10 +44,21 @@ export const SignIn: React.FC = () => {
 
         <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md mb-4 text-sm">
           <strong className="block mb-2">Test Admin Credentials:</strong>
-          <div className="space-y-1 font-mono text-xs">
-            <div>📧 Email: <span className="font-semibold">admin@gmail.com</span></div>
-            <div>📧 Email: <span className="font-semibold">demo@gmail.com</span></div>
-            <div className="text-blue-600 mt-2">⚠️ Passwords are set in Supabase Dashboard</div>
+          <div className="space-y-2 text-xs">
+            <div className="bg-white rounded p-2">
+              <div className="font-semibold text-blue-800">Admin Account</div>
+              <div className="font-mono mt-1">
+                <div>📧 admin@gmail.com</div>
+                <div>🔑 Admin123!</div>
+              </div>
+            </div>
+            <div className="bg-white rounded p-2">
+              <div className="font-semibold text-blue-800">Demo Account</div>
+              <div className="font-mono mt-1">
+                <div>📧 demo@gmail.com</div>
+                <div>🔑 Demo123!</div>
+              </div>
+            </div>
           </div>
         </div>
 
