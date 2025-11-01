@@ -3,8 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Briefcase, Mail, Lock, AlertCircle, MailWarning } from 'lucide-react';
-import { authService } from '../../lib/auth';
+import { Briefcase, Mail, Lock, AlertCircle } from 'lucide-react';
 
 export const SignIn: React.FC = () => {
   const navigate = useNavigate();
@@ -13,45 +12,18 @@ export const SignIn: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [emailNotVerified, setEmailNotVerified] = useState(false);
-  const [resending, setResending] = useState(false);
-  const [resentSuccess, setResentSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setEmailNotVerified(false);
     setLoading(true);
 
     try {
       await signIn(email, password);
     } catch (err: any) {
-      const errorMessage = err.message || 'Invalid email or password';
-
-      if (errorMessage.toLowerCase().includes('email') && errorMessage.toLowerCase().includes('confirm')) {
-        setEmailNotVerified(true);
-        setError('Please verify your email address before signing in.');
-      } else {
-        setError(errorMessage);
-      }
+      setError(err.message || 'Invalid email or password');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleResendVerification = async () => {
-    setResending(true);
-    setError('');
-    setResentSuccess(false);
-
-    try {
-      await authService.resendVerificationEmail(email);
-      setResentSuccess(true);
-      setTimeout(() => setResentSuccess(false), 5000);
-    } catch (err: any) {
-      setError(err.message || 'Failed to resend verification email');
-    } finally {
-      setResending(false);
     }
   };
 
@@ -91,42 +63,10 @@ export const SignIn: React.FC = () => {
         <Card>
           <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && !emailNotVerified && (
+              {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-start gap-2">
                   <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
                   <span className="text-sm">{error}</span>
-                </div>
-              )}
-
-              {emailNotVerified && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                  <div className="flex items-start gap-3">
-                    <MailWarning className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-yellow-900 mb-1">
-                        Email Not Verified
-                      </h4>
-                      <p className="text-sm text-yellow-800 mb-3">
-                        Please verify your email address before signing in. Check your inbox for the verification link.
-                      </p>
-                      {resentSuccess ? (
-                        <p className="text-sm text-green-700 font-medium">
-                          Verification email sent successfully!
-                        </p>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleResendVerification}
-                          disabled={resending || !email}
-                          className="border-yellow-300 text-yellow-900 hover:bg-yellow-100"
-                        >
-                          {resending ? 'Resending...' : 'Resend Verification Link'}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
                 </div>
               )}
 
