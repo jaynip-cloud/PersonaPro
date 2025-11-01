@@ -31,18 +31,43 @@ export interface Membership {
 
 export const authService = {
   async signUp(email: string, password: string) {
+    console.log('authService.signUp called with email:', email);
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/onboarding`,
+      },
     });
 
-    if (error) throw error;
+    console.log('Supabase signUp response:', { data, error });
 
-    if (data.user) {
-      const placeholderOrg = await this.createPlaceholderOrg(data.user.id);
-      return { user: data.user, session: data.session, organization: placeholderOrg };
+    if (error) {
+      console.error('Supabase signUp error:', error);
+      throw error;
     }
 
+    if (!data.user) {
+      console.error('No user returned from signUp');
+      throw new Error('Failed to create user account');
+    }
+
+    console.log('User created:', data.user.id, 'Session exists:', !!data.session);
+
+    if (data.user && data.session) {
+      console.log('Creating placeholder organization...');
+      try {
+        const placeholderOrg = await this.createPlaceholderOrg(data.user.id);
+        console.log('Placeholder org created:', placeholderOrg.id);
+        return { user: data.user, session: data.session, organization: placeholderOrg };
+      } catch (orgError) {
+        console.error('Error creating placeholder org:', orgError);
+        throw orgError;
+      }
+    }
+
+    console.log('No session returned - email confirmation may be required');
     return { user: data.user, session: data.session };
   },
 
