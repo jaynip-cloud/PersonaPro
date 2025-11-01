@@ -1,32 +1,46 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Mail, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
+import { Lock, AlertCircle, CheckCircle } from 'lucide-react';
 import { authService } from '../../lib/auth';
 
-export const ForgotPassword: React.FC = () => {
-  const [email, setEmail] = useState('');
+export const ResetPassword: React.FC = () => {
+  const navigate = useNavigate();
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await authService.resetPassword(email);
-      setSubmitted(true);
+      await authService.updatePassword(password);
+      setSuccess(true);
+      setTimeout(() => navigate('/dashboard'), 2000);
     } catch (err: any) {
-      setError(err.message || 'Failed to send reset email');
+      setError(err.message || 'Failed to reset password');
     } finally {
       setLoading(false);
     }
   };
 
-  if (submitted) {
+  if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
@@ -36,21 +50,10 @@ export const ForgotPassword: React.FC = () => {
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
                   <CheckCircle className="h-8 w-8 text-green-600" />
                 </div>
-                <h2 className="text-2xl font-bold text-foreground">Check Your Email</h2>
+                <h2 className="text-2xl font-bold text-foreground">Password Reset Successful</h2>
                 <p className="text-muted-foreground">
-                  We've sent password reset instructions to{' '}
-                  <span className="font-semibold">{email}</span>
+                  Your password has been updated. Redirecting to dashboard...
                 </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-900">
-                    Click the link in the email to reset your password. The link will expire in 1 hour.
-                  </p>
-                </div>
-                <Link to="/auth/signin">
-                  <Button variant="outline" className="w-full">
-                    Back to Sign In
-                  </Button>
-                </Link>
               </div>
             </CardContent>
           </Card>
@@ -63,9 +66,9 @@ export const ForgotPassword: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Reset Password</h1>
+          <h1 className="text-3xl font-bold text-foreground">Create New Password</h1>
           <p className="text-muted-foreground mt-2">
-            Enter your email to receive reset instructions
+            Enter a new password for your account
           </p>
         </div>
 
@@ -81,16 +84,37 @@ export const ForgotPassword: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Email Address
+                  New Password
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="w-full pl-10 pr-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="you@company.com"
+                    placeholder="••••••••"
+                    required
+                    minLength={8}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Must be at least 8 characters long
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Confirm New Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="••••••••"
                     required
                   />
                 </div>
@@ -102,15 +126,8 @@ export const ForgotPassword: React.FC = () => {
                 className="w-full"
                 disabled={loading}
               >
-                {loading ? 'Sending...' : 'Send Reset Instructions'}
+                {loading ? 'Updating Password...' : 'Reset Password'}
               </Button>
-
-              <Link to="/auth/signin">
-                <Button variant="ghost" className="w-full">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Sign In
-                </Button>
-              </Link>
             </form>
           </CardContent>
         </Card>

@@ -7,7 +7,7 @@ interface AuthContextType {
   user: SupabaseUser | null;
   organization: Organization | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<any>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -23,9 +23,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadUserData = async (currentUser: SupabaseUser) => {
     try {
+      console.log('AuthContext: Loading user data for:', currentUser.email);
       const orgs = await authService.getUserOrganizations(currentUser.id);
+      console.log('AuthContext: Organizations loaded:', orgs);
       if (orgs && orgs.length > 0) {
+        console.log('AuthContext: Setting organization:', orgs[0]);
         setOrganization(orgs[0]);
+      } else {
+        console.log('AuthContext: No organizations found');
       }
     } catch (error) {
       console.error('Error loading user data:', error);
@@ -33,7 +38,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    console.log('AuthContext: Initializing auth state...');
     authService.getSession().then((session) => {
+      console.log('AuthContext: Initial session:', session?.user?.email);
       setUser(session?.user ?? null);
       if (session?.user) {
         loadUserData(session.user);
@@ -43,7 +50,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('AuthContext: Auth state changed:', event, session?.user?.email);
       setUser(session?.user ?? null);
       if (session?.user) {
         await loadUserData(session.user);
@@ -61,10 +69,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (result.organization) {
       setOrganization(result.organization);
     }
+    return result;
   };
 
   const signIn = async (email: string, password: string) => {
+    console.log('AuthContext.signIn called');
     await authService.signIn(email, password);
+    console.log('AuthContext.signIn completed');
   };
 
   const signOut = async () => {

@@ -21,14 +21,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       if (!isOnboardingComplete && requireOnboarding) {
         navigate('/onboarding');
       } else if (isOnboardingComplete && !requireOnboarding && window.location.pathname === '/onboarding') {
-        navigate('/dashboard');
+        navigate('/welcome');
       }
     }
   }, [user, organization, loading, requireOnboarding, navigate]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-gray-100">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
