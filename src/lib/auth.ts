@@ -36,6 +36,7 @@ export const authService = {
         data: {
           name,
         },
+        emailRedirectTo: undefined,
       },
     });
 
