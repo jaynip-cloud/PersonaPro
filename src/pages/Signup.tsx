@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
@@ -12,8 +12,18 @@ export const Signup: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signUp } = useAuth();
+  const { signUp, user, isKnowledgeBaseComplete } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      if (isKnowledgeBaseComplete) {
+        navigate('/dashboard');
+      } else {
+        navigate('/knowledge-base');
+      }
+    }
+  }, [user, isKnowledgeBaseComplete, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,8 +46,6 @@ export const Signup: React.FC = () => {
     if (error) {
       setError(error.message);
       setLoading(false);
-    } else {
-      navigate('/dashboard');
     }
   };
 

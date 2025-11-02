@@ -6,6 +6,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isKnowledgeBaseComplete: boolean;
+  checkKnowledgeBaseStatus: () => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -21,11 +23,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isKnowledgeBaseComplete, setIsKnowledgeBaseComplete] = useState(false);
+
+  const checkKnowledgeBaseStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('company_profiles')
+          .select('onboarding_completed')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        setIsKnowledgeBaseComplete(profile?.onboarding_completed ?? false);
+      }
+    } catch (error) {
+      console.error('Error checking knowledge base status:', error);
+    }
+  };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) {
+        await checkKnowledgeBaseStatus();
+      }
       setLoading(false);
     });
 
@@ -33,6 +56,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       (async () => {
         setSession(session);
         setUser(session?.user ?? null);
+        if (session?.user) {
+          await checkKnowledgeBaseStatus();
+        }
         setLoading(false);
       })();
     });
@@ -85,6 +111,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         user,
         session,
         loading,
+        isKnowledgeBaseComplete,
+        checkKnowledgeBaseStatus,
         signUp,
         signIn,
         signOut,

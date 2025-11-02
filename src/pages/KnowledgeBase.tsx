@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { AIDataExtractor } from '../components/knowledge/AIDataExtractor';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import {
   Building2,
   FileText,
@@ -25,7 +28,8 @@ import {
   Youtube,
   Globe,
   Mail,
-  MapPin
+  MapPin,
+  ArrowRight
 } from 'lucide-react';
 
 type TabType = 'ai-extract' | 'company' | 'contact' | 'social' | 'services' | 'case-studies' | 'team' | 'blogs' | 'press' | 'careers' | 'technology';
@@ -33,6 +37,10 @@ type TabType = 'ai-extract' | 'company' | 'contact' | 'social' | 'services' | 'c
 export const KnowledgeBase: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('ai-extract');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const { user, isKnowledgeBaseComplete, checkKnowledgeBaseStatus } = useAuth();
+  const navigate = useNavigate();
 
   const [companyInfo, setCompanyInfo] = useState({
     name: 'TechSolutions Inc.',
@@ -128,9 +136,66 @@ export const KnowledgeBase: React.FC = () => {
     integrations: ['Salesforce', 'Slack', 'Jira']
   });
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    if (!user) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('company_profiles')
+        .update({
+          company_name: companyInfo.name,
+          website: companyInfo.canonicalUrl,
+          industry: companyInfo.industry,
+          about: companyInfo.description,
+          email: contactInfo.email,
+          phone: contactInfo.phone,
+          linkedin_url: socialProfiles.linkedin,
+          twitter_url: socialProfiles.twitter,
+          facebook_url: socialProfiles.facebook,
+          instagram_url: socialProfiles.instagram,
+          services: JSON.stringify(services),
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      console.error('Error saving:', error);
+      alert('Failed to save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCompleteSetup = async () => {
+    if (!user) return;
+
+    setCompleting(true);
+    try {
+      await handleSave();
+
+      const { error } = await supabase
+        .from('company_profiles')
+        .update({
+          onboarding_completed: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      await checkKnowledgeBaseStatus();
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error completing setup:', error);
+      alert('Failed to complete setup. Please try again.');
+    } finally {
+      setCompleting(false);
+    }
   };
 
   const handleDataExtracted = (data: any) => {
@@ -252,6 +317,34 @@ export const KnowledgeBase: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
+      {!isKnowledgeBaseComplete && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start justify-between">
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-blue-900 mb-1">
+              Welcome! Complete Your Company Profile
+            </h3>
+            <p className="text-sm text-blue-700">
+              Please fill in your company details to unlock all features. You can use AI extraction to speed up the process.
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            onClick={handleCompleteSetup}
+            disabled={completing || !companyInfo.name || !companyInfo.canonicalUrl}
+            className="ml-4 whitespace-nowrap"
+          >
+            {completing ? (
+              'Completing...'
+            ) : (
+              <>
+                Complete Setup
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Knowledge Base</h1>
@@ -404,12 +497,14 @@ export const KnowledgeBase: React.FC = () => {
                 />
               </div>
 
-              <Button variant="primary" onClick={handleSave} disabled={saved}>
+              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
                 {saved ? (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Saved!
                   </>
+                ) : saving ? (
+                  'Saving...'
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
@@ -465,12 +560,14 @@ export const KnowledgeBase: React.FC = () => {
                 />
               </div>
 
-              <Button variant="primary" onClick={handleSave} disabled={saved}>
+              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
                 {saved ? (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Saved!
                   </>
+                ) : saving ? (
+                  'Saving...'
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
@@ -555,12 +652,14 @@ export const KnowledgeBase: React.FC = () => {
                 />
               </div>
 
-              <Button variant="primary" onClick={handleSave} disabled={saved}>
+              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
                 {saved ? (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Saved!
                   </>
+                ) : saving ? (
+                  'Saving...'
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
@@ -859,12 +958,14 @@ export const KnowledgeBase: React.FC = () => {
                 />
               </div>
 
-              <Button variant="primary" onClick={handleSave} disabled={saved}>
+              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
                 {saved ? (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Saved!
                   </>
+                ) : saving ? (
+                  'Saving...'
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
@@ -923,12 +1024,14 @@ export const KnowledgeBase: React.FC = () => {
                 </div>
               </div>
 
-              <Button variant="primary" onClick={handleSave} disabled={saved}>
+              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
                 {saved ? (
                   <>
                     <CheckCircle className="h-4 w-4 mr-2" />
                     Saved!
                   </>
+                ) : saving ? (
+                  'Saving...'
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
