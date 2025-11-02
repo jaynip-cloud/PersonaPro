@@ -34,18 +34,21 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    name: '',
+    contactName: '',
     company: '',
-    email: '',
-    phone: '',
-    role: '',
-    industry: '',
-    location: '',
     website: '',
+    primaryEmail: '',
+    primaryPhone: '',
+    jobTitle: '',
+    industry: '',
+    city: '',
+    country: '',
+    companySize: '',
+    linkedinUrl: '',
     status: 'prospect' as 'active' | 'inactive' | 'prospect' | 'churned',
     tags: [] as string[],
     tagInput: '',
-    description: ''
+    companyOverview: ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -80,14 +83,14 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     const newErrors: Record<string, string> = {};
 
     if (currentStep === 1) {
-      if (!formData.name.trim()) newErrors.name = 'Name is required';
+      if (!formData.contactName.trim()) newErrors.contactName = 'Contact name is required';
       if (!formData.company.trim()) newErrors.company = 'Company is required';
-      if (!formData.email.trim()) {
-        newErrors.email = 'Email is required';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-        newErrors.email = 'Invalid email format';
+      if (!formData.primaryEmail.trim()) {
+        newErrors.primaryEmail = 'Email is required';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.primaryEmail)) {
+        newErrors.primaryEmail = 'Invalid email format';
       }
-      if (!formData.role.trim()) newErrors.role = 'Role is required';
+      if (!formData.jobTitle.trim()) newErrors.jobTitle = 'Job title is required';
       if (!formData.industry.trim()) newErrors.industry = 'Industry is required';
     }
 
@@ -114,17 +117,22 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
         .from('clients')
         .insert({
           user_id: user.id,
-          name: formData.name,
+          contact_name: formData.contactName,
           company: formData.company,
-          email: formData.email,
-          phone: formData.phone,
-          role: formData.role,
-          industry: formData.industry,
-          location: formData.location,
           website: formData.website,
+          primary_email: formData.primaryEmail,
+          email: formData.primaryEmail,
+          primary_phone: formData.primaryPhone,
+          phone: formData.primaryPhone,
+          job_title: formData.jobTitle,
+          industry: formData.industry,
+          city: formData.city,
+          country: formData.country,
+          company_size: formData.companySize,
+          linkedin_url: formData.linkedinUrl,
           status: formData.status,
           tags: formData.tags,
-          description: formData.description,
+          company_overview: formData.companyOverview,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
@@ -190,11 +198,11 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   </label>
                   <Input
                     placeholder="John Doe"
-                    value={formData.name}
-                    onChange={(e) => handleChange('name', e.target.value)}
+                    value={formData.contactName}
+                    onChange={(e) => handleChange('contactName', e.target.value)}
                   />
-                  {errors.name && (
-                    <p className="text-xs text-red-600 mt-1">{errors.name}</p>
+                  {errors.contactName && (
+                    <p className="text-xs text-red-600 mt-1">{errors.contactName}</p>
                   )}
                 </div>
 
@@ -219,11 +227,11 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   <Input
                     type="email"
                     placeholder="john@acme.com"
-                    value={formData.email}
-                    onChange={(e) => handleChange('email', e.target.value)}
+                    value={formData.primaryEmail}
+                    onChange={(e) => handleChange('primaryEmail', e.target.value)}
                   />
-                  {errors.email && (
-                    <p className="text-xs text-red-600 mt-1">{errors.email}</p>
+                  {errors.primaryEmail && (
+                    <p className="text-xs text-red-600 mt-1">{errors.primaryEmail}</p>
                   )}
                 </div>
 
@@ -234,8 +242,8 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   <Input
                     type="tel"
                     placeholder="+1 (555) 123-4567"
-                    value={formData.phone}
-                    onChange={(e) => handleChange('phone', e.target.value)}
+                    value={formData.primaryPhone}
+                    onChange={(e) => handleChange('primaryPhone', e.target.value)}
                   />
                 </div>
 
@@ -245,11 +253,11 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   </label>
                   <Input
                     placeholder="VP of Engineering"
-                    value={formData.role}
-                    onChange={(e) => handleChange('role', e.target.value)}
+                    value={formData.jobTitle}
+                    onChange={(e) => handleChange('jobTitle', e.target.value)}
                   />
-                  {errors.role && (
-                    <p className="text-xs text-red-600 mt-1">{errors.role}</p>
+                  {errors.jobTitle && (
+                    <p className="text-xs text-red-600 mt-1">{errors.jobTitle}</p>
                   )}
                 </div>
 
@@ -304,12 +312,53 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Location
+                    City
                   </label>
                   <Input
-                    placeholder="San Francisco, CA"
-                    value={formData.location}
-                    onChange={(e) => handleChange('location', e.target.value)}
+                    placeholder="San Francisco"
+                    value={formData.city}
+                    onChange={(e) => handleChange('city', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Country
+                  </label>
+                  <Input
+                    placeholder="United States"
+                    value={formData.country}
+                    onChange={(e) => handleChange('country', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Company Size
+                  </label>
+                  <select
+                    value={formData.companySize}
+                    onChange={(e) => handleChange('companySize', e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Size</option>
+                    <option value="1-10">1-10 employees</option>
+                    <option value="11-50">11-50 employees</option>
+                    <option value="51-200">51-200 employees</option>
+                    <option value="201-500">201-500 employees</option>
+                    <option value="501-1000">501-1000 employees</option>
+                    <option value="1000+">1000+ employees</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    LinkedIn Profile
+                  </label>
+                  <Input
+                    placeholder="https://linkedin.com/company/acme"
+                    value={formData.linkedinUrl}
+                    onChange={(e) => handleChange('linkedinUrl', e.target.value)}
                   />
                 </div>
 
@@ -376,12 +425,12 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Description / Notes
+                  Company Overview
                 </label>
                 <textarea
-                  placeholder="Add any additional notes about this client..."
-                  value={formData.description}
-                  onChange={(e) => handleChange('description', e.target.value)}
+                  placeholder="Brief overview of the company, their mission, and what they do..."
+                  value={formData.companyOverview}
+                  onChange={(e) => handleChange('companyOverview', e.target.value)}
                   className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
               </div>
