@@ -13,14 +13,12 @@ import {
   FileText,
   Users,
   Briefcase,
-  Award,
   Plus,
   Edit,
   Trash2,
   Save,
   CheckCircle,
   Sparkles,
-  Newspaper,
   Code,
   Phone,
   Linkedin,
@@ -29,11 +27,10 @@ import {
   Youtube,
   Globe,
   Mail,
-  MapPin,
-  ArrowRight
+  MapPin
 } from 'lucide-react';
 
-type TabType = 'ai-extract' | 'company' | 'contact' | 'social' | 'services' | 'case-studies' | 'team' | 'blogs' | 'press' | 'careers' | 'technology';
+type TabType = 'ai-extract' | 'company' | 'contact' | 'social' | 'services' | 'team' | 'blogs' | 'technology';
 
 export const KnowledgeBase: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('ai-extract');
@@ -122,17 +119,6 @@ export const KnowledgeBase: React.FC = () => {
           }
         }
 
-        if (profile.case_studies) {
-          try {
-            const caseStudiesData = JSON.parse(profile.case_studies as string);
-            if (Array.isArray(caseStudiesData)) {
-              setCaseStudies(caseStudiesData);
-            }
-          } catch (e) {
-            console.error('Error parsing case studies:', e);
-          }
-        }
-
         if (profile.blogs) {
           try {
             const blogsData = JSON.parse(profile.blogs as string);
@@ -141,30 +127,6 @@ export const KnowledgeBase: React.FC = () => {
             }
           } catch (e) {
             console.error('Error parsing blogs:', e);
-          }
-        }
-
-        if (profile.press_news) {
-          try {
-            const pressData = JSON.parse(profile.press_news as string);
-            if (Array.isArray(pressData)) {
-              setPressNews(pressData);
-            }
-          } catch (e) {
-            console.error('Error parsing press news:', e);
-          }
-        }
-
-        if (profile.careers) {
-          try {
-            const careersData = JSON.parse(profile.careers as string);
-            setCareers({
-              hiring: careersData.hiring || false,
-              openPositions: careersData.openPositions || [],
-              culture: careersData.culture || ''
-            });
-          } catch (e) {
-            console.error('Error parsing careers:', e);
           }
         }
 
@@ -217,17 +179,7 @@ export const KnowledgeBase: React.FC = () => {
 
   const [services, setServices] = useState<any[]>([]);
 
-  const [caseStudies, setCaseStudies] = useState<any[]>([]);
-
   const [blogs, setBlogs] = useState<any[]>([]);
-
-  const [pressNews, setPressNews] = useState<any[]>([]);
-
-  const [careers, setCareers] = useState({
-    hiring: false,
-    openPositions: [] as string[],
-    culture: ''
-  });
 
   const [technology, setTechnology] = useState({
     stack: [] as string[],
@@ -343,20 +295,6 @@ export const KnowledgeBase: React.FC = () => {
       setServices(newServices);
     }
 
-    if (data.caseStudies && data.caseStudies.length > 0) {
-      const newCaseStudies = data.caseStudies.map((study: any, index: number) => ({
-        id: `extracted-${Date.now()}-${index}`,
-        title: study.title || '',
-        client: study.client || '',
-        industry: study.industry || '',
-        challenge: study.challenge || '',
-        solution: study.solution || '',
-        results: study.results || [],
-        url: study.url || ''
-      }));
-      setCaseStudies(newCaseStudies);
-    }
-
     if (data.blogs && data.blogs.length > 0) {
       const newBlogs = data.blogs.map((blog: any, index: number) => ({
         id: `extracted-${Date.now()}-${index}`,
@@ -367,26 +305,6 @@ export const KnowledgeBase: React.FC = () => {
         author: blog.author || ''
       }));
       setBlogs(newBlogs);
-    }
-
-    if (data.pressNews && data.pressNews.length > 0) {
-      const newPress = data.pressNews.map((press: any, index: number) => ({
-        id: `extracted-${Date.now()}-${index}`,
-        title: press.title || '',
-        date: press.date || '',
-        summary: press.summary || '',
-        source: press.source || '',
-        url: press.url || ''
-      }));
-      setPressNews(newPress);
-    }
-
-    if (data.careers) {
-      setCareers({
-        hiring: data.careers.hiring || false,
-        openPositions: data.careers.openPositions || [],
-        culture: data.careers.culture || ''
-      });
     }
 
     if (data.technology) {
@@ -406,11 +324,8 @@ export const KnowledgeBase: React.FC = () => {
     { id: 'contact', label: 'Contact', icon: Phone },
     { id: 'social', label: 'Social', icon: Globe },
     { id: 'services', label: 'Services', icon: Briefcase },
-    { id: 'case-studies', label: 'Case Studies', icon: Award },
     { id: 'team', label: 'Leadership', icon: Users },
     { id: 'blogs', label: 'Blogs', icon: FileText },
-    { id: 'press', label: 'Press', icon: Newspaper },
-    { id: 'careers', label: 'Careers', icon: Users },
     { id: 'technology', label: 'Technology', icon: Code }
   ];
 
@@ -814,76 +729,6 @@ export const KnowledgeBase: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'case-studies' && (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            <Button variant="primary">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Case Study
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            {caseStudies.map((study) => (
-              <Card key={study.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground mb-1">
-                        {study.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {study.client} • {study.industry}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {study.challenge && (
-                    <div className="mb-3">
-                      <h4 className="text-sm font-medium text-foreground mb-1">Challenge:</h4>
-                      <p className="text-sm text-muted-foreground">{study.challenge}</p>
-                    </div>
-                  )}
-
-                  {study.solution && (
-                    <div className="mb-3">
-                      <h4 className="text-sm font-medium text-foreground mb-1">Solution:</h4>
-                      <p className="text-sm text-muted-foreground">{study.solution}</p>
-                    </div>
-                  )}
-
-                  <div className="mb-3">
-                    <h4 className="text-sm font-medium text-foreground mb-2">Results:</h4>
-                    <ul className="space-y-1">
-                      {study.results.map((result, idx) => (
-                        <li key={idx} className="text-sm text-muted-foreground flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-green-600" />
-                          {result}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {study.url && (
-                    <a href={study.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
-                      View Full Case Study →
-                    </a>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
       {activeTab === 'team' && (
         <div className="space-y-4">
           <div className="flex justify-end">
@@ -970,104 +815,6 @@ export const KnowledgeBase: React.FC = () => {
             ))}
           </div>
         </div>
-      )}
-
-      {activeTab === 'press' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4">
-            {pressNews.map((press) => (
-              <Card key={press.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-foreground mb-2">
-                        {press.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        {press.summary}
-                      </p>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        {press.date && <span>{press.date}</span>}
-                        {press.source && <span>Source: {press.source}</span>}
-                        {press.url && (
-                          <a href={press.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                            Read Article →
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'careers' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Careers & Hiring</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={careers.hiring}
-                  onChange={(e) => setCareers({ ...careers, hiring: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <label className="text-sm font-medium text-foreground">
-                  Currently Hiring
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Open Positions
-                </label>
-                <div className="space-y-2">
-                  {careers.openPositions.map((position, idx) => (
-                    <Badge key={idx} variant="secondary" className="mr-2">
-                      {position}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Company Culture
-                </label>
-                <textarea
-                  className="w-full min-h-[80px] p-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                  value={careers.culture}
-                  onChange={(e) => setCareers({ ...careers, culture: e.target.value })}
-                />
-              </div>
-
-              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
-                {saved ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Saved!
-                  </>
-                ) : saving ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Careers Info
-                  </>
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       {activeTab === 'technology' && (
