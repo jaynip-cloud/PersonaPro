@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import { AppLayout } from './components/layout/AppLayout';
+import { PublicRoute } from './components/layout/PublicRoute';
 import { HomePage } from './pages/HomePage';
 import { Dashboard } from './pages/Dashboard';
 import { Clients } from './pages/Clients';
@@ -29,9 +30,10 @@ function App() {
         <AppProvider>
           <BrowserRouter>
             <Routes>
-              <Route path="/auth/register" element={<Register />} />
-              <Route path="/auth/login" element={<Login />} />
-              <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+              <Route index element={<Navigate to="/auth/login" replace />} />
+              <Route path="/auth/register" element={<PublicRoute><Register /></PublicRoute>} />
+              <Route path="/auth/login" element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/auth/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
               <Route path="/onboarding" element={<Onboarding />} />
 
               <Route path="/" element={<AppLayout />}>
