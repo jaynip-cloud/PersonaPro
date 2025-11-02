@@ -4,6 +4,7 @@ import { OnboardingProvider } from './context/OnboardingContext';
 import { AppProvider } from './context/AppContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { OnboardingRoute } from './components/auth/OnboardingRoute';
+import { PublicRoute } from './components/auth/PublicRoute';
 import { AppLayout } from './components/layout/AppLayout';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
@@ -32,8 +33,23 @@ function App() {
           <AppProvider>
             <BrowserRouter>
               <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
+                <Route path="/" element={
+                  <PublicRoute>
+                    <Signup />
+                  </PublicRoute>
+                } />
+
+                <Route path="/login" element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                } />
+
+                <Route path="/signup" element={
+                  <PublicRoute>
+                    <Signup />
+                  </PublicRoute>
+                } />
 
                 <Route path="/onboarding" element={
                   <OnboardingRoute>
@@ -41,12 +57,12 @@ function App() {
                   </OnboardingRoute>
                 } />
 
-                <Route path="/" element={
+                <Route path="/app" element={
                   <ProtectedRoute>
                     <AppLayout />
                   </ProtectedRoute>
                 }>
-                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route index element={<Navigate to="/app/dashboard" replace />} />
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="home" element={<HomePage />} />
 
@@ -66,7 +82,7 @@ function App() {
 
                   <Route path="settings" element={<Settings />} />
 
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
                 </Route>
               </Routes>
               <KeyboardShortcuts />

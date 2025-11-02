@@ -183,7 +183,7 @@ export const ProjectDetail: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/projects')}
+            onClick={() => navigate('/app/projects')}
             className="gap-2 mb-4"
           >
             <ArrowLeft className="h-4 w-4" />

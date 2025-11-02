@@ -12,13 +12,13 @@ import {
 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Clients', href: '/clients', icon: Users },
-  { name: 'Projects', href: '/projects', icon: Briefcase },
-  { name: 'Pitch Generator', href: '/pitch-generator', icon: FileText },
-  { name: 'Growth Opportunities', href: '/growth-opportunities', icon: TrendingUp },
-  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
+  { name: 'Clients', href: '/app/clients', icon: Users },
+  { name: 'Projects', href: '/app/projects', icon: Briefcase },
+  { name: 'Pitch Generator', href: '/app/pitch-generator', icon: FileText },
+  { name: 'Growth Opportunities', href: '/app/growth-opportunities', icon: TrendingUp },
+  { name: 'Knowledge Base', href: '/app/knowledge-base', icon: BookOpen },
+  { name: 'Settings', href: '/app/settings', icon: Settings },
 ];
 
 export const Sidebar: React.FC = () => {

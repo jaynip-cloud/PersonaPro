@@ -97,7 +97,7 @@ export const Onboarding: React.FC = () => {
         setCurrentStep(currentStep + 1);
       } else {
         await completeOnboarding();
-        navigate('/dashboard');
+        navigate('/app/dashboard');
       }
     } catch (err) {
       setError('An error occurred. Please try again.');

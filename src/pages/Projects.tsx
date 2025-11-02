@@ -251,7 +251,7 @@ export const Projects: React.FC = () => {
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
-          <Button variant="primary" className="gap-2" onClick={() => navigate('/projects/new')}>
+          <Button variant="primary" className="gap-2" onClick={() => navigate('/app/projects/new')}>
             <Plus className="h-4 w-4" />
             New Project
           </Button>
@@ -443,7 +443,7 @@ export const Projects: React.FC = () => {
               <Briefcase className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">No projects yet</h3>
               <p className="text-muted-foreground mb-6">Create your first project to get started</p>
-              <Button variant="primary" className="gap-2" onClick={() => navigate('/projects/new')}>
+              <Button variant="primary" className="gap-2" onClick={() => navigate('/app/projects/new')}>
                 <Plus className="h-4 w-4" />
                 Create Project
               </Button>
