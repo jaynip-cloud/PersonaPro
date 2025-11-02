@@ -14,10 +14,7 @@ import {
   ArrowLeft,
   Sparkles,
   Users,
-  Award,
   Newspaper,
-  Megaphone,
-  UserCheck,
   Code,
   Plus,
   Trash2
@@ -35,17 +32,6 @@ interface LeadershipMember {
   bio: string;
 }
 
-interface CaseStudy {
-  id: string;
-  title: string;
-  client: string;
-  industry: string;
-  challenge: string;
-  solution: string;
-  results: string[];
-  url: string;
-}
-
 interface Blog {
   id: string;
   title: string;
@@ -53,15 +39,6 @@ interface Blog {
   date: string;
   summary: string;
   author: string;
-}
-
-interface PressNews {
-  id: string;
-  title: string;
-  date: string;
-  summary: string;
-  source: string;
-  url: string;
 }
 
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onComplete }) => {
@@ -95,13 +72,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     services: [] as string[],
     serviceInput: '',
     leadership: [] as LeadershipMember[],
-    caseStudies: [] as CaseStudy[],
     blogs: [] as Blog[],
-    pressNews: [] as PressNews[],
-    hiringStatus: false,
-    openPositions: [] as string[],
-    positionInput: '',
-    culture: '',
     techStack: [] as string[],
     techInput: '',
     partners: [] as string[],
@@ -131,10 +102,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         const serviceNames = services.map((s: any) => s.name || s);
 
         const leadership = profile.leadership ? JSON.parse(profile.leadership as string) : [];
-        const caseStudies = profile.case_studies ? JSON.parse(profile.case_studies as string) : [];
         const blogs = profile.blogs ? JSON.parse(profile.blogs as string) : [];
-        const pressNews = profile.press_news ? JSON.parse(profile.press_news as string) : [];
-        const careers = profile.careers ? JSON.parse(profile.careers as string) : {};
         const technology = profile.technology ? JSON.parse(profile.technology as string) : {};
 
         setFormData(prev => ({
@@ -159,12 +127,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           youtubeUrl: profile.youtube_url || '',
           services: serviceNames,
           leadership: leadership,
-          caseStudies: caseStudies,
           blogs: blogs,
-          pressNews: pressNews,
-          hiringStatus: careers.hiring || false,
-          openPositions: careers.openPositions || [],
-          culture: careers.culture || '',
           techStack: technology.stack || [],
           partners: technology.partners || [],
           integrations: technology.integrations || []
@@ -175,7 +138,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     }
   };
 
-  const totalSteps = 11;
+  const totalSteps = 8;
 
   const steps = [
     { number: 1, title: 'Company', icon: Building2 },
@@ -183,12 +146,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     { number: 3, title: 'Social', icon: Globe },
     { number: 4, title: 'Services', icon: Briefcase },
     { number: 5, title: 'Leadership', icon: Users },
-    { number: 6, title: 'Case Studies', icon: Award },
-    { number: 7, title: 'Blogs', icon: Newspaper },
-    { number: 8, title: 'Press', icon: Megaphone },
-    { number: 9, title: 'Careers', icon: UserCheck },
-    { number: 10, title: 'Technology', icon: Code },
-    { number: 11, title: 'Review', icon: CheckCircle }
+    { number: 6, title: 'Blogs', icon: Newspaper },
+    { number: 7, title: 'Technology', icon: Code },
+    { number: 8, title: 'Review', icon: CheckCircle }
   ];
 
   const handleChange = (field: string, value: any) => {
@@ -242,39 +202,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     }));
   };
 
-  const addCaseStudy = () => {
-    const newCase: CaseStudy = {
-      id: `case-${Date.now()}`,
-      title: '',
-      client: '',
-      industry: '',
-      challenge: '',
-      solution: '',
-      results: [],
-      url: ''
-    };
-    setFormData(prev => ({
-      ...prev,
-      caseStudies: [...prev.caseStudies, newCase]
-    }));
-  };
-
-  const updateCaseStudy = (index: number, field: keyof CaseStudy, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      caseStudies: prev.caseStudies.map((cs, i) =>
-        i === index ? { ...cs, [field]: value } : cs
-      )
-    }));
-  };
-
-  const removeCaseStudy = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      caseStudies: prev.caseStudies.filter((_, i) => i !== index)
-    }));
-  };
-
   const addBlog = () => {
     const newBlog: Blog = {
       id: `blog-${Date.now()}`,
@@ -306,37 +233,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     }));
   };
 
-  const addPress = () => {
-    const newPress: PressNews = {
-      id: `press-${Date.now()}`,
-      title: '',
-      date: '',
-      summary: '',
-      source: '',
-      url: ''
-    };
-    setFormData(prev => ({
-      ...prev,
-      pressNews: [...prev.pressNews, newPress]
-    }));
-  };
-
-  const updatePress = (index: number, field: keyof PressNews, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      pressNews: prev.pressNews.map((press, i) =>
-        i === index ? { ...press, [field]: value } : press
-      )
-    }));
-  };
-
-  const removePress = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      pressNews: prev.pressNews.filter((_, i) => i !== index)
-    }));
-  };
-
   const canProceed = () => {
     switch (currentStep) {
       case 1:
@@ -351,9 +247,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
       case 6:
       case 7:
       case 8:
-      case 9:
-      case 10:
-      case 11:
         return true;
       default:
         return false;
@@ -460,22 +353,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         }));
       }
 
-      if (extractedData.caseStudies && extractedData.caseStudies.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          caseStudies: extractedData.caseStudies.map((cs: any) => ({
-            id: `case-${Date.now()}-${Math.random()}`,
-            title: cs.title || '',
-            client: cs.client || '',
-            industry: cs.industry || '',
-            challenge: cs.challenge || '',
-            solution: cs.solution || '',
-            results: cs.results || [],
-            url: cs.url || ''
-          }))
-        }));
-      }
-
       if (extractedData.blogs && extractedData.blogs.length > 0) {
         setFormData(prev => ({
           ...prev,
@@ -487,29 +364,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             summary: b.summary || '',
             author: b.author || ''
           }))
-        }));
-      }
-
-      if (extractedData.pressNews && extractedData.pressNews.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          pressNews: extractedData.pressNews.map((p: any) => ({
-            id: `press-${Date.now()}-${Math.random()}`,
-            title: p.title || '',
-            date: p.date || '',
-            summary: p.summary || '',
-            source: p.source || '',
-            url: p.url || ''
-          }))
-        }));
-      }
-
-      if (extractedData.careers) {
-        setFormData(prev => ({
-          ...prev,
-          hiringStatus: extractedData.careers.hiring || false,
-          openPositions: extractedData.careers.openPositions || [],
-          culture: extractedData.careers.culture || ''
         }));
       }
 
@@ -567,14 +421,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           youtube_url: formData.youtubeUrl,
           services: JSON.stringify(servicesJson),
           leadership: JSON.stringify(formData.leadership),
-          case_studies: JSON.stringify(formData.caseStudies),
           blogs: JSON.stringify(formData.blogs),
-          press_news: JSON.stringify(formData.pressNews),
-          careers: JSON.stringify({
-            hiring: formData.hiringStatus,
-            openPositions: formData.openPositions,
-            culture: formData.culture
-          }),
           technology: JSON.stringify({
             stack: formData.techStack,
             partners: formData.partners,
@@ -1023,81 +870,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-slate-900">
-                  Case Studies
-                </h3>
-                <Button variant="outline" onClick={addCaseStudy} type="button">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Case Study
-                </Button>
-              </div>
-
-              {formData.caseStudies.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <Award className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No case studies added yet</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {formData.caseStudies.map((cs, index) => (
-                    <div key={cs.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-medium text-slate-900">Case Study {index + 1}</h4>
-                        <button
-                          onClick={() => removeCaseStudy(index)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                      <Input
-                        type="text"
-                        value={cs.title}
-                        onChange={(e) => updateCaseStudy(index, 'title', e.target.value)}
-                        placeholder="Title"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          type="text"
-                          value={cs.client}
-                          onChange={(e) => updateCaseStudy(index, 'client', e.target.value)}
-                          placeholder="Client Name"
-                        />
-                        <Input
-                          type="text"
-                          value={cs.industry}
-                          onChange={(e) => updateCaseStudy(index, 'industry', e.target.value)}
-                          placeholder="Industry"
-                        />
-                      </div>
-                      <textarea
-                        className="w-full min-h-[50px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                        value={cs.challenge}
-                        onChange={(e) => updateCaseStudy(index, 'challenge', e.target.value)}
-                        placeholder="Challenge"
-                      />
-                      <textarea
-                        className="w-full min-h-[50px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                        value={cs.solution}
-                        onChange={(e) => updateCaseStudy(index, 'solution', e.target.value)}
-                        placeholder="Solution"
-                      />
-                      <Input
-                        type="url"
-                        value={cs.url}
-                        onChange={(e) => updateCaseStudy(index, 'url', e.target.value)}
-                        placeholder="URL (optional)"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {currentStep === 7 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900">
                   Blog Articles
                 </h3>
                 <Button variant="outline" onClick={addBlog} type="button">
@@ -1163,152 +935,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             </div>
           )}
 
-          {currentStep === 8 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Press & News
-                </h3>
-                <Button variant="outline" onClick={addPress} type="button">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Press
-                </Button>
-              </div>
-
-              {formData.pressNews.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <Megaphone className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No press releases added yet</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {formData.pressNews.map((press, index) => (
-                    <div key={press.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-medium text-slate-900">Press {index + 1}</h4>
-                        <button
-                          onClick={() => removePress(index)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                      <Input
-                        type="text"
-                        value={press.title}
-                        onChange={(e) => updatePress(index, 'title', e.target.value)}
-                        placeholder="Headline"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          type="date"
-                          value={press.date}
-                          onChange={(e) => updatePress(index, 'date', e.target.value)}
-                          placeholder="Date"
-                        />
-                        <Input
-                          type="text"
-                          value={press.source}
-                          onChange={(e) => updatePress(index, 'source', e.target.value)}
-                          placeholder="Source/Publication"
-                        />
-                      </div>
-                      <textarea
-                        className="w-full min-h-[60px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                        value={press.summary}
-                        onChange={(e) => updatePress(index, 'summary', e.target.value)}
-                        placeholder="Summary"
-                      />
-                      <Input
-                        type="url"
-                        value={press.url}
-                        onChange={(e) => updatePress(index, 'url', e.target.value)}
-                        placeholder="URL (optional)"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {currentStep === 9 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                Careers & Hiring
-              </h3>
-
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="hiring"
-                  checked={formData.hiringStatus}
-                  onChange={(e) => handleChange('hiringStatus', e.target.checked)}
-                  className="w-4 h-4 text-blue-600"
-                />
-                <label htmlFor="hiring" className="text-sm font-medium text-slate-700">
-                  Currently Hiring
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Open Positions
-                </label>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    type="text"
-                    value={formData.positionInput}
-                    onChange={(e) => handleChange('positionInput', e.target.value)}
-                    placeholder="e.g., Senior Software Engineer"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addItem('openPositions', 'positionInput');
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="primary"
-                    onClick={() => addItem('openPositions', 'positionInput')}
-                    type="button"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {formData.openPositions.map((position, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
-                    >
-                      <span className="text-slate-900">{position}</span>
-                      <button
-                        onClick={() => removeItem('openPositions', index)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Company Culture
-                </label>
-                <textarea
-                  className="w-full min-h-[100px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  value={formData.culture}
-                  onChange={(e) => handleChange('culture', e.target.value)}
-                  placeholder="Describe your company culture and work environment..."
-                />
-              </div>
-            </div>
-          )}
-
-          {currentStep === 10 && (
+          {currentStep === 7 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">
                 Technology & Partners
@@ -1445,7 +1072,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             </div>
           )}
 
-          {currentStep === 11 && (
+          {currentStep === 8 && (
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">
                 Review Your Information
@@ -1491,10 +1118,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   <h4 className="text-sm font-semibold text-slate-700 mb-2">Additional Data</h4>
                   <div className="space-y-1 text-sm">
                     <p><span className="font-medium">Leadership:</span> {formData.leadership.length} members</p>
-                    <p><span className="font-medium">Case Studies:</span> {formData.caseStudies.length}</p>
                     <p><span className="font-medium">Blog Articles:</span> {formData.blogs.length}</p>
-                    <p><span className="font-medium">Press Releases:</span> {formData.pressNews.length}</p>
-                    <p><span className="font-medium">Open Positions:</span> {formData.openPositions.length}</p>
                     <p><span className="font-medium">Tech Stack:</span> {formData.techStack.length} technologies</p>
                   </div>
                 </div>

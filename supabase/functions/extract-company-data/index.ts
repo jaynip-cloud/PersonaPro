@@ -215,11 +215,8 @@ Extract COMPLETE information for:
 3. ALL social media profiles (LinkedIn, Twitter, Facebook, Instagram, YouTube)
 4. Services/Products with descriptions
 5. Leadership team members (names, titles, bios)
-6. Case studies (title, client, challenge, solution, results)
-7. Blog articles (title, URL, date, summary, author)
-8. Press/News coverage (title, date, source, summary)
-9. Careers info (hiring status, open positions, culture)
-10. Technology stack, partners, and integrations
+6. Blog articles (title, URL, date, summary, author)
+7. Technology stack, partners, and integrations
 
 Return ONLY valid JSON with ALL available data. If info is unavailable, use empty strings/arrays:
 
@@ -249,10 +246,7 @@ Return ONLY valid JSON with ALL available data. If info is unavailable, use empt
   },
   "services": [{"name": "", "description": "", "tags": [], "pricing": ""}],
   "leadership": [{"name": "", "role": "", "bio": ""}],
-  "caseStudies": [{"title": "", "client": "", "industry": "", "challenge": "", "solution": "", "results": [], "url": ""}],
   "blogs": [{"title": "", "url": "", "date": "", "summary": "", "author": ""}],
-  "pressNews": [{"title": "", "date": "", "summary": "", "source": "", "url": ""}],
-  "careers": {"hiring": false, "openPositions": [], "culture": ""},
   "technology": {"stack": [], "partners": [], "integrations": []}
 }
 
