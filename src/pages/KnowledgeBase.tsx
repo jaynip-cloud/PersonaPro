@@ -72,18 +72,18 @@ export const KnowledgeBase: React.FC = () => {
           canonicalUrl: profile.website || '',
           industry: profile.industry || '',
           description: profile.about || '',
-          valueProposition: '',
-          founded: '',
-          location: '',
-          size: '',
-          mission: '',
-          vision: ''
+          valueProposition: profile.value_proposition || '',
+          founded: profile.founded || '',
+          location: profile.location || '',
+          size: profile.size || '',
+          mission: profile.mission || '',
+          vision: profile.vision || ''
         });
 
         setContactInfo({
           email: profile.email || '',
           phone: profile.phone || '',
-          address: ''
+          address: profile.address || ''
         });
 
         setSocialProfiles({
@@ -91,7 +91,7 @@ export const KnowledgeBase: React.FC = () => {
           twitter: profile.twitter_url || '',
           facebook: profile.facebook_url || '',
           instagram: profile.instagram_url || '',
-          youtube: ''
+          youtube: profile.youtube_url || ''
         });
 
         if (profile.services) {
@@ -108,6 +108,76 @@ export const KnowledgeBase: React.FC = () => {
             }
           } catch (e) {
             console.error('Error parsing services:', e);
+          }
+        }
+
+        if (profile.leadership) {
+          try {
+            const leadershipData = JSON.parse(profile.leadership as string);
+            if (Array.isArray(leadershipData)) {
+              setLeadership(leadershipData);
+            }
+          } catch (e) {
+            console.error('Error parsing leadership:', e);
+          }
+        }
+
+        if (profile.case_studies) {
+          try {
+            const caseStudiesData = JSON.parse(profile.case_studies as string);
+            if (Array.isArray(caseStudiesData)) {
+              setCaseStudies(caseStudiesData);
+            }
+          } catch (e) {
+            console.error('Error parsing case studies:', e);
+          }
+        }
+
+        if (profile.blogs) {
+          try {
+            const blogsData = JSON.parse(profile.blogs as string);
+            if (Array.isArray(blogsData)) {
+              setBlogs(blogsData);
+            }
+          } catch (e) {
+            console.error('Error parsing blogs:', e);
+          }
+        }
+
+        if (profile.press_news) {
+          try {
+            const pressData = JSON.parse(profile.press_news as string);
+            if (Array.isArray(pressData)) {
+              setPressNews(pressData);
+            }
+          } catch (e) {
+            console.error('Error parsing press news:', e);
+          }
+        }
+
+        if (profile.careers) {
+          try {
+            const careersData = JSON.parse(profile.careers as string);
+            setCareers({
+              hiring: careersData.hiring || false,
+              openPositions: careersData.openPositions || [],
+              culture: careersData.culture || ''
+            });
+          } catch (e) {
+            console.error('Error parsing careers:', e);
+          }
+        }
+
+        if (profile.technology) {
+          try {
+            const technologyData = JSON.parse(profile.technology as string);
+            setTechnology({
+              stack: technologyData.stack || [],
+              partners: technologyData.partners || [],
+              integrations: technologyData.integrations || []
+            });
+          } catch (e) {
+            console.error('Error parsing technology:', e);
           }
         }
       }
