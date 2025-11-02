@@ -3,11 +3,11 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 
-interface ProtectedRouteProps {
+interface OnboardingRouteProps {
   children: React.ReactNode;
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+export const OnboardingRoute: React.FC<OnboardingRouteProps> = ({ children }) => {
   const { user, loading: authLoading } = useAuth();
   const { isOnboardingComplete, loading: onboardingLoading } = useOnboarding();
 
@@ -26,8 +26,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (!isOnboardingComplete) {
-    return <Navigate to="/onboarding" replace />;
+  if (isOnboardingComplete) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;
