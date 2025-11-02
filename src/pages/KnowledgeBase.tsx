@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { useOnboarding } from '../context/OnboardingContext';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -32,75 +31,35 @@ import {
 type TabType = 'ai-extract' | 'company' | 'contact' | 'social' | 'services' | 'case-studies' | 'team' | 'blogs' | 'press' | 'careers' | 'technology';
 
 export const KnowledgeBase: React.FC = () => {
-  const { companyProfile, updateCompanyProfile } = useOnboarding();
-  const [activeTab, setActiveTab] = useState<TabType>('company');
+  const [activeTab, setActiveTab] = useState<TabType>('ai-extract');
   const [saved, setSaved] = useState(false);
 
   const [companyInfo, setCompanyInfo] = useState({
-    name: '',
-    canonicalUrl: '',
-    industry: '',
-    description: '',
-    valueProposition: '',
-    founded: '',
-    location: '',
-    size: '',
-    mission: '',
-    vision: ''
+    name: 'TechSolutions Inc.',
+    canonicalUrl: 'https://techsolutions.com',
+    industry: 'Software & Technology',
+    description: 'We provide enterprise software solutions and consulting services to help businesses transform digitally.',
+    valueProposition: 'Accelerate digital transformation with AI-powered insights and proven methodologies.',
+    founded: '2015',
+    location: 'San Francisco, CA',
+    size: '50-100 employees',
+    mission: 'To empower businesses with cutting-edge technology solutions that drive measurable results.',
+    vision: 'To be the leading provider of AI-powered business transformation services globally.'
   });
 
   const [contactInfo, setContactInfo] = useState({
-    email: '',
-    phone: '',
-    address: ''
+    email: 'contact@techsolutions.com',
+    phone: '+1 (555) 123-4567',
+    address: '123 Tech Street, San Francisco, CA 94105'
   });
 
   const [socialProfiles, setSocialProfiles] = useState({
-    linkedin: '',
-    twitter: '',
+    linkedin: 'https://linkedin.com/company/techsolutions',
+    twitter: 'https://twitter.com/techsolutions',
     facebook: '',
     instagram: '',
     youtube: ''
   });
-
-  useEffect(() => {
-    if (companyProfile) {
-      setCompanyInfo({
-        name: companyProfile.company_name || '',
-        canonicalUrl: companyProfile.website || '',
-        industry: companyProfile.industry || '',
-        description: companyProfile.about || '',
-        valueProposition: '',
-        founded: '',
-        location: '',
-        size: '',
-        mission: '',
-        vision: ''
-      });
-      setContactInfo({
-        email: companyProfile.email || '',
-        phone: companyProfile.phone || '',
-        address: ''
-      });
-      setSocialProfiles({
-        linkedin: companyProfile.linkedin_url || '',
-        twitter: companyProfile.twitter_url || '',
-        facebook: companyProfile.facebook_url || '',
-        instagram: companyProfile.instagram_url || '',
-        youtube: ''
-      });
-      if (companyProfile.services && Array.isArray(companyProfile.services)) {
-        const loadedServices = companyProfile.services.map((name: string, idx: number) => ({
-          id: String(idx + 1),
-          name,
-          description: '',
-          tags: [],
-          pricing: ''
-        }));
-        setServices(loadedServices.length > 0 ? loadedServices : []);
-      }
-    }
-  }, [companyProfile]);
 
   const [leadership, setLeadership] = useState([
     {
@@ -169,22 +128,7 @@ export const KnowledgeBase: React.FC = () => {
     integrations: ['Salesforce', 'Slack', 'Jira']
   });
 
-  const handleSave = async () => {
-    const updateData: any = {
-      company_name: companyInfo.name,
-      website: companyInfo.canonicalUrl,
-      industry: companyInfo.industry,
-      about: companyInfo.description,
-      email: contactInfo.email,
-      phone: contactInfo.phone,
-      linkedin_url: socialProfiles.linkedin,
-      twitter_url: socialProfiles.twitter,
-      facebook_url: socialProfiles.facebook,
-      instagram_url: socialProfiles.instagram,
-      services: services.map(s => s.name).filter(n => n.trim() !== '')
-    };
-
-    await updateCompanyProfile(updateData);
+  const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

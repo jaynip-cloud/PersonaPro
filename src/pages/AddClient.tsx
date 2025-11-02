@@ -153,7 +153,7 @@ export const AddClient: React.FC = () => {
 
     showToast('success', 'Client created successfully');
     setTimeout(() => {
-      navigate('/app/clients');
+      navigate('/clients');
     }, 1000);
   };
 
@@ -179,7 +179,7 @@ export const AddClient: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/app/clients')}
+            onClick={() => navigate('/clients')}
             className="gap-2 mb-4"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -666,7 +666,7 @@ export const AddClient: React.FC = () => {
           Previous
         </Button>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => navigate('/app/clients')}>
+          <Button variant="outline" onClick={() => navigate('/clients')}>
             Cancel
           </Button>
           {activeTab !== 'additional' ? (

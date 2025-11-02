@@ -69,7 +69,7 @@ export const HomePage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/app/clients')}>
+        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate('/clients')}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -214,7 +214,7 @@ export const HomePage: React.FC = () => {
                 </div>
               ))}
             </div>
-            <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/app/clients')}>
+            <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/clients')}>
               View All Opportunities
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>

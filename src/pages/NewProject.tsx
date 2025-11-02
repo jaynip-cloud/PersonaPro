@@ -178,7 +178,7 @@ export const NewProject: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/app/projects')}
+            onClick={() => navigate('/projects')}
             className="gap-2 mb-4"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -498,7 +498,7 @@ export const NewProject: React.FC = () => {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate('/app/projects')}
+            onClick={() => navigate('/projects')}
           >
             Cancel
           </Button>

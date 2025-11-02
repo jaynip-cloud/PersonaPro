@@ -25,7 +25,7 @@ export const Clients: React.FC = () => {
           <h1 className="text-3xl font-bold text-foreground">Clients</h1>
           <p className="text-muted-foreground mt-2">Manage and analyze your client relationships</p>
         </div>
-        <Button variant="primary" onClick={() => navigate('/app/clients/new')}>
+        <Button variant="primary" onClick={() => navigate('/clients/new')}>
           <Plus className="h-4 w-4 mr-2" />
           Add Client
         </Button>

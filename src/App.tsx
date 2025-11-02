@@ -1,14 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import { OnboardingProvider } from './context/OnboardingContext';
 import { AppProvider } from './context/AppContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { OnboardingRoute } from './components/auth/OnboardingRoute';
-import { PublicRoute } from './components/auth/PublicRoute';
 import { AppLayout } from './components/layout/AppLayout';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
-import { Onboarding } from './pages/Onboarding';
 import { HomePage } from './pages/HomePage';
 import { Dashboard } from './pages/Dashboard';
 import { Clients } from './pages/Clients';
@@ -29,66 +25,43 @@ function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <OnboardingProvider>
-          <AppProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={
-                  <PublicRoute>
-                    <Signup />
-                  </PublicRoute>
-                } />
+        <AppProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
 
-                <Route path="/login" element={
-                  <PublicRoute>
-                    <Login />
-                  </PublicRoute>
-                } />
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="home" element={<HomePage />} />
 
-                <Route path="/signup" element={
-                  <PublicRoute>
-                    <Signup />
-                  </PublicRoute>
-                } />
+                <Route path="clients" element={<Clients />} />
+                <Route path="clients/new" element={<AddClient />} />
+                <Route path="clients/:id" element={<ClientDetailNew />} />
+                <Route path="clients/:id/edit" element={<AddClient />} />
 
-                <Route path="/onboarding" element={
-                  <OnboardingRoute>
-                    <Onboarding />
-                  </OnboardingRoute>
-                } />
+                <Route path="projects" element={<Projects />} />
+                <Route path="projects/new" element={<NewProject />} />
+                <Route path="projects/:id" element={<ProjectDetail />} />
 
-                <Route path="/app" element={
-                  <ProtectedRoute>
-                    <AppLayout />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Navigate to="/app/dashboard" replace />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="home" element={<HomePage />} />
+                <Route path="pitch-generator" element={<PitchGenerator />} />
+                <Route path="growth-opportunities" element={<GrowthOpportunities />} />
 
-                  <Route path="clients" element={<Clients />} />
-                  <Route path="clients/new" element={<AddClient />} />
-                  <Route path="clients/:id" element={<ClientDetailNew />} />
-                  <Route path="clients/:id/edit" element={<AddClient />} />
+                <Route path="knowledge-base" element={<KnowledgeBase />} />
 
-                  <Route path="projects" element={<Projects />} />
-                  <Route path="projects/new" element={<NewProject />} />
-                  <Route path="projects/:id" element={<ProjectDetail />} />
+                <Route path="settings" element={<Settings />} />
 
-                  <Route path="pitch-generator" element={<PitchGenerator />} />
-                  <Route path="growth-opportunities" element={<GrowthOpportunities />} />
-
-                  <Route path="knowledge-base" element={<KnowledgeBase />} />
-
-                  <Route path="settings" element={<Settings />} />
-
-                  <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
-                </Route>
-              </Routes>
-              <KeyboardShortcuts />
-            </BrowserRouter>
-          </AppProvider>
-        </OnboardingProvider>
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Route>
+            </Routes>
+            <KeyboardShortcuts />
+          </BrowserRouter>
+        </AppProvider>
       </AuthProvider>
     </ToastProvider>
   );

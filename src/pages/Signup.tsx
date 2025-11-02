@@ -37,7 +37,7 @@ export const Signup: React.FC = () => {
       setError(error.message);
       setLoading(false);
     } else {
-      navigate('/onboarding');
+      navigate('/dashboard');
     }
   };
 
