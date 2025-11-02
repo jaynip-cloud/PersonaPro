@@ -1,11 +1,24 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { Users, TrendingUp, AlertCircle, CheckCircle } from 'lucide-react';
+import { Button } from '../components/ui/Button';
+import { Users, TrendingUp, AlertCircle, CheckCircle, Plus, Sparkles } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { clients, recommendations, agentRuns } = useApp();
+  const { user, organization } = useAuth();
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('welcome') === 'true') {
+      setShowWelcome(true);
+    }
+  }, [searchParams]);
 
   const activeClients = clients.filter(c => c.status === 'active').length;
   const highPriorityRecs = recommendations.filter(r => r.priority === 'high' || r.priority === 'critical').length;
@@ -13,6 +26,40 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {showWelcome && (
+        <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                <Sparkles className="h-6 w-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-foreground mb-2">
+                  Welcome to {organization?.name || 'Your Dashboard'}!
+                </h2>
+                <p className="text-muted-foreground mb-4">
+                  Your company knowledge base is set up. Start adding clients to unlock AI-powered
+                  intelligence and personalized recommendations.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="primary"
+                    onClick={() => navigate('/clients/new')}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Your First Client
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowWelcome(false)}>
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div>
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground mt-2">Welcome back! Here's your AI-powered intelligence overview.</p>
