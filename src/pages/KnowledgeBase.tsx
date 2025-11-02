@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { AIDataExtractor } from '../components/knowledge/AIDataExtractor';
+import { OnboardingWizard } from '../components/onboarding/OnboardingWizard';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
@@ -39,8 +40,15 @@ export const KnowledgeBase: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
   const { user, isKnowledgeBaseComplete, checkKnowledgeBaseStatus } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isKnowledgeBaseComplete) {
+      setShowWizard(true);
+    }
+  }, [isKnowledgeBaseComplete]);
 
   const [companyInfo, setCompanyInfo] = useState({
     name: 'TechSolutions Inc.',
@@ -315,44 +323,27 @@ export const KnowledgeBase: React.FC = () => {
     { id: 'technology', label: 'Technology', icon: Code }
   ];
 
+  const handleWizardComplete = async () => {
+    setShowWizard(false);
+    await checkKnowledgeBaseStatus();
+  };
+
   return (
-    <div className="p-6 space-y-6">
-      {!isKnowledgeBaseComplete && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start justify-between">
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-blue-900 mb-1">
-              Welcome! Complete Your Company Profile
-            </h3>
-            <p className="text-sm text-blue-700">
-              Please fill in your company details to unlock all features. You can use AI extraction to speed up the process.
+    <>
+      <OnboardingWizard
+        isOpen={showWizard}
+        onComplete={handleWizardComplete}
+      />
+
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Knowledge Base</h1>
+            <p className="text-muted-foreground mt-2">
+              Comprehensive company intelligence powered by AI
             </p>
           </div>
-          <Button
-            variant="primary"
-            onClick={handleCompleteSetup}
-            disabled={completing || !companyInfo.name || !companyInfo.canonicalUrl}
-            className="ml-4 whitespace-nowrap"
-          >
-            {completing ? (
-              'Completing...'
-            ) : (
-              <>
-                Complete Setup
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </>
-            )}
-          </Button>
         </div>
-      )}
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Knowledge Base</h1>
-          <p className="text-muted-foreground mt-2">
-            Comprehensive company intelligence powered by AI
-          </p>
-        </div>
-      </div>
 
       <div className="flex gap-2 border-b border-border overflow-x-auto">
         {tabs.map((tab) => {
@@ -1044,5 +1035,6 @@ export const KnowledgeBase: React.FC = () => {
         </Card>
       )}
     </div>
+    </>
   );
 };

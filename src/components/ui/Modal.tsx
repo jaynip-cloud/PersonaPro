@@ -8,6 +8,8 @@ interface ModalProps {
   title?: string;
   description?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  closeOnEscape?: boolean;
+  closeOnClickOutside?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -17,10 +19,12 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   description,
   size = 'md',
+  closeOnEscape = true,
+  closeOnClickOutside = true,
 }) => {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && closeOnEscape) onClose();
     };
 
     if (isOpen) {
@@ -32,7 +36,7 @@ export const Modal: React.FC<ModalProps> = ({
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, closeOnEscape]);
 
   if (!isOpen) return null;
 
@@ -51,30 +55,35 @@ export const Modal: React.FC<ModalProps> = ({
       aria-labelledby={title ? 'modal-title' : undefined}
       aria-describedby={description ? 'modal-description' : undefined}
     >
-      <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+        onClick={closeOnClickOutside ? onClose : undefined}
+      />
       <div className={`relative bg-card rounded-lg shadow-lg border border-border w-full ${sizeClasses[size]} mx-4 max-h-[90vh] overflow-auto`}>
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <div>
-            {title && (
-              <h2 id="modal-title" className="text-lg font-semibold">
-                {title}
-              </h2>
-            )}
-            {description && (
-              <p id="modal-description" className="text-sm text-muted-foreground mt-1">
-                {description}
-              </p>
-            )}
+        {(title || description) && (
+          <div className="flex items-center justify-between p-6 border-b border-border">
+            <div>
+              {title && (
+                <h2 id="modal-title" className="text-lg font-semibold">
+                  {title}
+                </h2>
+              )}
+              {description && (
+                <p id="modal-description" className="text-sm text-muted-foreground mt-1">
+                  {description}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              aria-label="Close modal"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            aria-label="Close modal"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="p-6">{children}</div>
+        )}
+        <div className={title || description ? 'p-6' : ''}>{children}</div>
       </div>
     </div>
   );
