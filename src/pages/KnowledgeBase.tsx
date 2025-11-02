@@ -50,98 +50,119 @@ export const KnowledgeBase: React.FC = () => {
     }
   }, [isKnowledgeBaseComplete]);
 
+  useEffect(() => {
+    if (user && isKnowledgeBaseComplete) {
+      loadExistingData();
+    }
+  }, [user, isKnowledgeBaseComplete]);
+
+  const loadExistingData = async () => {
+    if (!user) return;
+
+    try {
+      const { data: profile } = await supabase
+        .from('company_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (profile) {
+        setCompanyInfo({
+          name: profile.company_name || '',
+          canonicalUrl: profile.website || '',
+          industry: profile.industry || '',
+          description: profile.about || '',
+          valueProposition: '',
+          founded: '',
+          location: '',
+          size: '',
+          mission: '',
+          vision: ''
+        });
+
+        setContactInfo({
+          email: profile.email || '',
+          phone: profile.phone || '',
+          address: ''
+        });
+
+        setSocialProfiles({
+          linkedin: profile.linkedin_url || '',
+          twitter: profile.twitter_url || '',
+          facebook: profile.facebook_url || '',
+          instagram: profile.instagram_url || '',
+          youtube: ''
+        });
+
+        if (profile.services) {
+          try {
+            const servicesData = JSON.parse(profile.services as string);
+            if (Array.isArray(servicesData) && servicesData.length > 0) {
+              setServices(servicesData.map((s: any, index: number) => ({
+                id: s.id || `service-${index}`,
+                name: s.name || '',
+                description: s.description || '',
+                tags: s.tags || [],
+                pricing: s.pricing || ''
+              })));
+            }
+          } catch (e) {
+            console.error('Error parsing services:', e);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading existing data:', error);
+    }
+  };
+
   const [companyInfo, setCompanyInfo] = useState({
-    name: 'TechSolutions Inc.',
-    canonicalUrl: 'https://techsolutions.com',
-    industry: 'Software & Technology',
-    description: 'We provide enterprise software solutions and consulting services to help businesses transform digitally.',
-    valueProposition: 'Accelerate digital transformation with AI-powered insights and proven methodologies.',
-    founded: '2015',
-    location: 'San Francisco, CA',
-    size: '50-100 employees',
-    mission: 'To empower businesses with cutting-edge technology solutions that drive measurable results.',
-    vision: 'To be the leading provider of AI-powered business transformation services globally.'
+    name: '',
+    canonicalUrl: '',
+    industry: '',
+    description: '',
+    valueProposition: '',
+    founded: '',
+    location: '',
+    size: '',
+    mission: '',
+    vision: ''
   });
 
   const [contactInfo, setContactInfo] = useState({
-    email: 'contact@techsolutions.com',
-    phone: '+1 (555) 123-4567',
-    address: '123 Tech Street, San Francisco, CA 94105'
+    email: '',
+    phone: '',
+    address: ''
   });
 
   const [socialProfiles, setSocialProfiles] = useState({
-    linkedin: 'https://linkedin.com/company/techsolutions',
-    twitter: 'https://twitter.com/techsolutions',
+    linkedin: '',
+    twitter: '',
     facebook: '',
     instagram: '',
     youtube: ''
   });
 
-  const [leadership, setLeadership] = useState([
-    {
-      id: '1',
-      name: 'Sarah Johnson',
-      role: 'CEO & Founder',
-      bio: 'AI Strategy, Business Development',
-      experience: '15 years'
-    }
-  ]);
+  const [leadership, setLeadership] = useState<any[]>([]);
 
-  const [services, setServices] = useState([
-    {
-      id: '1',
-      name: 'AI Consulting',
-      description: 'Strategic AI implementation and integration services',
-      tags: ['AI', 'Strategy', 'Consulting'],
-      pricing: '$50,000 - $200,000'
-    }
-  ]);
+  const [services, setServices] = useState<any[]>([]);
 
-  const [caseStudies, setCaseStudies] = useState([
-    {
-      id: '1',
-      title: 'Fortune 500 Digital Transformation',
-      client: 'Global Retail Corp',
-      industry: 'Retail',
-      challenge: 'Legacy systems hindering growth',
-      solution: 'AI-powered modernization',
-      results: ['40% increase in operational efficiency', 'Reduced costs by $2M annually'],
-      url: ''
-    }
-  ]);
+  const [caseStudies, setCaseStudies] = useState<any[]>([]);
 
-  const [blogs, setBlogs] = useState([
-    {
-      id: '1',
-      title: 'The Future of AI in Enterprise',
-      url: 'https://techsolutions.com/blog/future-ai',
-      date: '2024-01-15',
-      summary: 'Exploring upcoming AI trends',
-      author: 'Sarah Johnson'
-    }
-  ]);
+  const [blogs, setBlogs] = useState<any[]>([]);
 
-  const [pressNews, setPressNews] = useState([
-    {
-      id: '1',
-      title: 'TechSolutions Raises $10M Series A',
-      date: '2024-02-01',
-      summary: 'Funding to accelerate AI product development',
-      source: 'TechCrunch',
-      url: ''
-    }
-  ]);
+  const [pressNews, setPressNews] = useState<any[]>([]);
 
   const [careers, setCareers] = useState({
-    hiring: true,
-    openPositions: ['Senior AI Engineer', 'Product Manager'],
-    culture: 'Innovative, collaborative, remote-friendly environment'
+    hiring: false,
+    openPositions: [] as string[],
+    culture: ''
   });
 
   const [technology, setTechnology] = useState({
-    stack: ['React', 'Node.js', 'Python', 'TensorFlow'],
-    partners: ['AWS', 'Microsoft Azure'],
-    integrations: ['Salesforce', 'Slack', 'Jira']
+    stack: [] as string[],
+    partners: [] as string[],
+    integrations: [] as string[]
   });
 
   const handleSave = async () => {
@@ -672,8 +693,17 @@ export const KnowledgeBase: React.FC = () => {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {services.map((service) => (
+          {services.length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Briefcase className="h-12 w-12 mx-auto mb-3 text-slate-400" />
+                <p className="text-slate-600 mb-2">No services added yet</p>
+                <p className="text-sm text-slate-500">Services you entered during onboarding will appear here</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {services.map((service) => (
               <Card key={service.id}>
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
@@ -708,8 +738,9 @@ export const KnowledgeBase: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

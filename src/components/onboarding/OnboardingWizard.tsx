@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -23,6 +23,9 @@ interface OnboardingWizardProps {
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onComplete }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [openaiKey, setOpenaiKey] = useState('');
   const { user, checkKnowledgeBaseStatus } = useAuth();
   const navigate = useNavigate();
 
@@ -38,6 +41,44 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     services: [] as string[],
     serviceInput: ''
   });
+
+  useEffect(() => {
+    if (isOpen && user) {
+      loadExistingData();
+    }
+  }, [isOpen, user]);
+
+  const loadExistingData = async () => {
+    if (!user) return;
+
+    try {
+      const { data: profile } = await supabase
+        .from('company_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (profile) {
+        const services = profile.services ? JSON.parse(profile.services as string) : [];
+        const serviceNames = services.map((s: any) => s.name || s);
+
+        setFormData(prev => ({
+          ...prev,
+          companyName: profile.company_name || '',
+          website: profile.website || '',
+          industry: profile.industry || '',
+          description: profile.about || '',
+          email: profile.email || '',
+          phone: profile.phone || '',
+          linkedinUrl: profile.linkedin_url || '',
+          twitterUrl: profile.twitter_url || '',
+          services: serviceNames
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading existing data:', error);
+    }
+  };
 
   const totalSteps = 4;
 
@@ -93,6 +134,81 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep(prev => prev - 1);
+    }
+  };
+
+  const handleAutoFill = async () => {
+    if (!formData.website) {
+      alert('Please enter a website URL first');
+      return;
+    }
+
+    if (!openaiKey) {
+      setShowApiKeyInput(true);
+      return;
+    }
+
+    setExtracting(true);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-company-data`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: formData.website,
+          openaiKey: openaiKey
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to extract data');
+      }
+
+      const extractedData = await response.json();
+
+      if (extractedData.companyInfo) {
+        setFormData(prev => ({
+          ...prev,
+          companyName: extractedData.companyInfo.name || prev.companyName,
+          industry: extractedData.companyInfo.industry || prev.industry,
+          description: extractedData.companyInfo.description || prev.description,
+        }));
+      }
+
+      if (extractedData.contactInfo) {
+        setFormData(prev => ({
+          ...prev,
+          email: extractedData.contactInfo.email || prev.email,
+          phone: extractedData.contactInfo.phone || prev.phone,
+        }));
+      }
+
+      if (extractedData.socialProfiles) {
+        setFormData(prev => ({
+          ...prev,
+          linkedinUrl: extractedData.socialProfiles.linkedin || prev.linkedinUrl,
+          twitterUrl: extractedData.socialProfiles.twitter || prev.twitterUrl,
+        }));
+      }
+
+      if (extractedData.services && extractedData.services.length > 0) {
+        const serviceNames = extractedData.services.map((s: any) => s.name);
+        setFormData(prev => ({
+          ...prev,
+          services: [...new Set([...prev.services, ...serviceNames])]
+        }));
+      }
+
+      alert('Data extracted successfully! Please review and edit as needed.');
+    } catch (error) {
+      console.error('Error extracting data:', error);
+      alert('Failed to extract data. Please try again or enter details manually.');
+    } finally {
+      setExtracting(false);
     }
   };
 
@@ -201,9 +317,67 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         <div className="min-h-[400px]">
           {currentStep === 1 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                Tell us about your company
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Tell us about your company
+                </h3>
+                <Button
+                  variant="outline"
+                  onClick={handleAutoFill}
+                  disabled={!formData.website || extracting}
+                  type="button"
+                  className="flex items-center gap-2"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {extracting ? 'Extracting...' : 'AI Autofill'}
+                </Button>
+              </div>
+
+              {showApiKeyInput && !openaiKey && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                  <p className="text-sm text-blue-900">
+                    To use AI autofill, please enter your OpenAI API key. Your key is only used for this session and is not stored.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="password"
+                      value={openaiKey}
+                      onChange={(e) => setOpenaiKey(e.target.value)}
+                      placeholder="sk-..."
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        setShowApiKeyInput(false);
+                        if (openaiKey) handleAutoFill();
+                      }}
+                      disabled={!openaiKey}
+                    >
+                      Continue
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Website URL *
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    type="url"
+                    value={formData.website}
+                    onChange={(e) => handleChange('website', e.target.value)}
+                    placeholder="https://yourcompany.com"
+                    required
+                    className="flex-1"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Enter your website URL and click AI Autofill to extract company details automatically
+                </p>
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -214,19 +388,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   value={formData.companyName}
                   onChange={(e) => handleChange('companyName', e.target.value)}
                   placeholder="e.g., TechSolutions Inc."
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Website URL *
-                </label>
-                <Input
-                  type="url"
-                  value={formData.website}
-                  onChange={(e) => handleChange('website', e.target.value)}
-                  placeholder="https://yourcompany.com"
                   required
                 />
               </div>
