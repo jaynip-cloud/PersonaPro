@@ -29,29 +29,59 @@ export interface OnboardingData {
 
 export const authService = {
   async signUp(email: string, password: string, name: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
-        },
-        emailRedirectTo: undefined,
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-signup`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       },
+      body: JSON.stringify({ email, password, name }),
     });
 
-    if (error) throw error;
-    return data;
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to sign up');
+    }
+
+    if (result.session) {
+      await supabase.auth.setSession({
+        access_token: result.session.access_token,
+        refresh_token: result.session.refresh_token,
+      });
+    }
+
+    return { user: result.user, session: result.session };
   },
 
   async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-signin`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ email, password }),
     });
 
-    if (error) throw error;
-    return data;
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to sign in');
+    }
+
+    if (result.session) {
+      await supabase.auth.setSession({
+        access_token: result.session.access_token,
+        refresh_token: result.session.refresh_token,
+      });
+    }
+
+    return { user: result.user, session: result.session };
   },
 
   async signOut() {
