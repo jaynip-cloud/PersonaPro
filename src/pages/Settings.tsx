@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import {
   User,
   Bell,
@@ -14,7 +18,9 @@ import {
   CheckCircle,
   Database,
   Eye,
-  EyeOff
+  EyeOff,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
@@ -22,6 +28,11 @@ export const Settings: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [openaiKey, setOpenaiKey] = useState('');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const storedKey = localStorage.getItem('openai_key');
@@ -61,6 +72,39 @@ export const Settings: React.FC = () => {
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      alert('Please type DELETE to confirm account deletion');
+      return;
+    }
+
+    if (!user) return;
+
+    setIsDeleting(true);
+    try {
+      const { error: deleteError } = await supabase
+        .from('company_profiles')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (deleteError) {
+        console.error('Error deleting profile:', deleteError);
+      }
+
+      const { error } = await supabase.rpc('delete_user');
+
+      if (error) throw error;
+
+      localStorage.clear();
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      alert('Failed to delete account. Please try again or contact support.');
+      setIsDeleting(false);
+    }
   };
 
   const tabs = [
@@ -195,6 +239,21 @@ export const Settings: React.FC = () => {
                       </>
                     )}
                   </Button>
+
+                  <div className="mt-8 pt-6 border-t border-red-200">
+                    <h3 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h3>
+                    <p className="text-sm text-slate-600 mb-4">
+                      Permanently delete your account and all associated data. This action cannot be undone.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowDeleteModal(true)}
+                      className="border-red-300 text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Account
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -509,6 +568,82 @@ export const Settings: React.FC = () => {
           )}
         </div>
       </div>
+
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setDeleteConfirmation('');
+        }}
+        size="md"
+      >
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Delete Account</h2>
+              <p className="text-sm text-slate-600">This action is permanent and cannot be undone</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h3 className="font-semibold text-red-900 mb-2">Warning: This will permanently delete:</h3>
+              <ul className="text-sm text-red-800 space-y-1 list-disc list-inside">
+                <li>Your account and profile information</li>
+                <li>All company data and knowledge base</li>
+                <li>All client records and insights</li>
+                <li>All projects and documents</li>
+                <li>All settings and preferences</li>
+              </ul>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Type <span className="font-bold text-red-600">DELETE</span> to confirm:
+              </label>
+              <Input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="DELETE"
+                className="font-mono"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmation('');
+                }}
+                disabled={isDeleting}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmation !== 'DELETE' || isDeleting}
+                className="flex-1 bg-red-600 hover:bg-red-700"
+              >
+                {isDeleting ? (
+                  'Deleting...'
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete My Account
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
