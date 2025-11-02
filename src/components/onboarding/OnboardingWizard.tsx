@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { FirstClientWizard } from './FirstClientWizard';
 import {
   Building2,
   Globe,
@@ -47,6 +48,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
   const [extracting, setExtracting] = useState(false);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [openaiKey, setOpenaiKey] = useState('');
+  const [showFirstClientWizard, setShowFirstClientWizard] = useState(false);
   const { user, checkKnowledgeBaseStatus } = useAuth();
   const navigate = useNavigate();
 
@@ -385,6 +387,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     }
   };
 
+  const handleFirstClientComplete = () => {
+    setShowFirstClientWizard(false);
+    onComplete();
+    navigate('/clients');
+  };
+
+  const handleSkipFirstClient = () => {
+    setShowFirstClientWizard(false);
+    onComplete();
+    navigate('/dashboard');
+  };
+
   const handleComplete = async () => {
     if (!user) return;
 
@@ -435,8 +449,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
       if (error) throw error;
 
       await checkKnowledgeBaseStatus();
-      onComplete();
-      navigate('/dashboard');
+      setShowFirstClientWizard(true);
     } catch (error) {
       console.error('Error completing onboarding:', error);
       alert('Failed to complete setup. Please try again.');
@@ -446,6 +459,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
   };
 
   return (
+    <>
     <Modal isOpen={isOpen} onClose={() => {}} size="xl" closeOnEscape={false} closeOnClickOutside={false}>
       <div className="p-6">
         <div className="mb-8">
@@ -1172,5 +1186,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         </div>
       </div>
     </Modal>
+
+    <FirstClientWizard
+      isOpen={showFirstClientWizard}
+      onComplete={handleFirstClientComplete}
+      onSkip={handleSkipFirstClient}
+    />
+  </>
   );
 };
