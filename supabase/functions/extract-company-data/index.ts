@@ -75,56 +75,66 @@ Deno.serve(async (req: Request) => {
 async function crawlWebsite(startUrl: string): Promise<CrawlResult[]> {
   const results: CrawlResult[] = [];
   const visited = new Set<string>();
-  const queue: Array<{ url: string; depth: number }> = [{ url: startUrl, depth: 0 }];
-  const maxDepth = 3;
-  const maxPages = 50;
+  const targetPages = [
+    '',
+    'about',
+    'about-us',
+    'contact',
+    'team',
+    'leadership',
+    'services',
+    'products',
+    'solutions',
+    'blog',
+    'news',
+    'press',
+    'case-studies',
+    'portfolio',
+    'careers',
+    'jobs',
+    'technology',
+    'partners'
+  ];
+
   const baseUrl = new URL(startUrl);
   const baseDomain = baseUrl.hostname;
 
-  while (queue.length > 0 && results.length < maxPages) {
-    const { url, depth } = queue.shift()!;
+  const urlsToFetch: string[] = [startUrl];
+  for (const page of targetPages) {
+    const testUrl = new URL(startUrl);
+    testUrl.pathname = `/${page}`;
+    urlsToFetch.push(testUrl.href);
+  }
 
-    if (visited.has(url) || depth > maxDepth) {
-      continue;
-    }
-
+  const fetchPromises = urlsToFetch.slice(0, 10).map(async (url) => {
+    if (visited.has(url)) return null;
     visited.add(url);
-    console.log(`Crawling: ${url} (depth: ${depth})`);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       const response = await fetch(url, {
         headers: {
           "User-Agent": "Mozilla/5.0 (compatible; CompanyBot/1.0)",
         },
+        signal: AbortSignal.timeout(5000),
       });
 
       if (!response.ok) {
-        console.error(`Failed to fetch ${url}: ${response.status}`);
-        continue;
+        return null;
       }
 
       const html = await response.text();
-      const crawlResult = parseHtml(html, url);
-      results.push(crawlResult);
-
-      if (depth < maxDepth) {
-        for (const link of crawlResult.links) {
-          try {
-            const linkUrl = new URL(link, url);
-            if (linkUrl.hostname === baseDomain || linkUrl.hostname.endsWith(`.${baseDomain}`)) {
-              if (!visited.has(linkUrl.href)) {
-                queue.push({ url: linkUrl.href, depth: depth + 1 });
-              }
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-      }
+      return parseHtml(html, url);
     } catch (error) {
-      console.error(`Error crawling ${url}:`, error);
+      console.error(`Error fetching ${url}:`, error);
+      return null;
+    }
+  });
+
+  const fetchedResults = await Promise.all(fetchPromises);
+
+  for (const result of fetchedResults) {
+    if (result) {
+      results.push(result);
     }
   }
 
@@ -141,7 +151,7 @@ function parseHtml(html: string, url: string): CrawlResult {
     /https?:\/\/(www\.)?(x\.com\/[^\s"'<>]+)/gi,
     /https?:\/\/(www\.)?(facebook\.com\/[^\s"'<>]+)/gi,
     /https?:\/\/(www\.)?(instagram\.com\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(youtube\.com\/(c\/|channel\/|user\/)?[^\s"'<>]+)/gi,
+    /https?:\/\/(www\.)?(youtube\.com\/(c\/|channel\/|user\/|@)?[^\s"'<>]+)/gi,
   ];
 
   const socialLinks = new Set<string>();
@@ -181,7 +191,7 @@ function extractTextFromHtml(html: string): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  return text.substring(0, 15000);
+  return text.substring(0, 20000);
 }
 
 async function extractCompanyInfo(crawlResults: CrawlResult[], openaiKey: string, rootUrl: string) {
@@ -191,125 +201,65 @@ async function extractCompanyInfo(crawlResults: CrawlResult[], openaiKey: string
   });
 
   const combinedContent = crawlResults
-    .map(r => `PAGE: ${r.title || r.url}\nURL: ${r.url}\nCONTENT: ${r.content.substring(0, 5000)}\n\n`)
+    .map(r => `PAGE: ${r.title || r.url}\nURL: ${r.url}\nCONTENT: ${r.content.substring(0, 8000)}\n\n`)
     .join('\n---\n\n');
 
-  const prompt = `Analyze the following crawled content from a company website. Extract comprehensive information to build a complete company knowledge profile.
+  const prompt = `Analyze the following crawled content from a company website and extract comprehensive information for ALL categories.
 
 Root Domain: ${rootUrl}
-Social Media Profiles Found: ${Array.from(allSocialLinks).join(', ')}
+Social Media Found: ${Array.from(allSocialLinks).join(', ')}
 
-Extraction targets (priority order):
-1. Company name
-2. Official website canonical URL
-3. Headquarters/location
-4. Founding year
-5. Short company description
-6. Industry vertical(s)
-7. Top services/products
-8. Leadership (names & titles)
-9. Contact info (email, phone)
-10. Social profile URLs
-11. Blog articles (title, url, date, summary)
-12. Press/news
-13. Case studies
-14. Careers/hiring signals
-15. Partner/technology stack hints
-16. Pricing/packaging hints
-17. Public legal/privacy notes
+Extract COMPLETE information for:
+1. Company basics (name, industry, description, value prop, founded, location, size, mission, vision)
+2. Contact details (email, phone, address)
+3. ALL social media profiles (LinkedIn, Twitter, Facebook, Instagram, YouTube)
+4. Services/Products with descriptions
+5. Leadership team members (names, titles, bios)
+6. Case studies (title, client, challenge, solution, results)
+7. Blog articles (title, URL, date, summary, author)
+8. Press/News coverage (title, date, source, summary)
+9. Careers info (hiring status, open positions, culture)
+10. Technology stack, partners, and integrations
 
-Provide a comprehensive JSON response with ALL available information:
+Return ONLY valid JSON with ALL available data. If info is unavailable, use empty strings/arrays:
 
 {
   "companyInfo": {
-    "name": "Exact company name",
-    "canonicalUrl": "Official website URL",
-    "industry": "Primary industry vertical(s)",
-    "description": "Comprehensive company description",
-    "valueProposition": "Value proposition",
-    "founded": "Year founded",
-    "location": "Headquarters location",
-    "size": "Company size/employee count",
-    "mission": "Mission statement",
-    "vision": "Vision statement"
+    "name": "",
+    "industry": "",
+    "description": "",
+    "valueProposition": "",
+    "founded": "",
+    "location": "",
+    "size": "",
+    "mission": "",
+    "vision": ""
   },
   "contactInfo": {
-    "email": "Contact email",
-    "phone": "Contact phone",
-    "address": "Physical address"
+    "email": "",
+    "phone": "",
+    "address": ""
   },
   "socialProfiles": {
-    "linkedin": "LinkedIn URL",
-    "twitter": "Twitter/X URL",
-    "facebook": "Facebook URL",
-    "instagram": "Instagram URL",
-    "youtube": "YouTube URL"
+    "linkedin": "",
+    "twitter": "",
+    "facebook": "",
+    "instagram": "",
+    "youtube": ""
   },
-  "leadership": [
-    {
-      "name": "Leader name",
-      "role": "Title/Position",
-      "bio": "Brief bio if available"
-    }
-  ],
-  "services": [
-    {
-      "name": "Service/Product name",
-      "description": "Detailed description",
-      "tags": ["relevant", "tags"],
-      "pricing": "Pricing info if available"
-    }
-  ],
-  "caseStudies": [
-    {
-      "title": "Case study title",
-      "client": "Client name",
-      "industry": "Client industry",
-      "challenge": "Problem solved",
-      "solution": "Solution provided",
-      "results": ["Measurable result 1", "Result 2"],
-      "url": "Case study URL"
-    }
-  ],
-  "blogs": [
-    {
-      "title": "Article title",
-      "url": "Article URL",
-      "date": "Publication date",
-      "summary": "Article summary",
-      "author": "Author if available"
-    }
-  ],
-  "pressNews": [
-    {
-      "title": "News title",
-      "date": "Publication date",
-      "summary": "News summary",
-      "source": "Source/Publication",
-      "url": "News URL"
-    }
-  ],
-  "careers": {
-    "hiring": true/false,
-    "openPositions": ["Position 1", "Position 2"],
-    "culture": "Company culture notes"
-  },
-  "technology": {
-    "stack": ["Tech 1", "Tech 2"],
-    "partners": ["Partner 1", "Partner 2"],
-    "integrations": ["Integration 1", "Integration 2"]
-  },
-  "legal": {
-    "privacyPolicyUrl": "Privacy policy URL",
-    "termsOfServiceUrl": "Terms URL",
-    "complianceCertifications": ["Cert 1", "Cert 2"]
-  }
+  "services": [{"name": "", "description": "", "tags": [], "pricing": ""}],
+  "leadership": [{"name": "", "role": "", "bio": ""}],
+  "caseStudies": [{"title": "", "client": "", "industry": "", "challenge": "", "solution": "", "results": [], "url": ""}],
+  "blogs": [{"title": "", "url": "", "date": "", "summary": "", "author": ""}],
+  "pressNews": [{"title": "", "date": "", "summary": "", "source": "", "url": ""}],
+  "careers": {"hiring": false, "openPositions": [], "culture": ""},
+  "technology": {"stack": [], "partners": [], "integrations": []}
 }
 
 Crawled Content:
-${combinedContent.substring(0, 80000)}
+${combinedContent.substring(0, 100000)}
 
-Provide ONLY valid JSON, no additional text. Extract ALL available information. If information is not found, use empty strings, empty arrays, or null.`;
+Extract EVERYTHING available and return ONLY the JSON object.`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -323,15 +273,15 @@ Provide ONLY valid JSON, no additional text. Extract ALL available information. 
         messages: [
           {
             role: "system",
-            content: "You are an expert data extraction assistant. Extract comprehensive company information from crawled website content and return it as detailed, structured JSON. Be thorough and extract every piece of relevant information available.",
+            content: "You are a data extraction expert. Extract ALL available company information from website content and return complete, detailed JSON. Be thorough - extract every piece of relevant information for all categories.",
           },
           {
             role: "user",
             content: prompt,
           },
         ],
-        temperature: 0.2,
-        max_tokens: 4000,
+        temperature: 0.1,
+        max_tokens: 4096,
       }),
     });
 
@@ -342,12 +292,12 @@ Provide ONLY valid JSON, no additional text. Extract ALL available information. 
 
     const data = await response.json();
     const content = data.choices[0].message.content;
-    
+
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
-    
+
     return JSON.parse(content);
   } catch (error) {
     console.error("Error calling OpenAI:", error);
