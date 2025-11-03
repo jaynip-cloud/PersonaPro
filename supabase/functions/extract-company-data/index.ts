@@ -236,29 +236,38 @@ async function extractCompanyInfo(crawlResults: CrawlResult[], openaiKey: string
   const facebookUrls = Array.from(allSocialLinks).filter(link => link.includes('facebook.com'));
   const instagramUrls = Array.from(allSocialLinks).filter(link => link.includes('instagram.com'));
 
-  const prompt = `Extract company information from the provided website content.
+  const prompt = `You are an expert business intelligence analyst specializing in company research and data extraction. Your task is to extract comprehensive, accurate, and detailed company information from the provided website content.
 
 ROOT DOMAIN: ${rootUrl}
 
-SOCIAL LINKS:
-- LinkedIn: ${linkedinCompanyUrls.join(', ') || 'Not found'}
-- Twitter: ${twitterUrls.join(', ') || 'Not found'}
+DISCOVERED SOCIAL MEDIA PROFILES:
+- LinkedIn Company: ${linkedinCompanyUrls.join(', ') || 'Not found'}
+- Twitter/X: ${twitterUrls.join(', ') || 'Not found'}
 - Facebook: ${facebookUrls.join(', ') || 'Not found'}
 - Instagram: ${instagramUrls.join(', ') || 'Not found'}
 
-Return ONLY valid JSON:
+CRITICAL INSTRUCTIONS:
+1. Extract ONLY factual information explicitly stated in the content - DO NOT make assumptions or infer data
+2. Search thoroughly through ALL provided pages for each piece of information
+3. Be precise and complete - capture full details, not summaries
+4. For missing information, leave the field as an empty string "" - DO NOT fabricate data
+5. Cross-reference information across multiple pages for accuracy
+6. Return ONLY valid JSON - no additional text or explanations
+
+REQUIRED JSON STRUCTURE (extract ALL available information):
+
 {
   "companyInfo": {
-    "name": "Company name",
-    "industry": "Industry",
-    "description": "Company description",
-    "location": "City, Country",
-    "size": "Company size",
-    "founded": "Year founded"
+    "name": "Full official company name (look in: page titles, headers, about page, footer)",
+    "industry": "Specific industry/vertical (e.g., 'Enterprise SaaS', 'Healthcare Technology', 'FinTech', 'E-commerce'). Look in: about page, meta description, company description",
+    "description": "Comprehensive 2-4 sentence company description covering: what they do, who they serve, key value proposition, and differentiators. Look in: homepage hero, about page, meta description",
+    "location": "Full location format: 'City, State/Province, Country' (e.g., 'San Francisco, California, United States' or 'London, United Kingdom'). Look in: contact page, footer, about page, address sections",
+    "size": "Company size in employees (e.g., '1-10 employees', '50-200 employees', '500+ employees', '1000+ employees'). Look in: about page, careers page, LinkedIn info if visible",
+    "founded": "Year company was founded in YYYY format (e.g., '2020', '2015'). Look in: about page, company history, footer copyright year"
   },
   "contactInfo": {
-    "email": "Contact email",
-    "phone": "Phone number"
+    "email": "Primary contact email address (e.g., 'contact@company.com', 'info@company.com', 'hello@company.com'). Look for patterns: contact@, info@, hello@, support@, sales@ followed by domain. Check: contact page, footer, support section",
+    "phone": "Primary phone number with country code if available (e.g., '+1 (555) 123-4567', '+44 20 1234 5678'). Look in: contact page, header, footer, support section"
   },
   "socialProfiles": {
     "linkedin": "${linkedinCompanyUrls[0] || ''}",
@@ -268,8 +277,83 @@ Return ONLY valid JSON:
   }
 }
 
-WEBSITE CONTENT:
-${combinedContent.substring(0, 50000)}`;
+EXTRACTION GUIDELINES BY FIELD:
+
+**Company Name:**
+- Look for the official company name in: page title tags, main header, about page heading, footer
+- Use the most formal/official version (e.g., "Acme Corporation" not just "Acme")
+- Avoid taglines or slogans
+
+**Industry:**
+- Be specific and descriptive (avoid generic terms like "Technology" or "Services")
+- Good examples: "B2B SaaS for Marketing Automation", "AI-Powered Healthcare Analytics", "Cloud Infrastructure Management"
+- Look in: meta descriptions, about page first paragraph, service descriptions
+
+**Description:**
+- Write 2-4 complete sentences capturing:
+  1. What the company does (core business)
+  2. Who they serve (target customers/market)
+  3. Key value proposition (how they help)
+  4. What makes them unique (if mentioned)
+- Synthesize from: homepage hero section, about page, meta description
+- Be comprehensive but concise
+
+**Location:**
+- Format: "City, State/Province, Country"
+- If only city and country: "City, Country"
+- Use full names: "United States" not "US", "United Kingdom" not "UK"
+- Look in: contact page (often has full address), footer, about page
+
+**Company Size:**
+- Use ranges: "1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"
+- Add "employees" (e.g., "51-200 employees")
+- Look for phrases like: "team of X", "X+ employees", on careers or about pages
+
+**Founded Year:**
+- Four-digit year only (e.g., "2015")
+- Look in: about page ("founded in...", "established in...", "since..."), footer copyright, company timeline
+
+**Email:**
+- Must be a valid email format: name@domain.com
+- Common patterns to search for:
+  - contact@, info@, hello@, support@, sales@, inquiries@ followed by company domain
+  - Email links (mailto: links in contact sections)
+  - Email addresses in contact forms or contact page text
+- Check: contact page, footer, header, support section, about page
+- If multiple emails found, prioritize: contact@ or info@ over department-specific emails
+
+**Phone:**
+- Include country code if visible: +1, +44, etc.
+- Preserve formatting as shown: parentheses, dashes, spaces
+- Look in: contact page, header (often in top bar), footer, support section
+- Accept toll-free numbers, local numbers, international numbers
+
+**Social Profiles:**
+- Use the discovered URLs provided above
+- Verify these are company pages, not individual employee profiles
+- If URL is discovered, include it; otherwise leave empty
+
+SEARCH STRATEGY:
+1. Start with homepage - look for company name, tagline, hero description
+2. Check about/about-us page - usually has: company description, founding year, team size, mission
+3. Review contact page - typically has: email, phone, physical address
+4. Scan footer across all pages - often contains: location, copyright year, social links, contact info
+5. Check careers/jobs page - may mention company size, culture, benefits
+6. Look at meta tags in page source - description and title tags often have good company info
+
+QUALITY CHECKS:
+- Company name should not include taglines or generic words like "Official Site"
+- Industry should be specific and descriptive (3-6 words ideal)
+- Description should be 2-4 sentences, professional, and comprehensive
+- Location should be properly formatted with commas
+- Email must match pattern: text@domain.ext
+- Phone should include area code or country code when possible
+- All social URLs should be company pages (not personal profiles)
+
+WEBSITE CONTENT FROM MULTIPLE PAGES:
+${combinedContent.substring(0, 80000)}
+
+Now extract the company information and return ONLY the JSON object with all available data:`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -283,7 +367,7 @@ ${combinedContent.substring(0, 50000)}`;
         messages: [
           {
             role: "system",
-            content: "Extract company information from website content. Return only valid JSON.",
+            content: "You are an expert business intelligence analyst who excels at extracting comprehensive, accurate company information from website content. You are meticulous, thorough, and never fabricate data. You search through all provided content carefully to find every piece of requested information. You always return properly formatted JSON with complete, factual data. When information is not found, you leave fields empty rather than guessing.",
           },
           {
             role: "user",
@@ -291,7 +375,7 @@ ${combinedContent.substring(0, 50000)}`;
           },
         ],
         temperature: 0.1,
-        max_tokens: 2000,
+        max_tokens: 3000,
       }),
     });
 
