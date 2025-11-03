@@ -39,11 +39,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const openaiKey = Deno.env.get('OPENAI_API_KEY');
+    const perplexityKey = Deno.env.get('PERPLEXITY_API_KEY');
 
-    if (!openaiKey) {
+    if (!perplexityKey) {
       return new Response(
-        JSON.stringify({ success: false, error: "OpenAI API key not configured" }),
+        JSON.stringify({ success: false, error: "Perplexity API key not configured" }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const crawledData = await crawlWebsite(url);
-    const extractedInfo = await extractCompanyInfo(crawledData, openaiKey, url);
+    const extractedInfo = await extractCompanyInfo(crawledData, perplexityKey, url);
 
     const simplifiedData = {
       success: true,
@@ -220,7 +220,7 @@ function extractTextFromHtml(html: string): string {
   return text.substring(0, 20000);
 }
 
-async function extractCompanyInfo(crawlResults: CrawlResult[], openaiKey: string, rootUrl: string) {
+async function extractCompanyInfo(crawlResults: CrawlResult[], perplexityKey: string, rootUrl: string) {
   const allSocialLinks = new Set<string>();
   crawlResults.forEach(result => {
     result.socialLinks.forEach(link => allSocialLinks.add(link));
@@ -236,7 +236,13 @@ async function extractCompanyInfo(crawlResults: CrawlResult[], openaiKey: string
   const facebookUrls = Array.from(allSocialLinks).filter(link => link.includes('facebook.com'));
   const instagramUrls = Array.from(allSocialLinks).filter(link => link.includes('instagram.com'));
 
-  const prompt = `You are an expert business intelligence analyst specializing in company research and data extraction. Your task is to extract comprehensive, accurate, and detailed company information from the provided website content.
+  const prompt = `You are an expert business intelligence analyst specializing in company research and data extraction. Your task is to extract comprehensive, accurate, and detailed company information from the provided website content AND use your web search capabilities to find additional up-to-date information.
+
+IMPORTANT: You have access to real-time web search. Use it to:
+- Verify and enhance the information from the website
+- Find missing details like contact information, founding year, company size
+- Get the latest company news and updates
+- Cross-reference information for accuracy
 
 ROOT DOMAIN: ${rootUrl}
 
@@ -356,18 +362,18 @@ ${combinedContent.substring(0, 80000)}
 Now extract the company information and return ONLY the JSON object with all available data:`;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiKey}`,
+        "Authorization": `Bearer ${perplexityKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "llama-3.1-sonar-large-128k-online",
         messages: [
           {
             role: "system",
-            content: "You are an expert business intelligence analyst who excels at extracting comprehensive, accurate company information from website content. You are meticulous, thorough, and never fabricate data. You search through all provided content carefully to find every piece of requested information. You always return properly formatted JSON with complete, factual data. When information is not found, you leave fields empty rather than guessing.",
+            content: "You are an expert business intelligence analyst who excels at extracting comprehensive, accurate company information from website content and online sources. You are meticulous, thorough, and never fabricate data. You search through all provided content carefully to find every piece of requested information. You can also search the web for additional up-to-date information about the company. You always return properly formatted JSON with complete, factual data. When information is not found, you leave fields empty rather than guessing.",
           },
           {
             role: "user",
@@ -381,7 +387,7 @@ Now extract the company information and return ONLY the JSON object with all ava
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`OpenAI API error: ${error}`);
+      throw new Error(`Perplexity API error: ${error}`);
     }
 
     const data = await response.json();
@@ -398,7 +404,7 @@ Now extract the company information and return ONLY the JSON object with all ava
 
     return extractedData;
   } catch (error) {
-    console.error("Error calling OpenAI:", error);
+    console.error("Error calling Perplexity:", error);
     throw error;
   }
 }

@@ -228,12 +228,49 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     setCurrentStep(prev => prev - 1);
   };
 
+  const uploadFilesToStorage = async (clientId: string): Promise<any[]> => {
+    if (uploadedFiles.length === 0) return [];
+
+    const uploadedDocs = [];
+
+    for (const file of uploadedFiles) {
+      const fileName = `${clientId}/${Date.now()}-${file.name}`;
+
+      const { data, error } = await supabase.storage
+        .from('client-documents')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Error uploading file:', error);
+        throw new Error(`Failed to upload ${file.name}: ${error.message}`);
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('client-documents')
+        .getPublicUrl(fileName);
+
+      uploadedDocs.push({
+        name: file.name,
+        path: fileName,
+        url: publicUrl,
+        size: file.size,
+        type: file.type,
+        uploadedAt: new Date().toISOString()
+      });
+    }
+
+    return uploadedDocs;
+  };
+
   const handleSave = async () => {
     if (!user || !validateStep()) return;
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { data: newClient, error: insertError } = await supabase
         .from('clients')
         .insert({
           user_id: user.id,
@@ -272,9 +309,24 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
           csm: formData.csm,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
+
+      if (uploadedFiles.length > 0 && newClient) {
+        const uploadedDocs = await uploadFilesToStorage(newClient.id);
+
+        const { error: updateError } = await supabase
+          .from('clients')
+          .update({ documents: uploadedDocs })
+          .eq('id', newClient.id);
+
+        if (updateError) {
+          console.error('Error updating documents:', updateError);
+        }
+      }
 
       onComplete();
       navigate('/clients');

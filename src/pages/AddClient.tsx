@@ -293,6 +293,44 @@ export const AddClient: React.FC = () => {
     }
   };
 
+  const uploadFilesToStorage = async (clientId: string): Promise<any[]> => {
+    if (uploadedFiles.length === 0) return [];
+
+    const uploadedDocs = [];
+
+    for (const file of uploadedFiles) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${clientId}/${Date.now()}-${file.name}`;
+
+      const { data, error } = await supabase.storage
+        .from('client-documents')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Error uploading file:', error);
+        throw new Error(`Failed to upload ${file.name}: ${error.message}`);
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('client-documents')
+        .getPublicUrl(fileName);
+
+      uploadedDocs.push({
+        name: file.name,
+        path: fileName,
+        url: publicUrl,
+        size: file.size,
+        type: file.type,
+        uploadedAt: new Date().toISOString()
+      });
+    }
+
+    return uploadedDocs;
+  };
+
   const handleSave = async () => {
     if (!user) {
       showToast('error', 'You must be logged in to create a client');
@@ -306,7 +344,7 @@ export const AddClient: React.FC = () => {
 
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { data: newClient, error: insertError } = await supabase
         .from('clients')
         .insert({
           user_id: user.id,
@@ -345,11 +383,30 @@ export const AddClient: React.FC = () => {
           csm: formData.csm,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
-      showToast('success', 'Client created successfully');
+      if (uploadedFiles.length > 0 && newClient) {
+        const uploadedDocs = await uploadFilesToStorage(newClient.id);
+
+        const { error: updateError } = await supabase
+          .from('clients')
+          .update({ documents: uploadedDocs })
+          .eq('id', newClient.id);
+
+        if (updateError) {
+          console.error('Error updating documents:', updateError);
+          showToast('warning', 'Client created but some documents failed to upload');
+        } else {
+          showToast('success', `Client created successfully with ${uploadedFiles.length} document(s)`);
+        }
+      } else {
+        showToast('success', 'Client created successfully');
+      }
+
       setTimeout(() => {
         navigate('/clients');
       }, 1000);
