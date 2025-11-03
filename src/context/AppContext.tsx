@@ -16,6 +16,8 @@ import {
 } from '../types';
 import { mockClients, mockPersonas, mockDocuments, mockCallRecords, mockAgentRuns, mockRecommendations, mockMeetingTranscripts } from '../data/mockData';
 import { initialConnectors } from '../data/connectors';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthContext';
 
 interface AppContextType {
   clients: Client[];
@@ -33,6 +35,7 @@ interface AppContextType {
   theme: 'light' | 'dark';
   toggleTheme: () => void;
   isLoading: boolean;
+  refreshClients: () => Promise<void>;
   getClientById: (id: string) => Client | undefined;
   getPersonaByClientId: (clientId: string) => Persona | undefined;
   getDocumentsByClientId: (clientId: string) => Document[];
@@ -56,6 +59,7 @@ interface AppProviderProps {
 }
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
+  const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -79,18 +83,95 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         document.documentElement.classList.add('dark');
       }
     }
-
-    setTimeout(() => {
-      setClients(mockClients);
-      setPersonas(mockPersonas);
-      setDocuments(mockDocuments);
-      setCallRecords(mockCallRecords);
-      setAgentRuns(mockAgentRuns);
-      setRecommendations(mockRecommendations);
-      setMeetingTranscripts(mockMeetingTranscripts);
-      setIsLoading(false);
-    }, 500);
   }, []);
+
+  useEffect(() => {
+    const loadClients = async () => {
+      if (!user) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error loading clients:', error);
+          setClients(mockClients);
+        } else if (data) {
+          const mappedClients: Client[] = data.map((client: any) => ({
+            id: client.id,
+            name: client.contact_name || client.company_name || 'Unknown',
+            company: client.company_name || '',
+            role: client.job_title || '',
+            email: client.primary_email || '',
+            phone: client.primary_phone || '',
+            personaScore: 0,
+            fitScore: 0,
+            cooperationIndex: 0,
+            sentiment: 'positive',
+            lastInteraction: client.created_at,
+            totalCalls: 0,
+            tags: client.tags || []
+          }));
+          setClients(mappedClients);
+        }
+
+        setPersonas(mockPersonas);
+        setDocuments(mockDocuments);
+        setCallRecords(mockCallRecords);
+        setAgentRuns(mockAgentRuns);
+        setRecommendations(mockRecommendations);
+        setMeetingTranscripts(mockMeetingTranscripts);
+      } catch (error) {
+        console.error('Error in loadClients:', error);
+        setClients(mockClients);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadClients();
+  }, [user]);
+
+  const refreshClients = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error refreshing clients:', error);
+      } else if (data) {
+        const mappedClients: Client[] = data.map((client: any) => ({
+          id: client.id,
+          name: client.contact_name || client.company_name || 'Unknown',
+          company: client.company_name || '',
+          role: client.job_title || '',
+          email: client.primary_email || '',
+          phone: client.primary_phone || '',
+          personaScore: 0,
+          fitScore: 0,
+          cooperationIndex: 0,
+          sentiment: 'positive',
+          lastInteraction: client.created_at,
+          totalCalls: 0,
+          tags: client.tags || []
+        }));
+        setClients(mappedClients);
+      }
+    } catch (error) {
+      console.error('Error in refreshClients:', error);
+    }
+  };
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
@@ -168,6 +249,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         theme,
         toggleTheme,
         isLoading,
+        refreshClients,
         getClientById,
         getPersonaByClientId,
         getDocumentsByClientId,

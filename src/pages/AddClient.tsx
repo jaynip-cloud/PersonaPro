@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { useAuth } from '../context/AuthContext';
+import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import {
   ArrowLeft,
@@ -73,6 +74,7 @@ export const AddClient: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { user } = useAuth();
+  const { refreshClients } = useApp();
   const [activeTab, setActiveTab] = useState<'basic' | 'contact' | 'social' | 'additional' | 'goals'>('basic');
   const [completedTabs, setCompletedTabs] = useState<Set<string>>(new Set());
   const [newTag, setNewTag] = useState('');
@@ -415,6 +417,8 @@ export const AddClient: React.FC = () => {
       } else {
         showToast('success', 'Client created successfully');
       }
+
+      await refreshClients();
 
       setTimeout(() => {
         navigate('/clients');

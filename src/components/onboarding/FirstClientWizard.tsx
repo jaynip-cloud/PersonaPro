@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Badge } from '../ui/Badge';
 import { useAuth } from '../../context/AuthContext';
+import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
 import {
   User,
@@ -42,6 +43,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
   const [saving, setSaving] = useState(false);
   const [aiPrefilling, setAiPrefilling] = useState(false);
   const { user } = useAuth();
+  const { refreshClients } = useApp();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -336,6 +338,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
         }
       }
 
+      await refreshClients();
       onComplete();
       navigate('/clients');
     } catch (error) {
