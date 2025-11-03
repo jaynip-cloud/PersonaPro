@@ -106,7 +106,7 @@ async function crawlWebsite(startUrl: string): Promise<CrawlResult[]> {
     urlsToFetch.push(testUrl.href);
   }
 
-  const fetchPromises = urlsToFetch.slice(0, 10).map(async (url) => {
+  const fetchPromises = urlsToFetch.slice(0, 15).map(async (url) => {
     if (visited.has(url)) return null;
     visited.add(url);
 
@@ -287,23 +287,38 @@ async function extractCompanyInfo(crawlResults: CrawlResult[], openaiKey: string
   });
 
   const combinedContent = crawlResults
-    .map(r => `PAGE: ${r.title || r.url}\nURL: ${r.url}\nCONTENT: ${r.content.substring(0, 8000)}\n\n`)
+    .map(r => `PAGE: ${r.title || r.url}\nURL: ${r.url}\nCONTENT: ${r.content.substring(0, 12000)}\n\n`)
     .join('\n---\n\n');
 
-  const prompt = `You are analyzing a company website to extract COMPREHENSIVE business intelligence data across ALL 8 categories.
+  const linkedinProfileUrls = Array.from(allSocialLinks).filter(link => link.includes('linkedin.com/in/'));
+  const linkedinCompanyUrls = Array.from(allSocialLinks).filter(link => link.includes('linkedin.com/company/'));
+  const twitterUrls = Array.from(allSocialLinks).filter(link => link.includes('twitter.com') || link.includes('x.com'));
+  const facebookUrls = Array.from(allSocialLinks).filter(link => link.includes('facebook.com'));
+  const instagramUrls = Array.from(allSocialLinks).filter(link => link.includes('instagram.com'));
+  const youtubeUrls = Array.from(allSocialLinks).filter(link => link.includes('youtube.com'));
 
-Root Domain: ${rootUrl}
-Social Media URLs Discovered: ${Array.from(allSocialLinks).join(', ')}
+  const prompt = `You are a professional data extraction specialist. Extract ONLY factual information found in the content. DO NOT make assumptions or fabricate data.
 
-CRITICAL INSTRUCTIONS:
-- Extract EVERY piece of information available for ALL categories below
-- Be thorough - scan the entire content for each data point
-- For services: extract ALL services/products mentioned with full descriptions
-- For leadership: find ALL team members with complete bios from About, Team, or Leadership pages
-- For blogs: extract ALL blog posts/articles with complete metadata
-- For technology: identify ALL technologies, tools, partners, and integrations mentioned
-- Use the discovered social media URLs above for the socialProfiles section
-- If specific information is not found, use empty strings/arrays, but make a thorough attempt to find it first
+ROOT DOMAIN: ${rootUrl}
+
+DISCOVERED SOCIAL LINKS:
+- LinkedIn Company: ${linkedinCompanyUrls.join(', ') || 'Not found'}
+- LinkedIn Profiles: ${linkedinProfileUrls.join(', ') || 'Not found'}
+- Twitter/X: ${twitterUrls.join(', ') || 'Not found'}
+- Facebook: ${facebookUrls.join(', ') || 'Not found'}
+- Instagram: ${instagramUrls.join(', ') || 'Not found'}
+- YouTube: ${youtubeUrls.join(', ') || 'Not found'}
+
+EXTRACTION RULES - FOLLOW EXACTLY:
+1. Extract ONLY information explicitly stated in the content
+2. If information is not found, leave field as empty string "" or empty array []
+3. DO NOT infer, assume, or fabricate any data
+4. Be literal and precise - copy exact text when available
+5. For email/phone: Look for actual contact information, not example formats
+6. For services: Extract only explicitly mentioned services with their real descriptions
+7. For leadership: Extract only people explicitly listed as team members with their actual info
+8. For blogs: Extract only actual blog posts with real URLs and dates
+9. For social URLs: Use the discovered URLs listed above - do not make up URLs
 
 REQUIRED JSON STRUCTURE (fill ALL fields with available data):
 
@@ -320,65 +335,95 @@ REQUIRED JSON STRUCTURE (fill ALL fields with available data):
     "vision": "Complete vision statement - the company's aspirational future state"
   },
   "contactInfo": {
-    "email": "Primary contact email address (look for info@, hello@, contact@ addresses)",
-    "phone": "Full phone number with country code if available",
-    "address": "Complete physical mailing address including street, city, state, ZIP, country"
+    "email": "ONLY extract if you find an actual email address in the content (e.g., contact@company.com, info@company.com). Leave empty if not found.",
+    "phone": "ONLY extract if you find an actual phone number in the content (e.g., +1-555-123-4567, (555) 123-4567). Leave empty if not found.",
+    "address": "ONLY extract if you find an actual physical address in the content. Leave empty if not found."
   },
   "socialProfiles": {
-    "linkedin": "Full LinkedIn company page URL (use from discovered URLs or extract from content)",
-    "twitter": "Full Twitter/X profile URL (use from discovered URLs or extract from content)",
-    "facebook": "Full Facebook page URL (use from discovered URLs or extract from content)",
-    "instagram": "Full Instagram profile URL (use from discovered URLs or extract from content)",
-    "youtube": "Full YouTube channel URL (use from discovered URLs or extract from content)"
+    "linkedin": "Use ONLY the LinkedIn company URL from discovered links above. If multiple, use the first one. Leave empty if none found.",
+    "twitter": "Use ONLY the Twitter/X URL from discovered links above. If multiple, use the first one. Leave empty if none found.",
+    "facebook": "Use ONLY the Facebook URL from discovered links above. If multiple, use the first one. Leave empty if none found.",
+    "instagram": "Use ONLY the Instagram URL from discovered links above. If multiple, use the first one. Leave empty if none found.",
+    "youtube": "Use ONLY the YouTube URL from discovered links above. If multiple, use the first one. Leave empty if none found."
   },
   "services": [
     {
-      "name": "Service/Product name",
-      "description": "Detailed description of what this service/product does and its benefits",
-      "tags": ["relevant", "category", "tags"],
-      "pricing": "Pricing info if mentioned (e.g., 'Starting at $99/mo', 'Enterprise pricing', 'Free trial available')"
+      "name": "ONLY extract actual service/product names mentioned in the content",
+      "description": "Extract the ACTUAL description from the content - do not write your own",
+      "tags": [],
+      "pricing": "ONLY include if actual pricing is mentioned"
     }
   ],
   "leadership": [
     {
-      "name": "Full name of leader",
-      "role": "Complete job title (CEO, CTO, VP Engineering, etc.)",
-      "bio": "Full biography including background, experience, education, achievements - extract everything available",
-      "linkedinUrl": "LinkedIn profile URL for this person (e.g., https://linkedin.com/in/username)"
+      "name": "ONLY extract names of people explicitly listed as leadership/team members",
+      "role": "Extract their ACTUAL job title from the content",
+      "bio": "Extract their ACTUAL bio/description from the content - do not make up information",
+      "linkedinUrl": "Match this person's name to LinkedIn profile URLs from discovered links above. Leave empty if no match found."
     }
   ],
   "blogs": [
     {
-      "title": "Complete article title",
-      "url": "Full URL to the article",
-      "date": "Publication date in YYYY-MM-DD format if available",
-      "summary": "Comprehensive 2-3 sentence summary of the article content",
-      "author": "Article author name"
+      "title": "ONLY extract actual blog post titles you find",
+      "url": "Extract the ACTUAL full URL to the blog post",
+      "date": "Extract ACTUAL publication date if visible (YYYY-MM-DD format)",
+      "summary": "Extract or summarize the ACTUAL content preview/excerpt shown",
+      "author": "Extract ACTUAL author name if shown"
     }
   ],
   "technology": {
-    "stack": ["List", "ALL", "technologies", "tools", "frameworks", "mentioned", "React", "Node.js", "AWS", "etc"],
-    "partners": ["List", "ALL", "technology", "partners", "AWS", "Microsoft", "Google", "etc"],
-    "integrations": ["List", "ALL", "integrations", "Salesforce", "Slack", "Stripe", "etc"]
+    "stack": ["ONLY list technologies/tools explicitly mentioned in the content - common examples: React, Python, AWS, PostgreSQL, Docker"],
+    "partners": ["ONLY list actual partner companies mentioned - examples: Microsoft, Google Cloud, AWS, Salesforce"],
+    "integrations": ["ONLY list actual integrations/APIs mentioned - examples: Stripe, Slack, Zoom, GitHub"]
   }
 }
 
-EXTRACTION GUIDELINES:
-1. COMPANY INFO: Look in homepage, about page, meta descriptions
-2. CONTACT: Check contact page, footer, about page
-3. SOCIAL: Use the discovered URLs above, also check footer and header links
-4. SERVICES: Look in services, products, solutions, what-we-do pages - extract ALL offerings
-5. LEADERSHIP: Check about, team, leadership, founders, executives pages - get ALL team members
-   - CRITICAL: Extract LinkedIn profile URLs (linkedin.com/in/username) for each leader from discovered social links
-   - Match LinkedIn URLs to leaders by name proximity in the page content
-   - Include complete bios with experience, education, and achievements
-6. BLOGS: Check blog, news, articles, insights pages - extract recent posts
-7. TECHNOLOGY: Identify tools in job postings, technical pages, case studies, about pages
+SPECIFIC EXTRACTION INSTRUCTIONS BY SECTION:
 
-Crawled Website Content:
+CONTACT INFO:
+- Search for email patterns: info@, contact@, hello@, support@, sales@ followed by domain
+- Search for phone patterns: numbers with parentheses, dashes, or +country code
+- Search for address patterns: street numbers, city, state/province, ZIP/postal code
+- Check: Contact page, footer sections, About page
+- If not found: Leave empty - DO NOT fabricate
+
+SOCIAL PROFILES:
+- Use ONLY the discovered URLs listed above
+- Match by domain (linkedin.com, twitter.com, facebook.com, etc.)
+- If multiple URLs for same platform, use the first one
+- If not found: Leave empty - DO NOT create URLs
+
+SERVICES/PRODUCTS:
+- Look in: Services page, Products page, What We Do page, Solutions page, homepage features
+- Extract the ACTUAL service names and descriptions as written
+- If a service is mentioned but no description: add name only, leave description empty
+- If no services found: Return empty array []
+
+LEADERSHIP TEAM:
+- Look in: Team page, About page, Leadership page, Founders page, Our Team section
+- Extract ONLY people explicitly shown with names and titles
+- For bios: Copy the exact text shown, don't summarize unless necessary
+- For LinkedIn: Match names to the LinkedIn profile URLs discovered
+- If no team members found: Return empty array []
+
+BLOG POSTS:
+- Look in: Blog page, News page, Insights page, Articles page
+- Extract ONLY posts that have visible titles and URLs
+- Dates: Extract if shown (common formats: "Jan 15, 2024", "2024-01-15", "January 15, 2024")
+- Summaries: Use the actual preview text or excerpt shown
+- If no blog posts found: Return empty array []
+
+TECHNOLOGY & PARTNERS:
+- Stack: Look for mentions of programming languages, frameworks, databases, cloud providers
+- Partners: Look for "Partners", "Powered by", "Works with" sections
+- Integrations: Look for "Integrations", "Connects with", "APIs" sections
+- Only include if explicitly mentioned
+- If not found: Return empty arrays []
+
+CRAWLED WEBSITE CONTENT:
 ${combinedContent.substring(0, 100000)}
 
-Return ONLY the complete JSON object with ALL extracted data. Be thorough and comprehensive!`;
+CRITICAL: Return ONLY valid JSON. Extract ONLY factual information found in the content above. DO NOT fabricate, assume, or infer any data. If information is not present, use empty strings "" or arrays [].`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -392,7 +437,7 @@ Return ONLY the complete JSON object with ALL extracted data. Be thorough and co
         messages: [
           {
             role: "system",
-            content: "You are an expert business intelligence analyst specializing in comprehensive company data extraction. Your task is to extract COMPLETE and DETAILED information across ALL 8 categories: company info, contact details, social profiles, services/products, leadership team, blog articles, and technology stack/partners/integrations. Extract EVERY available detail - names, roles, bios, descriptions, URLs, dates. Be exhaustive and thorough. Return properly structured JSON with all fields populated where data exists.",
+            content: "You are a precise data extraction specialist. Extract ONLY factual information explicitly present in the provided content. NEVER fabricate, assume, or infer data. If information is not found, use empty strings or arrays. Be literal and accurate. Your job is to find and copy real information, not to fill in missing data with assumptions. Return only valid JSON with actual extracted data.",
           },
           {
             role: "user",

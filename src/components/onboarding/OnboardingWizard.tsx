@@ -26,6 +26,12 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
+interface Service {
+  id: string;
+  name: string;
+  description: string;
+}
+
 interface LeadershipMember {
   id: string;
   name: string;
@@ -82,8 +88,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     facebookUrl: '',
     instagramUrl: '',
     youtubeUrl: '',
-    services: [] as string[],
+    services: [] as Service[],
     serviceInput: '',
+    serviceDescInput: '',
     leadership: [] as LeadershipMember[],
     blogs: [] as Blog[],
     techStack: [] as string[],
@@ -112,7 +119,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
       if (profile) {
         const services = profile.services ? JSON.parse(profile.services as string) : [];
-        const serviceNames = services.map((s: any) => s.name || s);
+        const servicesArray = services.map((s: any) => {
+          if (typeof s === 'string') {
+            return { id: `service-${Date.now()}-${Math.random()}`, name: s, description: '' };
+          }
+          return {
+            id: s.id || `service-${Date.now()}-${Math.random()}`,
+            name: s.name || '',
+            description: s.description || ''
+          };
+        });
 
         const leadership = profile.leadership ? JSON.parse(profile.leadership as string) : [];
         const blogs = profile.blogs ? JSON.parse(profile.blogs as string) : [];
@@ -138,7 +154,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           facebookUrl: profile.facebook_url || '',
           instagramUrl: profile.instagram_url || '',
           youtubeUrl: profile.youtube_url || '',
-          services: serviceNames,
+          services: servicesArray,
           leadership: leadership,
           blogs: blogs,
           techStack: technology.stack || [],
@@ -166,6 +182,38 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const addService = () => {
+    if (formData.serviceInput && formData.serviceInput.trim()) {
+      const newService: Service = {
+        id: `service-${Date.now()}-${Math.random()}`,
+        name: formData.serviceInput.trim(),
+        description: formData.serviceDescInput.trim()
+      };
+      setFormData(prev => ({
+        ...prev,
+        services: [...prev.services, newService],
+        serviceInput: '',
+        serviceDescInput: ''
+      }));
+    }
+  };
+
+  const removeService = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      services: prev.services.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateService = (index: number, field: 'name' | 'description', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      services: prev.services.map((service, i) =>
+        i === index ? { ...service, [field]: value } : service
+      )
+    }));
   };
 
   const addItem = (arrayField: string, inputField: string) => {
@@ -347,10 +395,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
       }
 
       if (extractedData.services && extractedData.services.length > 0) {
-        const serviceNames = extractedData.services.map((s: any) => s.name);
+        const newServices = extractedData.services.map((s: any) => ({
+          id: `service-${Date.now()}-${Math.random()}`,
+          name: s.name || '',
+          description: s.description || ''
+        }));
         setFormData(prev => ({
           ...prev,
-          services: [...new Set([...prev.services, ...serviceNames])]
+          services: [...prev.services, ...newServices]
         }));
       }
 
@@ -792,25 +844,38 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                 Services & Products
               </h3>
 
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  value={formData.serviceInput}
-                  onChange={(e) => handleChange('serviceInput', e.target.value)}
-                  placeholder="Enter a service (e.g., AI Consulting)"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addItem('services', 'serviceInput');
-                    }
-                  }}
-                />
+              <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Service/Product Name *
+                  </label>
+                  <Input
+                    type="text"
+                    value={formData.serviceInput}
+                    onChange={(e) => handleChange('serviceInput', e.target.value)}
+                    placeholder="e.g., AI Consulting, Cloud Migration"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    className="w-full min-h-[80px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    value={formData.serviceDescInput}
+                    onChange={(e) => handleChange('serviceDescInput', e.target.value)}
+                    placeholder="Describe what this service/product does and its key benefits..."
+                  />
+                </div>
                 <Button
                   variant="primary"
-                  onClick={() => addItem('services', 'serviceInput')}
+                  onClick={addService}
                   type="button"
+                  disabled={!formData.serviceInput.trim()}
+                  className="w-full"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Service/Product
                 </Button>
               </div>
 
@@ -820,19 +885,44 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   <p>No services added yet. Add at least one to continue.</p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {formData.services.map((service, index) => (
                     <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
+                      key={service.id}
+                      className="p-4 bg-white rounded-lg border border-slate-200 space-y-2"
                     >
-                      <span className="text-slate-900">{service}</span>
-                      <button
-                        onClick={() => removeItem('services', index)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-medium text-slate-900">Service {index + 1}</h4>
+                        <button
+                          onClick={() => removeService(index)}
+                          className="text-red-600 hover:text-red-700"
+                          type="button"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">
+                          Name
+                        </label>
+                        <Input
+                          type="text"
+                          value={service.name}
+                          onChange={(e) => updateService(index, 'name', e.target.value)}
+                          placeholder="Service name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">
+                          Description
+                        </label>
+                        <textarea
+                          className="w-full min-h-[60px] p-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                          value={service.description}
+                          onChange={(e) => updateService(index, 'description', e.target.value)}
+                          placeholder="Service description..."
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1129,15 +1219,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
                 <div className="border-t border-slate-200 pt-4">
                   <h4 className="text-sm font-semibold text-slate-700 mb-2">Services ({formData.services.length})</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.services.slice(0, 5).map((service, index) => (
-                      <span key={index} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                        {service}
-                      </span>
+                  <div className="space-y-2">
+                    {formData.services.slice(0, 3).map((service, index) => (
+                      <div key={service.id} className="text-sm">
+                        <p className="font-medium text-slate-900">{service.name}</p>
+                        {service.description && (
+                          <p className="text-slate-600 text-xs mt-1">{service.description.substring(0, 100)}{service.description.length > 100 ? '...' : ''}</p>
+                        )}
+                      </div>
                     ))}
-                    {formData.services.length > 5 && (
-                      <span className="px-3 py-1 bg-slate-200 text-slate-700 rounded-full text-sm">
-                        +{formData.services.length - 5} more
+                    {formData.services.length > 3 && (
+                      <span className="text-xs text-slate-500">
+                        +{formData.services.length - 3} more services
                       </span>
                     )}
                   </div>
