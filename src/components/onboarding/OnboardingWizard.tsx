@@ -57,15 +57,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
   const [saving, setSaving] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-  const [openaiKey, setOpenaiKey] = useState('');
+  const [perplexityKey, setPerplexityKey] = useState('');
   const [showFirstClientWizard, setShowFirstClientWizard] = useState(false);
   const { user, checkKnowledgeBaseStatus } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedKey = localStorage.getItem('openai_key');
+    const storedKey = localStorage.getItem('perplexity_key');
     if (storedKey) {
-      setOpenaiKey(storedKey);
+      setPerplexityKey(storedKey);
     }
   }, []);
 
@@ -130,9 +130,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           };
         });
 
-        const leadership = profile.leadership ? JSON.parse(profile.leadership as string) : [];
-        const blogs = profile.blogs ? JSON.parse(profile.blogs as string) : [];
-        const technology = profile.technology ? JSON.parse(profile.technology as string) : {};
+        const leadership = profile.leadership && typeof profile.leadership === 'string' && profile.leadership.trim() !== ''
+          ? JSON.parse(profile.leadership)
+          : [];
+        const blogs = profile.blogs && typeof profile.blogs === 'string' && profile.blogs.trim() !== ''
+          ? JSON.parse(profile.blogs)
+          : [];
+        const technology = profile.technology && typeof profile.technology === 'string' && profile.technology.trim() !== ''
+          ? JSON.parse(profile.technology)
+          : {};
 
         setFormData(prev => ({
           ...prev,
@@ -332,7 +338,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
       return;
     }
 
-    if (!openaiKey) {
+    if (!perplexityKey) {
       setShowApiKeyInput(true);
       return;
     }
@@ -348,8 +354,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          url: formData.website,
-          openaiKey: openaiKey
+          url: formData.website
         })
       });
 
@@ -590,26 +595,29 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                 </Button>
               </div>
 
-              {showApiKeyInput && !openaiKey && (
+              {showApiKeyInput && !perplexityKey && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
                   <p className="text-sm text-blue-900">
-                    To use AI autofill, please enter your OpenAI API key. Your key is only used for this session and is not stored.
+                    To use AI autofill, please enter your Perplexity API key. Your key is stored locally for future use.
                   </p>
                   <div className="flex gap-2">
                     <Input
                       type="password"
-                      value={openaiKey}
-                      onChange={(e) => setOpenaiKey(e.target.value)}
-                      placeholder="sk-..."
+                      value={perplexityKey}
+                      onChange={(e) => {
+                        setPerplexityKey(e.target.value);
+                        localStorage.setItem('perplexity_key', e.target.value);
+                      }}
+                      placeholder="pplx-..."
                       className="flex-1"
                     />
                     <Button
                       variant="primary"
                       onClick={() => {
                         setShowApiKeyInput(false);
-                        if (openaiKey) handleAutoFill();
+                        if (perplexityKey) handleAutoFill();
                       }}
-                      disabled={!openaiKey}
+                      disabled={!perplexityKey}
                     >
                       Continue
                     </Button>

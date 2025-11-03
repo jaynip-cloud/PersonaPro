@@ -401,18 +401,23 @@ export const AddClient: React.FC = () => {
       if (insertError) throw insertError;
 
       if (uploadedFiles.length > 0 && newClient) {
-        const uploadedDocs = await uploadFilesToStorage(newClient.id);
+        try {
+          const uploadedDocs = await uploadFilesToStorage(newClient.id);
 
-        const { error: updateError } = await supabase
-          .from('clients')
-          .update({ documents: uploadedDocs })
-          .eq('id', newClient.id);
+          const { error: updateError } = await supabase
+            .from('clients')
+            .update({ documents: uploadedDocs })
+            .eq('id', newClient.id);
 
-        if (updateError) {
-          console.error('Error updating documents:', updateError);
-          showToast('warning', 'Client created but some documents failed to upload');
-        } else {
-          showToast('success', `Client created successfully with ${uploadedFiles.length} document(s)`);
+          if (updateError) {
+            console.error('Error updating documents:', updateError);
+            showToast('warning', 'Client created but some documents failed to save');
+          } else {
+            showToast('success', `Client created successfully with ${uploadedFiles.length} document(s)`);
+          }
+        } catch (uploadError) {
+          console.error('Error uploading documents:', uploadError);
+          showToast('warning', 'Client created but documents failed to upload');
         }
       } else {
         showToast('success', 'Client created successfully');

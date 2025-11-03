@@ -326,15 +326,19 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
       if (insertError) throw insertError;
 
       if (uploadedFiles.length > 0 && newClient) {
-        const uploadedDocs = await uploadFilesToStorage(newClient.id);
+        try {
+          const uploadedDocs = await uploadFilesToStorage(newClient.id);
 
-        const { error: updateError } = await supabase
-          .from('clients')
-          .update({ documents: uploadedDocs })
-          .eq('id', newClient.id);
+          const { error: updateError } = await supabase
+            .from('clients')
+            .update({ documents: uploadedDocs })
+            .eq('id', newClient.id);
 
-        if (updateError) {
-          console.error('Error updating documents:', updateError);
+          if (updateError) {
+            console.error('Error updating documents:', updateError);
+          }
+        } catch (uploadError) {
+          console.error('Error uploading documents:', uploadError);
         }
       }
 
