@@ -92,7 +92,9 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
   };
 
   const handleAIPrefill = async () => {
-    if (!formData.website || !user) return;
+    const urlToExtract = formData.website || formData.linkedinUrl;
+
+    if (!urlToExtract || !user) return;
 
     setAiPrefilling(true);
     try {
@@ -104,7 +106,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ url: formData.website })
+          body: JSON.stringify({ url: urlToExtract })
         }
       );
 
@@ -129,15 +131,18 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
         if (data.data.location?.city && !formData.city) updates.city = data.data.location.city;
         if (data.data.location?.country && !formData.country) updates.country = data.data.location.country;
 
-        if (data.data.email && !formData.primaryEmail) updates.primaryEmail = data.data.email;
-        if (data.data.phone && !formData.primaryPhone) updates.primaryPhone = data.data.phone;
+        if (data.data.email) {
+          if (!formData.primaryEmail) updates.primaryEmail = data.data.email;
+        }
+        if (data.data.phone) {
+          if (!formData.primaryPhone) updates.primaryPhone = data.data.phone;
+        }
 
         if (data.data.socialProfiles?.linkedin && !formData.linkedinUrl) updates.linkedinUrl = data.data.socialProfiles.linkedin;
         if (data.data.socialProfiles?.twitter && !formData.twitterUrl) updates.twitterUrl = data.data.socialProfiles.twitter;
         if (data.data.socialProfiles?.facebook && !formData.facebookUrl) updates.facebookUrl = data.data.socialProfiles.facebook;
         if (data.data.socialProfiles?.instagram && !formData.instagramUrl) updates.instagramUrl = data.data.socialProfiles.instagram;
 
-        if (data.data.logo && !formData.logoUrl) updates.logoUrl = data.data.logo;
 
         if (Object.keys(updates).length > 0) {
           setFormData(prev => ({ ...prev, ...updates }));
@@ -312,11 +317,12 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
               </h3>
 
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900 mb-3">
-                  Enter the company website and click "AI Autofill" to automatically populate company details!
+                <p className="text-sm text-blue-900 mb-3 font-medium">
+                  <Sparkles className="h-4 w-4 inline mr-2" />
+                  Enter company website or LinkedIn URL and let AI populate the details!
                 </p>
-                <div className="flex gap-2">
-                  <div className="flex-1">
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div>
                     <Input
                       placeholder="https://company.com"
                       value={formData.website}
@@ -326,24 +332,32 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                       <p className="text-xs text-red-600 mt-1">{errors.website}</p>
                     )}
                   </div>
-                  <Button
-                    variant="primary"
-                    onClick={handleAIPrefill}
-                    disabled={!formData.website || aiPrefilling}
-                  >
-                    {aiPrefilling ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Prefilling...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        AI Autofill
-                      </>
-                    )}
-                  </Button>
+                  <div>
+                    <Input
+                      placeholder="https://linkedin.com/company/..."
+                      value={formData.linkedinUrl}
+                      onChange={(e) => handleChange('linkedinUrl', e.target.value)}
+                    />
+                  </div>
                 </div>
+                <Button
+                  variant="primary"
+                  onClick={handleAIPrefill}
+                  disabled={(!formData.website && !formData.linkedinUrl) || aiPrefilling}
+                  className="w-full"
+                >
+                  {aiPrefilling ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Prefilling...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      AI Autofill from {formData.website ? 'Website' : formData.linkedinUrl ? 'LinkedIn' : 'URL'}
+                    </>
+                  )}
+                </Button>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -579,34 +593,6 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                     onChange={(e) => handleChange('alternatePhone', e.target.value)}
                   />
                 </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Preferred Contact Method
-                  </label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        value="email"
-                        checked={formData.preferredContactMethod === 'email'}
-                        onChange={(e) => handleChange('preferredContactMethod', e.target.value)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm">Email</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        value="phone"
-                        checked={formData.preferredContactMethod === 'phone'}
-                        onChange={(e) => handleChange('preferredContactMethod', e.target.value)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm">Phone</span>
-                    </label>
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -666,20 +652,6 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                     onChange={(e) => handleChange('facebookUrl', e.target.value)}
                   />
                 </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Company Logo URL
-                  </label>
-                  <Input
-                    placeholder="https://example.com/logo.png"
-                    value={formData.logoUrl}
-                    onChange={(e) => handleChange('logoUrl', e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter the URL of the company's logo image
-                  </p>
-                </div>
               </div>
             </div>
           )}
@@ -690,26 +662,6 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                 <Tag className="h-5 w-5" />
                 Additional Information
               </h3>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  <DollarSign className="h-4 w-4 inline mr-2" />
-                  Budget Range
-                </label>
-                <select
-                  value={formData.budgetRange}
-                  onChange={(e) => handleChange('budgetRange', e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Budget Range</option>
-                  <option value="< $10K">Less than $10,000</option>
-                  <option value="$10K - $50K">$10,000 - $50,000</option>
-                  <option value="$50K - $100K">$50,000 - $100,000</option>
-                  <option value="$100K - $250K">$100,000 - $250,000</option>
-                  <option value="$250K - $500K">$250,000 - $500,000</option>
-                  <option value="$500K+">$500,000+</option>
-                </select>
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">

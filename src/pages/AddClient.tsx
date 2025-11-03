@@ -180,8 +180,10 @@ export const AddClient: React.FC = () => {
   };
 
   const handleAIPrefill = async () => {
-    if (!formData.website || !user) {
-      showToast('error', 'Please enter a website URL first');
+    const urlToExtract = formData.website || formData.linkedinUrl;
+
+    if (!urlToExtract || !user) {
+      showToast('error', 'Please enter a website URL or LinkedIn URL first');
       return;
     }
 
@@ -195,7 +197,7 @@ export const AddClient: React.FC = () => {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ url: formData.website })
+          body: JSON.stringify({ url: urlToExtract })
         }
       );
 
@@ -220,21 +222,19 @@ export const AddClient: React.FC = () => {
         if (data.data.location?.city && !formData.city) updates.city = data.data.location.city;
         if (data.data.location?.country && !formData.country) updates.country = data.data.location.country;
 
-        if (data.data.email && !formData.primaryEmail) {
-          updates.primaryEmail = data.data.email;
-          updates.email = data.data.email;
+        if (data.data.email) {
+          if (!formData.email) updates.email = data.data.email;
+          if (!formData.primaryEmail) updates.primaryEmail = data.data.email;
         }
-        if (data.data.phone && !formData.primaryPhone) {
-          updates.primaryPhone = data.data.phone;
-          updates.phone = data.data.phone;
+        if (data.data.phone) {
+          if (!formData.phone) updates.phone = data.data.phone;
+          if (!formData.primaryPhone) updates.primaryPhone = data.data.phone;
         }
 
         if (data.data.socialProfiles?.linkedin && !formData.linkedinUrl) updates.linkedinUrl = data.data.socialProfiles.linkedin;
         if (data.data.socialProfiles?.twitter && !formData.twitterUrl) updates.twitterUrl = data.data.socialProfiles.twitter;
         if (data.data.socialProfiles?.facebook && !formData.facebookUrl) updates.facebookUrl = data.data.socialProfiles.facebook;
         if (data.data.socialProfiles?.instagram && !formData.instagramUrl) updates.instagramUrl = data.data.socialProfiles.instagram;
-
-        if (data.data.logo && !formData.logoUrl) updates.logoUrl = data.data.logo;
 
         if (Object.keys(updates).length > 0) {
           setFormData({ ...formData, ...updates });
@@ -441,10 +441,10 @@ export const AddClient: React.FC = () => {
               <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p className="text-sm text-blue-900 dark:text-blue-100 mb-3 font-medium">
                   <Sparkles className="h-4 w-4 inline mr-2" />
-                  AI-Powered Autofill: Enter company website and let AI populate the details!
+                  AI-Powered Autofill: Enter company website or LinkedIn URL and let AI populate the details!
                 </p>
-                <div className="flex gap-2">
-                  <div className="flex-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                  <div>
                     <Input
                       placeholder="https://company.com"
                       value={formData.website}
@@ -455,24 +455,32 @@ export const AddClient: React.FC = () => {
                       <p className="text-xs text-red-600 mt-1">{errors.website}</p>
                     )}
                   </div>
-                  <Button
-                    variant="primary"
-                    onClick={handleAIPrefill}
-                    disabled={!formData.website || aiPrefilling}
-                  >
-                    {aiPrefilling ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Prefilling...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        AI Autofill
-                      </>
-                    )}
-                  </Button>
+                  <div>
+                    <Input
+                      placeholder="https://linkedin.com/company/..."
+                      value={formData.linkedinUrl}
+                      onChange={(e) => handleInputChange('linkedinUrl', e.target.value)}
+                    />
+                  </div>
                 </div>
+                <Button
+                  variant="primary"
+                  onClick={handleAIPrefill}
+                  disabled={(!formData.website && !formData.linkedinUrl) || aiPrefilling}
+                  className="w-full"
+                >
+                  {aiPrefilling ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Prefilling...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      AI Autofill from {formData.website ? 'Website' : formData.linkedinUrl ? 'LinkedIn' : 'URL'}
+                    </>
+                  )}
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -740,34 +748,6 @@ export const AddClient: React.FC = () => {
                     />
                   </div>
                 </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Preferred Contact Method
-                  </label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        value="email"
-                        checked={formData.preferredContactMethod === 'email'}
-                        onChange={(e) => handleInputChange('preferredContactMethod', e.target.value)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm">Email</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        value="phone"
-                        checked={formData.preferredContactMethod === 'phone'}
-                        onChange={(e) => handleInputChange('preferredContactMethod', e.target.value)}
-                        className="w-4 h-4"
-                      />
-                      <span className="text-sm">Phone</span>
-                    </label>
-                  </div>
-                </div>
               </div>
 
               <div className="flex justify-between pt-6 mt-6 border-t border-border">
@@ -843,20 +823,6 @@ export const AddClient: React.FC = () => {
                     onChange={(e) => handleInputChange('facebookUrl', e.target.value)}
                   />
                 </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Company Logo URL
-                  </label>
-                  <Input
-                    placeholder="https://example.com/logo.png"
-                    value={formData.logoUrl}
-                    onChange={(e) => handleInputChange('logoUrl', e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter the URL of the company's logo image
-                  </p>
-                </div>
               </div>
 
               <div className="flex justify-between pt-6 mt-6 border-t border-border">
@@ -884,26 +850,6 @@ export const AddClient: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  <DollarSign className="h-4 w-4 inline mr-2" />
-                  Budget Range
-                </label>
-                <select
-                  value={formData.budgetRange}
-                  onChange={(e) => handleInputChange('budgetRange', e.target.value)}
-                  className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">Select Budget Range</option>
-                  <option value="< $10K">Less than $10,000</option>
-                  <option value="$10K - $50K">$10,000 - $50,000</option>
-                  <option value="$50K - $100K">$50,000 - $100,000</option>
-                  <option value="$100K - $250K">$100,000 - $250,000</option>
-                  <option value="$250K - $500K">$250,000 - $500,000</option>
-                  <option value="$500K+">$500,000+</option>
-                </select>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Tags
@@ -949,6 +895,27 @@ export const AddClient: React.FC = () => {
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   className="w-full min-h-[120px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <Upload className="h-4 w-4 inline mr-2" />
+                  Upload Documents (Optional)
+                </label>
+                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer bg-background">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls"
+                    className="hidden"
+                    id="document-upload"
+                  />
+                  <label htmlFor="document-upload" className="cursor-pointer">
+                    <FileText className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                    <p className="text-sm text-foreground mb-1 font-medium">Click to upload documents</p>
+                    <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, TXT, CSV, XLSX (Max 10MB per file)</p>
+                  </label>
+                </div>
               </div>
 
               <div className="flex justify-between pt-6 mt-6 border-t border-border">
