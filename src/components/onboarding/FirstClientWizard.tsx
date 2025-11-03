@@ -109,30 +109,48 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
       );
 
       if (!response.ok) {
-        throw new Error('Failed to fetch company data');
+        const errorData = await response.json();
+        console.error('AI Prefill error:', errorData);
+        alert(`AI Autofill failed: ${errorData.error || 'Unknown error'}`);
+        return;
       }
 
       const data = await response.json();
 
       if (data.success && data.data) {
-        setFormData(prev => ({
-          ...prev,
-          company: data.data.name || prev.company,
-          industry: data.data.industry || prev.industry,
-          companyOverview: data.data.description || prev.companyOverview,
-          city: data.data.location?.city || prev.city,
-          country: data.data.location?.country || prev.country,
-          linkedinUrl: data.data.socialProfiles?.linkedin || prev.linkedinUrl,
-          twitterUrl: data.data.socialProfiles?.twitter || prev.twitterUrl,
-          facebookUrl: data.data.socialProfiles?.facebook || prev.facebookUrl,
-          instagramUrl: data.data.socialProfiles?.instagram || prev.instagramUrl,
-          logoUrl: data.data.logo || prev.logoUrl,
-          primaryEmail: data.data.email || prev.primaryEmail,
-          primaryPhone: data.data.phone || prev.primaryPhone
-        }));
+        const updates: any = {};
+
+        if (data.data.name && !formData.company) updates.company = data.data.name;
+        if (data.data.industry && !formData.industry) updates.industry = data.data.industry;
+        if (data.data.description && !formData.companyOverview) updates.companyOverview = data.data.description;
+        if (data.data.founded && !formData.founded) updates.founded = data.data.founded;
+        if (data.data.companySize && !formData.companySize) updates.companySize = data.data.companySize;
+
+        if (data.data.location?.city && !formData.city) updates.city = data.data.location.city;
+        if (data.data.location?.country && !formData.country) updates.country = data.data.location.country;
+
+        if (data.data.email && !formData.primaryEmail) updates.primaryEmail = data.data.email;
+        if (data.data.phone && !formData.primaryPhone) updates.primaryPhone = data.data.phone;
+
+        if (data.data.socialProfiles?.linkedin && !formData.linkedinUrl) updates.linkedinUrl = data.data.socialProfiles.linkedin;
+        if (data.data.socialProfiles?.twitter && !formData.twitterUrl) updates.twitterUrl = data.data.socialProfiles.twitter;
+        if (data.data.socialProfiles?.facebook && !formData.facebookUrl) updates.facebookUrl = data.data.socialProfiles.facebook;
+        if (data.data.socialProfiles?.instagram && !formData.instagramUrl) updates.instagramUrl = data.data.socialProfiles.instagram;
+
+        if (data.data.logo && !formData.logoUrl) updates.logoUrl = data.data.logo;
+
+        if (Object.keys(updates).length > 0) {
+          setFormData(prev => ({ ...prev, ...updates }));
+          alert(`Successfully populated ${Object.keys(updates).length} fields with company data!`);
+        } else {
+          alert('No new data found to populate. All fields are already filled or no data was available.');
+        }
+      } else {
+        alert('No company data could be extracted from the website.');
       }
     } catch (error) {
       console.error('AI Prefill error:', error);
+      alert('AI Autofill encountered an error. Please try again or fill in manually.');
     } finally {
       setAiPrefilling(false);
     }

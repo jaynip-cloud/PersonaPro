@@ -8,7 +8,6 @@ const corsHeaders = {
 
 interface RequestBody {
   url: string;
-  openaiKey: string;
 }
 
 interface CrawlResult {
@@ -28,11 +27,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { url, openaiKey }: RequestBody = await req.json();
+    const { url }: RequestBody = await req.json();
 
     if (!url) {
       return new Response(
-        JSON.stringify({ error: "No URL provided" }),
+        JSON.stringify({ success: false, error: "No URL provided" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -40,11 +39,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const openaiKey = Deno.env.get('OPENAI_API_KEY');
+
     if (!openaiKey) {
       return new Response(
-        JSON.stringify({ error: "OpenAI API key is required" }),
+        JSON.stringify({ success: false, error: "OpenAI API key not configured" }),
         {
-          status: 400,
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
@@ -53,8 +54,32 @@ Deno.serve(async (req: Request) => {
     const crawledData = await crawlWebsite(url);
     const extractedInfo = await extractCompanyInfo(crawledData, openaiKey, url);
 
+    const simplifiedData = {
+      success: true,
+      data: {
+        name: extractedInfo.companyInfo?.name || '',
+        industry: extractedInfo.companyInfo?.industry || '',
+        description: extractedInfo.companyInfo?.description || '',
+        founded: extractedInfo.companyInfo?.founded || '',
+        companySize: extractedInfo.companyInfo?.size || '',
+        location: {
+          city: extractLocationCity(extractedInfo.companyInfo?.location || ''),
+          country: extractLocationCountry(extractedInfo.companyInfo?.location || ''),
+        },
+        email: extractedInfo.contactInfo?.email || '',
+        phone: extractedInfo.contactInfo?.phone || '',
+        socialProfiles: {
+          linkedin: extractedInfo.socialProfiles?.linkedin || '',
+          twitter: extractedInfo.socialProfiles?.twitter || '',
+          facebook: extractedInfo.socialProfiles?.facebook || '',
+          instagram: extractedInfo.socialProfiles?.instagram || '',
+        },
+        logo: findLogoUrl(crawledData),
+      }
+    };
+
     return new Response(
-      JSON.stringify(extractedInfo),
+      JSON.stringify(simplifiedData),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -63,7 +88,7 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ success: false, error: error.message || "Internal server error" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -195,91 +220,6 @@ function extractTextFromHtml(html: string): string {
   return text.substring(0, 20000);
 }
 
-async function enrichLinkedInProfiles(leadership: any[], openaiKey: string): Promise<any[]> {
-  const enrichedLeadership = [];
-
-  for (const leader of leadership) {
-    if (!leader.linkedinUrl) {
-      enrichedLeadership.push(leader);
-      continue;
-    }
-
-    try {
-      const response = await fetch(leader.linkedinUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; CompanyBot/1.0)",
-        },
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (!response.ok) {
-        enrichedLeadership.push(leader);
-        continue;
-      }
-
-      const html = await response.text();
-      const profileContent = extractTextFromHtml(html).substring(0, 15000);
-
-      const enrichmentPrompt = `Extract detailed professional information from this LinkedIn profile page content for ${leader.name}.
-
-Profile Content:
-${profileContent}
-
-Extract and return ONLY valid JSON with these fields:
-{
-  "name": "${leader.name}",
-  "role": "${leader.role}",
-  "bio": "Comprehensive biography including: current role, previous positions, education, skills, achievements, certifications, and any notable accomplishments. Be detailed and thorough.",
-  "linkedinUrl": "${leader.linkedinUrl}",
-  "experience": "Detailed work experience summary",
-  "education": "Educational background",
-  "skills": ["skill1", "skill2", "skill3"]
-}`;
-
-      const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: "You are an expert at extracting professional information from LinkedIn profiles. Return detailed, comprehensive information in valid JSON format only.",
-            },
-            {
-              role: "user",
-              content: enrichmentPrompt,
-            },
-          ],
-          temperature: 0.1,
-          max_tokens: 1500,
-        }),
-      });
-
-      if (aiResponse.ok) {
-        const aiData = await aiResponse.json();
-        const content = aiData.choices[0].message.content;
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-
-        if (jsonMatch) {
-          const enrichedData = JSON.parse(jsonMatch[0]);
-          enrichedLeadership.push(enrichedData);
-          continue;
-        }
-      }
-    } catch (error) {
-      console.error(`Error enriching LinkedIn profile for ${leader.name}:`, error);
-    }
-
-    enrichedLeadership.push(leader);
-  }
-
-  return enrichedLeadership;
-}
-
 async function extractCompanyInfo(crawlResults: CrawlResult[], openaiKey: string, rootUrl: string) {
   const allSocialLinks = new Set<string>();
   crawlResults.forEach(result => {
@@ -295,162 +235,41 @@ async function extractCompanyInfo(crawlResults: CrawlResult[], openaiKey: string
   const twitterUrls = Array.from(allSocialLinks).filter(link => link.includes('twitter.com') || link.includes('x.com'));
   const facebookUrls = Array.from(allSocialLinks).filter(link => link.includes('facebook.com'));
   const instagramUrls = Array.from(allSocialLinks).filter(link => link.includes('instagram.com'));
-  const youtubeUrls = Array.from(allSocialLinks).filter(link => link.includes('youtube.com'));
 
-  const prompt = `You are a professional data extraction specialist. Extract ONLY factual information found in the content. DO NOT make assumptions or fabricate data.
+  const prompt = `Extract company information from the provided website content.
 
 ROOT DOMAIN: ${rootUrl}
 
-DISCOVERED SOCIAL LINKS:
-- LinkedIn Company: ${linkedinCompanyUrls.join(', ') || 'Not found'}
-- LinkedIn Profiles: ${linkedinProfileUrls.join(', ') || 'Not found'}
-- Twitter/X: ${twitterUrls.join(', ') || 'Not found'}
+SOCIAL LINKS:
+- LinkedIn: ${linkedinCompanyUrls.join(', ') || 'Not found'}
+- Twitter: ${twitterUrls.join(', ') || 'Not found'}
 - Facebook: ${facebookUrls.join(', ') || 'Not found'}
 - Instagram: ${instagramUrls.join(', ') || 'Not found'}
-- YouTube: ${youtubeUrls.join(', ') || 'Not found'}
 
-EXTRACTION RULES - FOLLOW EXACTLY:
-1. Extract ONLY information explicitly stated in the content
-2. If information is not found, leave field as empty string "" or empty array []
-3. DO NOT infer, assume, or fabricate any data
-4. Be literal and precise - copy exact text when available
-5. For email/phone: Look for actual contact information, not example formats
-6. For services: Extract only explicitly mentioned services with their real descriptions
-7. For leadership: Extract only people explicitly listed as team members with their actual info
-8. For blogs: Extract only actual blog posts with real URLs and dates
-9. For social URLs: Use the discovered URLs listed above - do not make up URLs
-
-REQUIRED JSON STRUCTURE (fill ALL fields with available data):
-
+Return ONLY valid JSON:
 {
   "companyInfo": {
-    "name": "Full legal or trading company name",
-    "industry": "Specific industry/sector (e.g., Enterprise SaaS, HealthTech, FinTech)",
-    "description": "Comprehensive 2-3 sentence description of what the company does and who they serve",
-    "valueProposition": "Clear statement of unique value delivered to customers",
-    "founded": "Year company was founded (YYYY format)",
-    "location": "Full location: City, State/Province, Country",
-    "size": "Company size in employees (e.g., 50-100 employees, 500+ employees)",
-    "mission": "Complete mission statement - the company's purpose and what they aim to achieve",
-    "vision": "Complete vision statement - the company's aspirational future state"
+    "name": "Company name",
+    "industry": "Industry",
+    "description": "Company description",
+    "location": "City, Country",
+    "size": "Company size",
+    "founded": "Year founded"
   },
   "contactInfo": {
-    "email": "ONLY extract if you find an actual email address in the content (e.g., contact@company.com, info@company.com). Leave empty if not found.",
-    "phone": "ONLY extract if you find an actual phone number in the content (e.g., +1-555-123-4567, (555) 123-4567). Leave empty if not found.",
-    "address": "ONLY extract if you find an actual physical address in the content. Leave empty if not found."
+    "email": "Contact email",
+    "phone": "Phone number"
   },
   "socialProfiles": {
-    "linkedin": "Use ONLY the LinkedIn company URL from discovered links above. If multiple, use the first one. Leave empty if none found.",
-    "twitter": "Use ONLY the Twitter/X URL from discovered links above. If multiple, use the first one. Leave empty if none found.",
-    "facebook": "Use ONLY the Facebook URL from discovered links above. If multiple, use the first one. Leave empty if none found.",
-    "instagram": "Use ONLY the Instagram URL from discovered links above. If multiple, use the first one. Leave empty if none found.",
-    "youtube": "Use ONLY the YouTube URL from discovered links above. If multiple, use the first one. Leave empty if none found."
-  },
-  "services": [
-    {
-      "name": "ONLY extract actual service/product names mentioned in the content",
-      "description": "Extract the ACTUAL description from the content - do not write your own",
-      "tags": [],
-      "pricing": "ONLY include if actual pricing is mentioned"
-    }
-  ],
-  "leadership": [
-    {
-      "name": "Full name of person (e.g., 'Sarah Johnson', 'Michael Chen')",
-      "role": "Their exact job title (e.g., 'CEO & Founder', 'Chief Technology Officer', 'VP of Engineering')",
-      "bio": "Copy the complete biographical text shown - include background, experience, education, achievements. Extract everything you find about this person.",
-      "linkedinUrl": "Match their name to a LinkedIn profile URL from the discovered links (e.g., 'https://linkedin.com/in/sarahjohnson'). Leave empty if not found."
-    }
-  ],
-  "blogs": [
-    {
-      "title": "The actual blog post title (e.g., 'How We Built Our AI Platform', '5 Tips for Cloud Migration')",
-      "url": "Full URL to the blog post (e.g., 'https://example.com/blog/our-ai-platform' or if you see '/blog/post', make it 'https://example.com/blog/post')",
-      "date": "Publication date in YYYY-MM-DD if you can parse it, or original format if not (e.g., '2024-01-15' or 'January 15, 2024')",
-      "summary": "The preview text, excerpt, or description shown for this post. Copy what you see.",
-      "author": "Author name if shown (e.g., 'John Smith', 'By Sarah Johnson')"
-    }
-  ],
-  "technology": {
-    "stack": ["ONLY list technologies/tools explicitly mentioned in the content - common examples: React, Python, AWS, PostgreSQL, Docker"],
-    "partners": ["ONLY list actual partner companies mentioned - examples: Microsoft, Google Cloud, AWS, Salesforce"],
-    "integrations": ["ONLY list actual integrations/APIs mentioned - examples: Stripe, Slack, Zoom, GitHub"]
+    "linkedin": "${linkedinCompanyUrls[0] || ''}",
+    "twitter": "${twitterUrls[0] || ''}",
+    "facebook": "${facebookUrls[0] || ''}",
+    "instagram": "${instagramUrls[0] || ''}"
   }
 }
 
-SPECIFIC EXTRACTION INSTRUCTIONS BY SECTION:
-
-CONTACT INFO:
-- Search for email patterns: info@, contact@, hello@, support@, sales@ followed by domain
-- Search for phone patterns: numbers with parentheses, dashes, or +country code
-- Search for address patterns: street numbers, city, state/province, ZIP/postal code
-- Check: Contact page, footer sections, About page
-- If not found: Leave empty - DO NOT fabricate
-
-SOCIAL PROFILES:
-- Use ONLY the discovered URLs listed above
-- Match by domain (linkedin.com, twitter.com, facebook.com, etc.)
-- If multiple URLs for same platform, use the first one
-- If not found: Leave empty - DO NOT create URLs
-
-SERVICES/PRODUCTS:
-- Look in: Services page, Products page, What We Do page, Solutions page, homepage features
-- Extract the ACTUAL service names and descriptions as written
-- If a service is mentioned but no description: add name only, leave description empty
-- If no services found: Return empty array []
-
-LEADERSHIP TEAM (CRITICAL - READ CAREFULLY):
-- Look for sections with headers like: "Team", "Our Team", "Leadership", "About Us", "Meet the Team", "Founders", "Management"
-- Extract ALL people shown with their information:
-  * Names: Full name as shown (e.g., "John Smith", "Jane Doe")
-  * Roles: Exact job title (e.g., "CEO", "Chief Technology Officer", "VP of Sales", "Co-Founder")
-  * Bios: Copy ALL biographical text shown for each person - this may include background, experience, education, achievements
-  * LinkedIn URLs: Match the person's name to any LinkedIn profile URLs (linkedin.com/in/...) found in the discovered links
-- Example of what to look for in content:
-  * "John Smith - CEO: John has 20 years of experience in..."
-  * "Jane Doe, Chief Technology Officer, Previously worked at..."
-  * Team member cards/profiles with photos and descriptions
-- Extract EVERY team member you find - don't limit to just executives
-- If no team members found anywhere in the content: Return empty array []
-
-BLOG POSTS (CRITICAL - READ CAREFULLY):
-- Look for blog/article listings with these patterns:
-  * Blog post titles (often as links)
-  * Publication dates
-  * Author names
-  * Preview text or excerpts
-  * URLs to full articles
-- Common page patterns to search:
-  * "Recent Posts", "Latest Articles", "Blog", "News", "Insights"
-  * Article list pages with multiple posts
-  * Homepage with recent blog links
-- For each blog post found, extract:
-  * Title: The actual blog post headline
-  * URL: The full link to the article (if relative URL like "/blog/post-title", prepend the root domain)
-  * Date: Look for dates near the title (formats: "January 15, 2024", "2024-01-15", "Jan 15, 2024", "3 days ago")
-  * Summary: The preview text, excerpt, or first few sentences shown
-  * Author: Look for "By [Name]", "Author: [Name]", or author byline
-- Extract ALL blog posts you can find, especially recent ones
-- If no blog posts/articles found: Return empty array []
-
-TECHNOLOGY & PARTNERS:
-- Stack: Look for mentions of programming languages, frameworks, databases, cloud providers
-- Partners: Look for "Partners", "Powered by", "Works with" sections
-- Integrations: Look for "Integrations", "Connects with", "APIs" sections
-- Only include if explicitly mentioned
-- If not found: Return empty arrays []
-
-CRAWLED WEBSITE CONTENT:
-${combinedContent.substring(0, 100000)}
-
-FINAL INSTRUCTIONS - PLEASE READ:
-1. LEADERSHIP: Search the content above for ANY mentions of team members, founders, executives, or staff. Look for names with job titles. Extract ALL people you find.
-2. BLOGS: Search for ANY blog posts, articles, news items, or content pieces. Look for titles, dates, and URLs. Extract ALL posts you find.
-3. If you find leadership or blog information in the content, YOU MUST include it in the JSON response.
-4. For all other fields: Extract ONLY factual information found in the content. DO NOT fabricate, assume, or infer data.
-5. Return ONLY valid JSON.
-
-Now extract the data and return the JSON:`;
+WEBSITE CONTENT:
+${combinedContent.substring(0, 50000)}`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -464,7 +283,7 @@ Now extract the data and return the JSON:`;
         messages: [
           {
             role: "system",
-            content: "You are a precise data extraction specialist. Extract ONLY factual information explicitly present in the provided content. NEVER fabricate, assume, or infer data. If information is not found, use empty strings or arrays. Be literal and accurate. Your job is to find and copy real information, not to fill in missing data with assumptions. Return only valid JSON with actual extracted data.",
+            content: "Extract company information from website content. Return only valid JSON.",
           },
           {
             role: "user",
@@ -472,7 +291,7 @@ Now extract the data and return the JSON:`;
           },
         ],
         temperature: 0.1,
-        max_tokens: 6000,
+        max_tokens: 2000,
       }),
     });
 
@@ -493,14 +312,48 @@ Now extract the data and return the JSON:`;
       extractedData = JSON.parse(content);
     }
 
-    console.log('Extraction Results:');
-    console.log('- Leadership found:', extractedData.leadership?.length || 0);
-    console.log('- Blogs found:', extractedData.blogs?.length || 0);
-    console.log('- Services found:', extractedData.services?.length || 0);
-
     return extractedData;
   } catch (error) {
     console.error("Error calling OpenAI:", error);
     throw error;
   }
+}
+
+function extractLocationCity(location: string): string {
+  if (!location) return '';
+  const parts = location.split(',').map(p => p.trim());
+  return parts[0] || '';
+}
+
+function extractLocationCountry(location: string): string {
+  if (!location) return '';
+  const parts = location.split(',').map(p => p.trim());
+  return parts[parts.length - 1] || '';
+}
+
+function findLogoUrl(crawlResults: CrawlResult[]): string {
+  for (const result of crawlResults) {
+    const logoPatterns = [
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      /<link[^>]+rel=["']icon["'][^>]+href=["']([^"']+)["']/i,
+      /<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i,
+      /<img[^>]+class=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/i,
+      /<img[^>]+alt=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/i,
+    ];
+
+    for (const pattern of logoPatterns) {
+      const match = result.content.match(pattern);
+      if (match && match[1]) {
+        let url = match[1];
+        if (url.startsWith('//')) {
+          url = 'https:' + url;
+        } else if (url.startsWith('/')) {
+          const baseUrl = new URL(result.url);
+          url = baseUrl.origin + url;
+        }
+        return url;
+      }
+    }
+  }
+  return '';
 }
