@@ -78,6 +78,7 @@ export const AddClient: React.FC = () => {
   const [newTag, setNewTag] = useState('');
   const [saving, setSaving] = useState(false);
   const [aiPrefilling, setAiPrefilling] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
   const [formData, setFormData] = useState<ClientFormData>({
     company: '',
@@ -177,6 +178,17 @@ export const AddClient: React.FC = () => {
 
   const handleRemoveTag = (tagToRemove: string) => {
     setFormData({ ...formData, tags: formData.tags.filter(tag => tag !== tagToRemove) });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      setUploadedFiles(prev => [...prev, ...filesArray]);
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleAIPrefill = async () => {
@@ -909,6 +921,7 @@ export const AddClient: React.FC = () => {
                     accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls"
                     className="hidden"
                     id="document-upload"
+                    onChange={handleFileChange}
                   />
                   <label htmlFor="document-upload" className="cursor-pointer">
                     <FileText className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
@@ -916,6 +929,26 @@ export const AddClient: React.FC = () => {
                     <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, TXT, CSV, XLSX (Max 10MB per file)</p>
                   </label>
                 </div>
+                {uploadedFiles.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium text-foreground">{uploadedFiles.length} file(s) selected:</p>
+                    {uploadedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-foreground">{file.name}</span>
+                          <span className="text-xs text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveFile(index)}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between pt-6 mt-6 border-t border-border">

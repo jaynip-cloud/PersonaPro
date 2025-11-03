@@ -81,6 +81,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
   const totalSteps = 5;
 
@@ -89,6 +90,17 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      setUploadedFiles(prev => [...prev, ...filesArray]);
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleAIPrefill = async () => {
@@ -721,14 +733,36 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                     multiple
                     accept=".pdf,.doc,.docx,.txt,.csv,.xlsx"
                     className="hidden"
-                    id="document-upload"
+                    id="document-upload-wizard"
+                    onChange={handleFileChange}
                   />
-                  <label htmlFor="document-upload" className="cursor-pointer">
+                  <label htmlFor="document-upload-wizard" className="cursor-pointer">
                     <FileText className="h-8 w-8 mx-auto mb-2 text-slate-400" />
                     <p className="text-sm text-slate-600 mb-1">Click to upload documents</p>
                     <p className="text-xs text-slate-500">PDF, DOC, DOCX, TXT, CSV, XLSX (Max 10MB)</p>
                   </label>
                 </div>
+                {uploadedFiles.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm font-medium text-slate-700">{uploadedFiles.length} file(s) selected:</p>
+                    {uploadedFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded-md">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-slate-400" />
+                          <span className="text-sm text-slate-700">{file.name}</span>
+                          <span className="text-xs text-slate-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveFile(index)}
+                          className="text-slate-400 hover:text-red-600"
+                          type="button"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
