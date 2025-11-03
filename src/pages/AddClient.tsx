@@ -303,10 +303,8 @@ export const AddClient: React.FC = () => {
     }
   };
 
-  const uploadFilesToStorage = async (clientId: string): Promise<any[]> => {
-    if (uploadedFiles.length === 0) return [];
-
-    const uploadedDocs = [];
+  const uploadFilesToStorage = async (clientId: string): Promise<void> => {
+    if (uploadedFiles.length === 0) return;
 
     for (const file of uploadedFiles) {
       const fileExt = file.name.split('.').pop();
@@ -328,17 +326,29 @@ export const AddClient: React.FC = () => {
         .from('client-documents')
         .getPublicUrl(fileName);
 
-      uploadedDocs.push({
-        name: file.name,
-        path: fileName,
-        url: publicUrl,
-        size: file.size,
-        type: file.type,
-        uploadedAt: new Date().toISOString()
-      });
-    }
+      const documentType = file.type.includes('pdf') ? 'proposal' :
+                          file.type.includes('word') ? 'contract' :
+                          file.type.includes('image') ? 'other' : 'email';
 
-    return uploadedDocs;
+      const { error: dbError } = await supabase
+        .from('documents')
+        .insert({
+          client_id: clientId,
+          user_id: user!.id,
+          name: file.name,
+          type: documentType,
+          size: file.size,
+          url: publicUrl,
+          source: fileName,
+          status: 'completed',
+          uploaded_at: new Date().toISOString()
+        });
+
+      if (dbError) {
+        console.error('Error saving document to database:', dbError);
+        throw new Error(`Failed to save ${file.name} to database: ${dbError.message}`);
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -402,19 +412,8 @@ export const AddClient: React.FC = () => {
 
       if (uploadedFiles.length > 0 && newClient) {
         try {
-          const uploadedDocs = await uploadFilesToStorage(newClient.id);
-
-          const { error: updateError } = await supabase
-            .from('clients')
-            .update({ documents: uploadedDocs })
-            .eq('id', newClient.id);
-
-          if (updateError) {
-            console.error('Error updating documents:', updateError);
-            showToast('warning', 'Client created but some documents failed to save');
-          } else {
-            showToast('success', `Client created successfully with ${uploadedFiles.length} document(s)`);
-          }
+          await uploadFilesToStorage(newClient.id);
+          showToast('success', `Client created successfully with ${uploadedFiles.length} document(s)`);
         } catch (uploadError) {
           console.error('Error uploading documents:', uploadError);
           showToast('warning', 'Client created but documents failed to upload');
