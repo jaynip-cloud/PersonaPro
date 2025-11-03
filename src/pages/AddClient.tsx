@@ -348,6 +348,7 @@ export const AddClient: React.FC = () => {
         .from('clients')
         .insert({
           user_id: user.id,
+          name: formData.contactName || formData.company,
           company: formData.company,
           website: formData.website,
           industry: formData.industry,
