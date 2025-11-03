@@ -65,9 +65,26 @@ Deno.serve(async (req: Request) => {
         location: {
           city: extractLocationCity(extractedInfo.companyInfo?.location || ''),
           country: extractLocationCountry(extractedInfo.companyInfo?.location || ''),
+          zipCode: extractedInfo.companyInfo?.zipCode || '',
         },
-        email: extractedInfo.contactInfo?.email || '',
-        phone: extractedInfo.contactInfo?.phone || '',
+        contactInfo: {
+          contactName: extractedInfo.leadership?.primaryContact?.name || extractedInfo.leadership?.ceo?.name || extractedInfo.leadership?.founder?.name || '',
+          jobTitle: extractedInfo.leadership?.primaryContact?.title || extractedInfo.leadership?.ceo?.title || extractedInfo.leadership?.founder?.title || '',
+          primaryEmail: extractedInfo.contactInfo?.primaryEmail || extractedInfo.contactInfo?.email || '',
+          alternateEmail: extractedInfo.contactInfo?.alternateEmail || '',
+          primaryPhone: extractedInfo.contactInfo?.primaryPhone || extractedInfo.contactInfo?.phone || '',
+          alternatePhone: extractedInfo.contactInfo?.alternatePhone || '',
+        },
+        leadership: {
+          ceo: extractedInfo.leadership?.ceo || null,
+          founder: extractedInfo.leadership?.founder || null,
+          owner: extractedInfo.leadership?.owner || null,
+        },
+        businessGoals: {
+          shortTermGoals: extractedInfo.businessInfo?.shortTermGoals || '',
+          longTermGoals: extractedInfo.businessInfo?.longTermGoals || '',
+          expectations: extractedInfo.businessInfo?.expectations || '',
+        },
         socialProfiles: {
           linkedin: extractedInfo.socialProfiles?.linkedin || '',
           twitter: extractedInfo.socialProfiles?.twitter || '',
@@ -242,6 +259,7 @@ IMPORTANT: You have access to real-time web search. Use it to:
 - Verify and enhance the information from the website
 - Find missing details like contact information, founding year, company size
 - Get the latest company news and updates
+- Find leadership information (CEO, Founder, Owner)
 - Cross-reference information for accuracy
 
 ROOT DOMAIN: ${rootUrl}
@@ -257,23 +275,60 @@ CRITICAL INSTRUCTIONS:
 2. Search thoroughly through ALL provided pages for each piece of information
 3. Be precise and complete - capture full details, not summaries
 4. For missing information, leave the field as an empty string "" - DO NOT fabricate data
-5. Cross-reference information across multiple pages for accuracy
-6. Return ONLY valid JSON - no additional text or explanations
+5. Use your web search to find leadership details (CEO, Founder, Owner) from LinkedIn, news, press releases
+6. Cross-reference information across multiple pages for accuracy
+7. Return ONLY valid JSON - no additional text or explanations
 
 REQUIRED JSON STRUCTURE (extract ALL available information):
 
 {
   "companyInfo": {
-    "name": "Full official company name (look in: page titles, headers, about page, footer)",
-    "industry": "Specific industry/vertical (e.g., 'Enterprise SaaS', 'Healthcare Technology', 'FinTech', 'E-commerce'). Look in: about page, meta description, company description",
-    "description": "Comprehensive 2-4 sentence company description covering: what they do, who they serve, key value proposition, and differentiators. Look in: homepage hero, about page, meta description",
-    "location": "Full location format: 'City, State/Province, Country' (e.g., 'San Francisco, California, United States' or 'London, United Kingdom'). Look in: contact page, footer, about page, address sections",
-    "size": "Company size in employees (e.g., '1-10 employees', '50-200 employees', '500+ employees', '1000+ employees'). Look in: about page, careers page, LinkedIn info if visible",
-    "founded": "Year company was founded in YYYY format (e.g., '2020', '2015'). Look in: about page, company history, footer copyright year"
+    "name": "Full official company name",
+    "industry": "Specific industry/vertical (e.g., 'Enterprise SaaS', 'Healthcare Technology', 'FinTech')",
+    "description": "Comprehensive 2-4 sentence company description",
+    "location": "Full location: 'City, State/Province, Country'",
+    "zipCode": "Postal/Zip code (e.g., '94102', 'SW1A 1AA'). Look in: contact page, footer address",
+    "size": "Company size (e.g., '1-10 employees', '50-200 employees')",
+    "founded": "Year founded in YYYY format (e.g., '2020')"
   },
   "contactInfo": {
-    "email": "Primary contact email address (e.g., 'contact@company.com', 'info@company.com', 'hello@company.com'). Look for patterns: contact@, info@, hello@, support@, sales@ followed by domain. Check: contact page, footer, support section",
-    "phone": "Primary phone number with country code if available (e.g., '+1 (555) 123-4567', '+44 20 1234 5678'). Look in: contact page, header, footer, support section"
+    "email": "Primary general contact email (contact@, info@, hello@)",
+    "primaryEmail": "Primary contact email or general email",
+    "alternateEmail": "Secondary/alternate email if found (sales@, support@, different department)",
+    "phone": "Primary phone number with country code",
+    "primaryPhone": "Primary phone number",
+    "alternatePhone": "Secondary/alternate phone if found (different departments, toll-free)"
+  },
+  "leadership": {
+    "ceo": {
+      "name": "CEO full name",
+      "title": "CEO" or actual title,
+      "email": "CEO email if found",
+      "linkedin": "CEO LinkedIn profile URL"
+    },
+    "founder": {
+      "name": "Founder full name",
+      "title": "Founder" or "Co-Founder",
+      "email": "Founder email if found",
+      "linkedin": "Founder LinkedIn profile URL"
+    },
+    "owner": {
+      "name": "Owner full name",
+      "title": "Owner" or actual title,
+      "email": "Owner email if found",
+      "linkedin": "Owner LinkedIn profile URL"
+    },
+    "primaryContact": {
+      "name": "Primary contact person name (from contact page, team page)",
+      "title": "Their job title/role",
+      "email": "Their direct email",
+      "phone": "Their direct phone"
+    }
+  },
+  "businessInfo": {
+    "shortTermGoals": "Company's short-term goals/objectives if mentioned (next 6-12 months)",
+    "longTermGoals": "Company's long-term vision/goals if mentioned (2-5 years)",
+    "expectations": "What the company expects from partnerships/clients/services if mentioned"
   },
   "socialProfiles": {
     "linkedin": "${linkedinCompanyUrls[0] || ''}",
@@ -294,6 +349,12 @@ EXTRACTION GUIDELINES BY FIELD:
 - Be specific and descriptive (avoid generic terms like "Technology" or "Services")
 - Good examples: "B2B SaaS for Marketing Automation", "AI-Powered Healthcare Analytics", "Cloud Infrastructure Management"
 - Look in: meta descriptions, about page first paragraph, service descriptions
+- Use web search to verify and get more accurate industry classification
+
+**Zip Code:**
+- Extract from full address on contact page or footer
+- Format varies by country: US (12345 or 12345-6789), UK (SW1A 1AA), Canada (A1A 1A1)
+- Look in: contact page full address, footer address block, location information
 
 **Description:**
 - Write 2-4 complete sentences capturing:
@@ -332,7 +393,20 @@ EXTRACTION GUIDELINES BY FIELD:
 - Include country code if visible: +1, +44, etc.
 - Preserve formatting as shown: parentheses, dashes, spaces
 - Look in: contact page, header (often in top bar), footer, support section
-- Accept toll-free numbers, local numbers, international numbers
+- If multiple phones found: primaryPhone = main line, alternatePhone = secondary/toll-free/department
+
+**Leadership (CEO/Founder/Owner):**
+- Use web search to find leadership information on LinkedIn, company news, press releases
+- Look for: CEO, Founder, Co-Founder, Owner, President
+- Check: about page, team page, leadership section, LinkedIn company page
+- Extract: full name, title, email (if found), LinkedIn profile URL
+- For primaryContact: use main contact person from contact page if leadership not found
+
+**Business Goals & Expectations:**
+- shortTermGoals: Near-term objectives, current initiatives (look in: about, blog, news, press releases)
+- longTermGoals: Vision statements, strategic goals, future plans (look in: about, mission, vision sections)
+- expectations: What they seek in partnerships, services, or client relationships (look in: about, partner pages)
+- These are often aspirational statements - extract if clearly stated, otherwise leave empty
 
 **Social Profiles:**
 - Use the discovered URLs provided above
@@ -341,11 +415,13 @@ EXTRACTION GUIDELINES BY FIELD:
 
 SEARCH STRATEGY:
 1. Start with homepage - look for company name, tagline, hero description
-2. Check about/about-us page - usually has: company description, founding year, team size, mission
-3. Review contact page - typically has: email, phone, physical address
-4. Scan footer across all pages - often contains: location, copyright year, social links, contact info
-5. Check careers/jobs page - may mention company size, culture, benefits
-6. Look at meta tags in page source - description and title tags often have good company info
+2. Check about/about-us page - usually has: company description, founding year, team size, mission, leadership
+3. Review team/leadership page - CEO, founders, key contacts
+4. Review contact page - typically has: email, phone, physical address with zip code, contact person
+5. Scan footer across all pages - often contains: location, copyright year, social links, contact info
+6. Check careers/jobs page - may mention company size, culture, benefits
+7. Look at meta tags in page source - description and title tags often have good company info
+8. Use web search for: industry classification, company size, leadership names and roles
 
 QUALITY CHECKS:
 - Company name should not include taglines or generic words like "Official Site"

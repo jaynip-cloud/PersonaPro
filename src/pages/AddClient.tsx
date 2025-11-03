@@ -233,20 +233,28 @@ export const AddClient: React.FC = () => {
 
         if (data.data.location?.city && !formData.city) updates.city = data.data.location.city;
         if (data.data.location?.country && !formData.country) updates.country = data.data.location.country;
+        if (data.data.location?.zipCode && !formData.zipCode) updates.zipCode = data.data.location.zipCode;
 
-        if (data.data.email) {
-          if (!formData.email) updates.email = data.data.email;
-          if (!formData.primaryEmail) updates.primaryEmail = data.data.email;
-        }
-        if (data.data.phone) {
-          if (!formData.phone) updates.phone = data.data.phone;
-          if (!formData.primaryPhone) updates.primaryPhone = data.data.phone;
-        }
+        if (data.data.contactInfo?.contactName && !formData.contactName) updates.contactName = data.data.contactInfo.contactName;
+        if (data.data.contactInfo?.jobTitle && !formData.jobTitle) updates.jobTitle = data.data.contactInfo.jobTitle;
+        if (data.data.contactInfo?.primaryEmail && !formData.primaryEmail) updates.primaryEmail = data.data.contactInfo.primaryEmail;
+        if (data.data.contactInfo?.alternateEmail && !formData.alternateEmail) updates.alternateEmail = data.data.contactInfo.alternateEmail;
+        if (data.data.contactInfo?.primaryPhone && !formData.primaryPhone) updates.primaryPhone = data.data.contactInfo.primaryPhone;
+        if (data.data.contactInfo?.alternatePhone && !formData.alternatePhone) updates.alternatePhone = data.data.contactInfo.alternatePhone;
+
+        if (data.data.contactInfo?.primaryEmail && !formData.email) updates.email = data.data.contactInfo.primaryEmail;
+        if (data.data.contactInfo?.primaryPhone && !formData.phone) updates.phone = data.data.contactInfo.primaryPhone;
+
+        if (data.data.businessGoals?.shortTermGoals && !formData.shortTermGoals) updates.shortTermGoals = data.data.businessGoals.shortTermGoals;
+        if (data.data.businessGoals?.longTermGoals && !formData.longTermGoals) updates.longTermGoals = data.data.businessGoals.longTermGoals;
+        if (data.data.businessGoals?.expectations && !formData.expectations) updates.expectations = data.data.businessGoals.expectations;
 
         if (data.data.socialProfiles?.linkedin && !formData.linkedinUrl) updates.linkedinUrl = data.data.socialProfiles.linkedin;
         if (data.data.socialProfiles?.twitter && !formData.twitterUrl) updates.twitterUrl = data.data.socialProfiles.twitter;
         if (data.data.socialProfiles?.facebook && !formData.facebookUrl) updates.facebookUrl = data.data.socialProfiles.facebook;
         if (data.data.socialProfiles?.instagram && !formData.instagramUrl) updates.instagramUrl = data.data.socialProfiles.instagram;
+
+        if (data.data.logo && !formData.logoUrl) updates.logoUrl = data.data.logo;
 
         if (Object.keys(updates).length > 0) {
           setFormData({ ...formData, ...updates });
