@@ -492,12 +492,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
     setSaving(true);
     try {
-      const servicesJson = formData.services.map(name => ({
-        id: `service-${Date.now()}-${Math.random()}`,
-        name,
-        description: '',
-        tags: [],
-        pricing: ''
+      const servicesJson = formData.services.map(service => ({
+        id: service.id || `service-${Date.now()}-${Math.random()}`,
+        name: service.name || '',
+        description: service.description || '',
+        tags: service.tags || [],
+        pricing: service.pricing || ''
       }));
 
       const { error } = await supabase

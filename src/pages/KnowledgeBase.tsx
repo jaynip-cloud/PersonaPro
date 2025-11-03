@@ -94,17 +94,31 @@ export const KnowledgeBase: React.FC = () => {
         if (profile.services) {
           try {
             const servicesData = JSON.parse(profile.services as string);
+            console.log('Raw servicesData from DB:', servicesData);
             if (Array.isArray(servicesData) && servicesData.length > 0) {
               setServices(servicesData.map((s: any, index: number) => {
-                const serviceName = typeof s === 'string' ? s : (s.name || '');
-                const serviceDesc = typeof s === 'object' ? (s.description || '') : '';
+                let serviceName = '';
+                let serviceDesc = '';
+                let serviceId = `service-${index}`;
+                let serviceTags: string[] = [];
+                let servicePricing = '';
+
+                if (typeof s === 'string') {
+                  serviceName = s;
+                } else if (typeof s === 'object' && s !== null) {
+                  serviceName = typeof s.name === 'string' ? s.name : (typeof s.name === 'object' ? JSON.stringify(s.name) : '');
+                  serviceDesc = typeof s.description === 'string' ? s.description : (typeof s.description === 'object' ? JSON.stringify(s.description) : '');
+                  serviceId = s.id || serviceId;
+                  serviceTags = Array.isArray(s.tags) ? s.tags : [];
+                  servicePricing = typeof s.pricing === 'string' ? s.pricing : '';
+                }
 
                 return {
-                  id: (typeof s === 'object' ? s.id : null) || `service-${index}`,
-                  name: String(serviceName),
-                  description: String(serviceDesc),
-                  tags: Array.isArray(s.tags) ? s.tags : [],
-                  pricing: typeof s === 'object' ? (s.pricing || '') : ''
+                  id: serviceId,
+                  name: serviceName || 'Unnamed Service',
+                  description: serviceDesc,
+                  tags: serviceTags,
+                  pricing: servicePricing
                 };
               }));
             }
