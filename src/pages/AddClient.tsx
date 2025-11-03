@@ -27,7 +27,9 @@ import {
   Linkedin,
   Twitter,
   Instagram,
-  Facebook
+  Facebook,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '../components/ui/Toast';
 
@@ -75,6 +77,7 @@ export const AddClient: React.FC = () => {
   const [completedTabs, setCompletedTabs] = useState<Set<string>>(new Set());
   const [newTag, setNewTag] = useState('');
   const [saving, setSaving] = useState(false);
+  const [aiPrefilling, setAiPrefilling] = useState(false);
 
   const [formData, setFormData] = useState<ClientFormData>({
     company: '',
@@ -174,6 +177,80 @@ export const AddClient: React.FC = () => {
 
   const handleRemoveTag = (tagToRemove: string) => {
     setFormData({ ...formData, tags: formData.tags.filter(tag => tag !== tagToRemove) });
+  };
+
+  const handleAIPrefill = async () => {
+    if (!formData.website || !user) {
+      showToast('error', 'Please enter a website URL first');
+      return;
+    }
+
+    setAiPrefilling(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-company-data`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url: formData.website })
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('AI Prefill error:', errorData);
+        showToast('error', `AI Autofill failed: ${errorData.error || 'Unknown error'}`);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        const updates: Partial<ClientFormData> = {};
+
+        if (data.data.name && !formData.company) updates.company = data.data.name;
+        if (data.data.industry && !formData.industry) updates.industry = data.data.industry;
+        if (data.data.description && !formData.companyOverview) updates.companyOverview = data.data.description;
+        if (data.data.founded && !formData.founded) updates.founded = data.data.founded;
+        if (data.data.companySize && !formData.companySize) updates.companySize = data.data.companySize;
+
+        if (data.data.location?.city && !formData.city) updates.city = data.data.location.city;
+        if (data.data.location?.country && !formData.country) updates.country = data.data.location.country;
+
+        if (data.data.email && !formData.primaryEmail) {
+          updates.primaryEmail = data.data.email;
+          updates.email = data.data.email;
+        }
+        if (data.data.phone && !formData.primaryPhone) {
+          updates.primaryPhone = data.data.phone;
+          updates.phone = data.data.phone;
+        }
+
+        if (data.data.socialProfiles?.linkedin && !formData.linkedinUrl) updates.linkedinUrl = data.data.socialProfiles.linkedin;
+        if (data.data.socialProfiles?.twitter && !formData.twitterUrl) updates.twitterUrl = data.data.socialProfiles.twitter;
+        if (data.data.socialProfiles?.facebook && !formData.facebookUrl) updates.facebookUrl = data.data.socialProfiles.facebook;
+        if (data.data.socialProfiles?.instagram && !formData.instagramUrl) updates.instagramUrl = data.data.socialProfiles.instagram;
+
+        if (data.data.logo && !formData.logoUrl) updates.logoUrl = data.data.logo;
+
+        if (Object.keys(updates).length > 0) {
+          setFormData({ ...formData, ...updates });
+          showToast('success', `Successfully populated ${Object.keys(updates).length} fields with company data!`);
+        } else {
+          showToast('info', 'No new data found to populate. All fields are already filled or no data was available.');
+        }
+      } else {
+        showToast('warning', 'No company data could be extracted from the website.');
+      }
+    } catch (error) {
+      console.error('AI Prefill error:', error);
+      showToast('error', 'AI Autofill encountered an error. Please try again or fill in manually.');
+    } finally {
+      setAiPrefilling(false);
+    }
   };
 
   const handleNext = () => {
@@ -361,6 +438,43 @@ export const AddClient: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-900 dark:text-blue-100 mb-3 font-medium">
+                  <Sparkles className="h-4 w-4 inline mr-2" />
+                  AI-Powered Autofill: Enter company website and let AI populate the details!
+                </p>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="https://company.com"
+                      value={formData.website}
+                      onChange={(e) => handleInputChange('website', e.target.value)}
+                      className={errors.website ? 'border-red-500' : ''}
+                    />
+                    {errors.website && (
+                      <p className="text-xs text-red-600 mt-1">{errors.website}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="primary"
+                    onClick={handleAIPrefill}
+                    disabled={!formData.website || aiPrefilling}
+                  >
+                    {aiPrefilling ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Prefilling...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        AI Autofill
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">
@@ -374,21 +488,6 @@ export const AddClient: React.FC = () => {
                   />
                   {errors.company && (
                     <p className="text-xs text-red-600 mt-1">{errors.company}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Website
-                  </label>
-                  <Input
-                    placeholder="https://acme.com"
-                    value={formData.website}
-                    onChange={(e) => handleInputChange('website', e.target.value)}
-                    className={errors.website ? 'border-red-500' : ''}
-                  />
-                  {errors.website && (
-                    <p className="text-xs text-red-600 mt-1">{errors.website}</p>
                   )}
                 </div>
 
