@@ -206,6 +206,33 @@ export const KnowledgeBase: React.FC = () => {
     integrations: [] as string[]
   });
 
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+
+  const addService = () => {
+    const newService = {
+      id: `service-${Date.now()}`,
+      name: '',
+      description: '',
+      tags: [],
+      pricing: ''
+    };
+    setServices([...services, newService]);
+    setEditingServiceId(newService.id);
+  };
+
+  const updateService = (index: number, field: string, value: any) => {
+    const updatedServices = [...services];
+    updatedServices[index] = { ...updatedServices[index], [field]: value };
+    setServices(updatedServices);
+  };
+
+  const deleteService = (index: number) => {
+    if (confirm('Are you sure you want to delete this service?')) {
+      const updatedServices = services.filter((_, i) => i !== index);
+      setServices(updatedServices);
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
 
@@ -218,13 +245,24 @@ export const KnowledgeBase: React.FC = () => {
           website: companyInfo.canonicalUrl,
           industry: companyInfo.industry,
           about: companyInfo.description,
+          value_proposition: companyInfo.valueProposition,
+          founded: companyInfo.founded,
+          location: companyInfo.location,
+          size: companyInfo.size,
+          mission: companyInfo.mission,
+          vision: companyInfo.vision,
           email: contactInfo.email,
           phone: contactInfo.phone,
+          address: contactInfo.address,
           linkedin_url: socialProfiles.linkedin,
           twitter_url: socialProfiles.twitter,
           facebook_url: socialProfiles.facebook,
           instagram_url: socialProfiles.instagram,
+          youtube_url: socialProfiles.youtube,
           services: JSON.stringify(services),
+          leadership: JSON.stringify(leadership),
+          blogs: JSON.stringify(blogs),
+          technology: JSON.stringify(technology),
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);
@@ -691,7 +729,7 @@ export const KnowledgeBase: React.FC = () => {
       {activeTab === 'services' && (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <Button variant="primary">
+            <Button variant="primary" onClick={addService}>
               <Plus className="h-4 w-4 mr-2" />
               Add Service
             </Button>
@@ -707,44 +745,110 @@ export const KnowledgeBase: React.FC = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {services.map((service) => (
-              <Card key={service.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-foreground mb-2">
-                        {typeof service.name === 'string' ? service.name : 'Unnamed Service'}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        {typeof service.description === 'string' ? service.description : ''}
-                      </p>
-                      {service.tags && service.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {service.tags.map((tag: string, idx: number) => (
-                            <Badge key={idx} variant="secondary">
-                              {tag}
-                            </Badge>
-                          ))}
+              {services.map((service, index) => {
+                const isEditing = editingServiceId === service.id;
+                return (
+                  <Card key={service.id}>
+                    <CardContent className="p-6">
+                      {isEditing ? (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Service Name
+                            </label>
+                            <Input
+                              type="text"
+                              value={service.name}
+                              onChange={(e) => updateService(index, 'name', e.target.value)}
+                              placeholder="Enter service name"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Description
+                            </label>
+                            <textarea
+                              className="w-full min-h-[100px] p-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                              value={service.description}
+                              onChange={(e) => updateService(index, 'description', e.target.value)}
+                              placeholder="Describe the service..."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Pricing
+                            </label>
+                            <Input
+                              type="text"
+                              value={service.pricing}
+                              onChange={(e) => updateService(index, 'pricing', e.target.value)}
+                              placeholder="e.g., $99/month, Custom quote"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setEditingServiceId(null)}>
+                              Done
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-foreground mb-2">
+                              {typeof service.name === 'string' ? service.name : 'Unnamed Service'}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-3">
+                              {typeof service.description === 'string' ? service.description : ''}
+                            </p>
+                            {service.tags && service.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mb-3">
+                                {service.tags.map((tag: string, idx: number) => (
+                                  <Badge key={idx} variant="secondary">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                            {service.pricing && (
+                              <div className="text-sm text-muted-foreground">
+                                <span className="font-medium">Pricing:</span> {service.pricing}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setEditingServiceId(service.id)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => deleteService(index)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       )}
-                      {service.pricing && (
-                        <div className="text-sm text-muted-foreground">
-                          <span className="font-medium">Pricing:</span> {service.pricing}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {services.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
+                {saved ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Saved!
+                  </>
+                ) : saving ? (
+                  'Saving...'
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Services
+                  </>
+                )}
+              </Button>
             </div>
           )}
         </div>
