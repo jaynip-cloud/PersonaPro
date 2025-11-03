@@ -699,13 +699,15 @@ export const KnowledgeBase: React.FC = () => {
                       <p className="text-sm text-muted-foreground mb-3">
                         {service.description}
                       </p>
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {service.tags.map((tag, idx) => (
-                          <Badge key={idx} variant="secondary">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
+                      {service.tags && service.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {service.tags.map((tag: string, idx: number) => (
+                            <Badge key={idx} variant="secondary">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                       {service.pricing && (
                         <div className="text-sm text-muted-foreground">
                           <span className="font-medium">Pricing:</span> {service.pricing}
