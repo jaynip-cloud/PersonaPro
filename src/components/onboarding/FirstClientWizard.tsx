@@ -18,7 +18,17 @@ import {
   CheckCircle,
   ArrowRight,
   ArrowLeft,
-  Sparkles
+  Sparkles,
+  Target,
+  DollarSign,
+  Smile,
+  Linkedin,
+  Twitter,
+  Instagram,
+  Facebook,
+  Upload,
+  FileText,
+  Loader2
 } from 'lucide-react';
 
 interface FirstClientWizardProps {
@@ -30,35 +40,101 @@ interface FirstClientWizardProps {
 export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, onComplete, onSkip }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [aiPrefilling, setAiPrefilling] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    contactName: '',
     company: '',
     website: '',
-    primaryEmail: '',
-    primaryPhone: '',
-    jobTitle: '',
     industry: '',
     city: '',
     country: '',
+    zipCode: '',
+    founded: '',
     companySize: '',
-    linkedinUrl: '',
     status: 'prospect' as 'active' | 'inactive' | 'prospect' | 'churned',
+    csm: '',
+    companyOverview: '',
+    contactName: '',
+    primaryEmail: '',
+    alternateEmail: '',
+    primaryPhone: '',
+    alternatePhone: '',
+    jobTitle: '',
+    preferredContactMethod: 'email' as 'email' | 'phone',
+    linkedinUrl: '',
+    twitterUrl: '',
+    instagramUrl: '',
+    facebookUrl: '',
+    logoUrl: '',
+    budgetRange: '',
     tags: [] as string[],
     tagInput: '',
-    companyOverview: ''
+    description: '',
+    shortTermGoals: '',
+    longTermGoals: '',
+    expectations: '',
+    satisfactionScore: 0,
+    satisfactionFeedback: '',
+    uploadedDocuments: [] as string[]
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const totalSteps = 3;
+  const totalSteps = 5;
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleAIPrefill = async () => {
+    if (!formData.website || !user) return;
+
+    setAiPrefilling(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-company-data`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url: formData.website })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch company data');
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        setFormData(prev => ({
+          ...prev,
+          company: data.data.name || prev.company,
+          industry: data.data.industry || prev.industry,
+          companyOverview: data.data.description || prev.companyOverview,
+          city: data.data.location?.city || prev.city,
+          country: data.data.location?.country || prev.country,
+          linkedinUrl: data.data.socialProfiles?.linkedin || prev.linkedinUrl,
+          twitterUrl: data.data.socialProfiles?.twitter || prev.twitterUrl,
+          facebookUrl: data.data.socialProfiles?.facebook || prev.facebookUrl,
+          instagramUrl: data.data.socialProfiles?.instagram || prev.instagramUrl,
+          logoUrl: data.data.logo || prev.logoUrl,
+          primaryEmail: data.data.email || prev.primaryEmail,
+          primaryPhone: data.data.phone || prev.primaryPhone
+        }));
+      }
+    } catch (error) {
+      console.error('AI Prefill error:', error);
+    } finally {
+      setAiPrefilling(false);
     }
   };
 
@@ -83,15 +159,24 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     const newErrors: Record<string, string> = {};
 
     if (currentStep === 1) {
-      if (!formData.contactName.trim()) newErrors.contactName = 'Contact name is required';
       if (!formData.company.trim()) newErrors.company = 'Company is required';
+      if (!formData.industry.trim()) newErrors.industry = 'Industry is required';
+      if (formData.website && !/^https?:\/\/.+/.test(formData.website)) {
+        newErrors.website = 'Please enter a valid URL';
+      }
+    }
+
+    if (currentStep === 2) {
+      if (!formData.contactName.trim()) newErrors.contactName = 'Contact name is required';
       if (!formData.primaryEmail.trim()) {
         newErrors.primaryEmail = 'Email is required';
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.primaryEmail)) {
         newErrors.primaryEmail = 'Invalid email format';
       }
+      if (formData.alternateEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.alternateEmail)) {
+        newErrors.alternateEmail = 'Invalid email format';
+      }
       if (!formData.jobTitle.trim()) newErrors.jobTitle = 'Job title is required';
-      if (!formData.industry.trim()) newErrors.industry = 'Industry is required';
     }
 
     setErrors(newErrors);
@@ -117,22 +202,39 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
         .from('clients')
         .insert({
           user_id: user.id,
-          contact_name: formData.contactName,
           company: formData.company,
           website: formData.website,
-          primary_email: formData.primaryEmail,
-          email: formData.primaryEmail,
-          primary_phone: formData.primaryPhone,
-          phone: formData.primaryPhone,
-          job_title: formData.jobTitle,
           industry: formData.industry,
+          email: formData.primaryEmail,
+          phone: formData.primaryPhone,
           city: formData.city,
           country: formData.country,
+          zip_code: formData.zipCode,
+          founded: formData.founded,
           company_size: formData.companySize,
           linkedin_url: formData.linkedinUrl,
+          twitter_url: formData.twitterUrl,
+          instagram_url: formData.instagramUrl,
+          facebook_url: formData.facebookUrl,
+          logo_url: formData.logoUrl,
+          contact_name: formData.contactName,
+          primary_email: formData.primaryEmail,
+          alternate_email: formData.alternateEmail,
+          primary_phone: formData.primaryPhone,
+          alternate_phone: formData.alternatePhone,
+          job_title: formData.jobTitle,
+          preferred_contact_method: formData.preferredContactMethod,
+          company_overview: formData.companyOverview,
+          budget_range: formData.budgetRange,
+          short_term_goals: formData.shortTermGoals,
+          long_term_goals: formData.longTermGoals,
+          expectations: formData.expectations,
+          satisfaction_score: formData.satisfactionScore > 0 ? formData.satisfactionScore : null,
+          satisfaction_feedback: formData.satisfactionFeedback,
           status: formData.status,
           tags: formData.tags,
-          company_overview: formData.companyOverview,
+          description: formData.description,
+          csm: formData.csm,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
@@ -169,7 +271,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
             Let's get you started by adding your first client
           </p>
           <div className="mt-4 flex gap-2">
-            {[1, 2, 3].map((step) => (
+            {[1, 2, 3, 4, 5].map((step) => (
               <div
                 key={step}
                 className={`h-2 flex-1 rounded-full ${
@@ -183,29 +285,50 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
           </p>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 max-h-[60vh] overflow-y-auto">
           {currentStep === 1 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Basic Information
+                <Building2 className="h-5 w-5" />
+                Company Information
               </h3>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Contact Name <span className="text-red-600">*</span>
-                  </label>
-                  <Input
-                    placeholder="John Doe"
-                    value={formData.contactName}
-                    onChange={(e) => handleChange('contactName', e.target.value)}
-                  />
-                  {errors.contactName && (
-                    <p className="text-xs text-red-600 mt-1">{errors.contactName}</p>
-                  )}
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-900 mb-3">
+                  Enter the company website and click "AI Autofill" to automatically populate company details!
+                </p>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="https://company.com"
+                      value={formData.website}
+                      onChange={(e) => handleChange('website', e.target.value)}
+                    />
+                    {errors.website && (
+                      <p className="text-xs text-red-600 mt-1">{errors.website}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="primary"
+                    onClick={handleAIPrefill}
+                    disabled={!formData.website || aiPrefilling}
+                  >
+                    {aiPrefilling ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Prefilling...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        AI Autofill
+                      </>
+                    )}
+                  </Button>
                 </div>
+              </div>
 
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Company Name <span className="text-red-600">*</span>
@@ -217,47 +340,6 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   />
                   {errors.company && (
                     <p className="text-xs text-red-600 mt-1">{errors.company}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Email <span className="text-red-600">*</span>
-                  </label>
-                  <Input
-                    type="email"
-                    placeholder="john@acme.com"
-                    value={formData.primaryEmail}
-                    onChange={(e) => handleChange('primaryEmail', e.target.value)}
-                  />
-                  {errors.primaryEmail && (
-                    <p className="text-xs text-red-600 mt-1">{errors.primaryEmail}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Phone
-                  </label>
-                  <Input
-                    type="tel"
-                    placeholder="+1 (555) 123-4567"
-                    value={formData.primaryPhone}
-                    onChange={(e) => handleChange('primaryPhone', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Role / Title <span className="text-red-600">*</span>
-                  </label>
-                  <Input
-                    placeholder="VP of Engineering"
-                    value={formData.jobTitle}
-                    onChange={(e) => handleChange('jobTitle', e.target.value)}
-                  />
-                  {errors.jobTitle && (
-                    <p className="text-xs text-red-600 mt-1">{errors.jobTitle}</p>
                   )}
                 </div>
 
@@ -284,30 +366,24 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                     <p className="text-xs text-red-600 mt-1">{errors.industry}</p>
                   )}
                 </div>
-              </div>
-            </div>
-          )}
 
-          {currentStep === 2 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Company Details
-              </h3>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Website
+                    Company Size
                   </label>
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4 text-slate-400" />
-                    <Input
-                      placeholder="https://company.com"
-                      value={formData.website}
-                      onChange={(e) => handleChange('website', e.target.value)}
-                    />
-                  </div>
+                  <select
+                    value={formData.companySize}
+                    onChange={(e) => handleChange('companySize', e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Size</option>
+                    <option value="1-10">1-10 employees</option>
+                    <option value="11-50">11-50 employees</option>
+                    <option value="51-200">51-200 employees</option>
+                    <option value="201-500">201-500 employees</option>
+                    <option value="501-1000">501-1000 employees</option>
+                    <option value="1000+">1000+ employees</option>
+                  </select>
                 </div>
 
                 <div>
@@ -334,35 +410,27 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Company Size
+                    Zip Code
                   </label>
-                  <select
-                    value={formData.companySize}
-                    onChange={(e) => handleChange('companySize', e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Size</option>
-                    <option value="1-10">1-10 employees</option>
-                    <option value="11-50">11-50 employees</option>
-                    <option value="51-200">51-200 employees</option>
-                    <option value="201-500">201-500 employees</option>
-                    <option value="501-1000">501-1000 employees</option>
-                    <option value="1000+">1000+ employees</option>
-                  </select>
+                  <Input
+                    placeholder="94102"
+                    value={formData.zipCode}
+                    onChange={(e) => handleChange('zipCode', e.target.value)}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    LinkedIn Profile
+                    Founded Year
                   </label>
                   <Input
-                    placeholder="https://linkedin.com/company/acme"
-                    value={formData.linkedinUrl}
-                    onChange={(e) => handleChange('linkedinUrl', e.target.value)}
+                    placeholder="2020"
+                    value={formData.founded}
+                    onChange={(e) => handleChange('founded', e.target.value)}
                   />
                 </div>
 
-                <div className="col-span-2">
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Status
                   </label>
@@ -377,6 +445,150 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                     <option value="churned">Churned</option>
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Assigned CSM
+                  </label>
+                  <Input
+                    placeholder="John Doe"
+                    value={formData.csm}
+                    onChange={(e) => handleChange('csm', e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Company Overview
+                  </label>
+                  <textarea
+                    placeholder="Brief overview of the company..."
+                    value={formData.companyOverview}
+                    onChange={(e) => handleChange('companyOverview', e.target.value)}
+                    className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Contact Details
+              </h3>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Contact Name <span className="text-red-600">*</span>
+                  </label>
+                  <Input
+                    placeholder="John Doe"
+                    value={formData.contactName}
+                    onChange={(e) => handleChange('contactName', e.target.value)}
+                  />
+                  {errors.contactName && (
+                    <p className="text-xs text-red-600 mt-1">{errors.contactName}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Job Title / Role <span className="text-red-600">*</span>
+                  </label>
+                  <Input
+                    placeholder="VP of Engineering"
+                    value={formData.jobTitle}
+                    onChange={(e) => handleChange('jobTitle', e.target.value)}
+                  />
+                  {errors.jobTitle && (
+                    <p className="text-xs text-red-600 mt-1">{errors.jobTitle}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Primary Email <span className="text-red-600">*</span>
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="john@acme.com"
+                    value={formData.primaryEmail}
+                    onChange={(e) => handleChange('primaryEmail', e.target.value)}
+                  />
+                  {errors.primaryEmail && (
+                    <p className="text-xs text-red-600 mt-1">{errors.primaryEmail}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Alternate Email
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="john.doe@personal.com"
+                    value={formData.alternateEmail}
+                    onChange={(e) => handleChange('alternateEmail', e.target.value)}
+                  />
+                  {errors.alternateEmail && (
+                    <p className="text-xs text-red-600 mt-1">{errors.alternateEmail}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Primary Phone
+                  </label>
+                  <Input
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
+                    value={formData.primaryPhone}
+                    onChange={(e) => handleChange('primaryPhone', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Alternate Phone
+                  </label>
+                  <Input
+                    type="tel"
+                    placeholder="+1 (555) 987-6543"
+                    value={formData.alternatePhone}
+                    onChange={(e) => handleChange('alternatePhone', e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Preferred Contact Method
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        value="email"
+                        checked={formData.preferredContactMethod === 'email'}
+                        onChange={(e) => handleChange('preferredContactMethod', e.target.value)}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Email</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        value="phone"
+                        checked={formData.preferredContactMethod === 'phone'}
+                        onChange={(e) => handleChange('preferredContactMethod', e.target.value)}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Phone</span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -384,9 +596,102 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
           {currentStep === 3 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <Tag className="h-5 w-5" />
-                Additional Details
+                <Globe className="h-5 w-5" />
+                Social Media Profiles
               </h3>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <Linkedin className="h-4 w-4 inline mr-2" />
+                    LinkedIn Profile
+                  </label>
+                  <Input
+                    placeholder="https://linkedin.com/company/acme"
+                    value={formData.linkedinUrl}
+                    onChange={(e) => handleChange('linkedinUrl', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <Twitter className="h-4 w-4 inline mr-2" />
+                    Twitter Handle
+                  </label>
+                  <Input
+                    placeholder="@acmecorp or https://twitter.com/acmecorp"
+                    value={formData.twitterUrl}
+                    onChange={(e) => handleChange('twitterUrl', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <Instagram className="h-4 w-4 inline mr-2" />
+                    Instagram Profile
+                  </label>
+                  <Input
+                    placeholder="https://instagram.com/acmecorp"
+                    value={formData.instagramUrl}
+                    onChange={(e) => handleChange('instagramUrl', e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    <Facebook className="h-4 w-4 inline mr-2" />
+                    Facebook Page
+                  </label>
+                  <Input
+                    placeholder="https://facebook.com/acmecorp"
+                    value={formData.facebookUrl}
+                    onChange={(e) => handleChange('facebookUrl', e.target.value)}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Company Logo URL
+                  </label>
+                  <Input
+                    placeholder="https://example.com/logo.png"
+                    value={formData.logoUrl}
+                    onChange={(e) => handleChange('logoUrl', e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter the URL of the company's logo image
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 4 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <Tag className="h-5 w-5" />
+                Additional Information
+              </h3>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <DollarSign className="h-4 w-4 inline mr-2" />
+                  Budget Range
+                </label>
+                <select
+                  value={formData.budgetRange}
+                  onChange={(e) => handleChange('budgetRange', e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Budget Range</option>
+                  <option value="< $10K">Less than $10,000</option>
+                  <option value="$10K - $50K">$10,000 - $50,000</option>
+                  <option value="$50K - $100K">$50,000 - $100,000</option>
+                  <option value="$100K - $250K">$100,000 - $250,000</option>
+                  <option value="$250K - $500K">$250,000 - $500,000</option>
+                  <option value="$500K+">$500,000+</option>
+                </select>
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -425,12 +730,113 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Company Overview
+                  Notes / Description
                 </label>
                 <textarea
-                  placeholder="Brief overview of the company, their mission, and what they do..."
-                  value={formData.companyOverview}
-                  onChange={(e) => handleChange('companyOverview', e.target.value)}
+                  placeholder="Add any additional notes or context about this client..."
+                  value={formData.description}
+                  onChange={(e) => handleChange('description', e.target.value)}
+                  className="w-full min-h-[120px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <Upload className="h-4 w-4 inline mr-2" />
+                  Upload Documents (Optional)
+                </label>
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.csv,.xlsx"
+                    className="hidden"
+                    id="document-upload"
+                  />
+                  <label htmlFor="document-upload" className="cursor-pointer">
+                    <FileText className="h-8 w-8 mx-auto mb-2 text-slate-400" />
+                    <p className="text-sm text-slate-600 mb-1">Click to upload documents</p>
+                    <p className="text-xs text-slate-500">PDF, DOC, DOCX, TXT, CSV, XLSX (Max 10MB)</p>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 5 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Goals & Satisfaction
+              </h3>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Short-Term Goals
+                </label>
+                <textarea
+                  placeholder="What are the client's immediate goals? (next 3-6 months)"
+                  value={formData.shortTermGoals}
+                  onChange={(e) => handleChange('shortTermGoals', e.target.value)}
+                  className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Long-Term Goals
+                </label>
+                <textarea
+                  placeholder="What are the client's long-term objectives? (1+ years)"
+                  value={formData.longTermGoals}
+                  onChange={(e) => handleChange('longTermGoals', e.target.value)}
+                  className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Client Expectations
+                </label>
+                <textarea
+                  placeholder="What specific outcomes or results is the client seeking from your services?"
+                  value={formData.expectations}
+                  onChange={(e) => handleChange('expectations', e.target.value)}
+                  className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <Smile className="h-4 w-4 inline mr-2" />
+                  Client Satisfaction Score (1-10)
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    value={formData.satisfactionScore}
+                    onChange={(e) => handleChange('satisfactionScore', parseInt(e.target.value))}
+                    className="flex-1"
+                  />
+                  <span className="text-2xl font-bold text-blue-600 w-12 text-center">
+                    {formData.satisfactionScore > 0 ? formData.satisfactionScore : '-'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Rate based on feedback, surveys, or metrics from previous experiences
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Satisfaction Feedback / Notes
+                </label>
+                <textarea
+                  placeholder="Add any feedback, survey results, or notes about client satisfaction..."
+                  value={formData.satisfactionFeedback}
+                  onChange={(e) => handleChange('satisfactionFeedback', e.target.value)}
                   className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
               </div>
