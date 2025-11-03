@@ -95,13 +95,18 @@ export const KnowledgeBase: React.FC = () => {
           try {
             const servicesData = JSON.parse(profile.services as string);
             if (Array.isArray(servicesData) && servicesData.length > 0) {
-              setServices(servicesData.map((s: any, index: number) => ({
-                id: s.id || `service-${index}`,
-                name: s.name || '',
-                description: s.description || '',
-                tags: s.tags || [],
-                pricing: s.pricing || ''
-              })));
+              setServices(servicesData.map((s: any, index: number) => {
+                const serviceName = typeof s === 'string' ? s : (s.name || '');
+                const serviceDesc = typeof s === 'object' ? (s.description || '') : '';
+
+                return {
+                  id: (typeof s === 'object' ? s.id : null) || `service-${index}`,
+                  name: String(serviceName),
+                  description: String(serviceDesc),
+                  tags: Array.isArray(s.tags) ? s.tags : [],
+                  pricing: typeof s === 'object' ? (s.pricing || '') : ''
+                };
+              }));
             }
           } catch (e) {
             console.error('Error parsing services:', e);
@@ -694,10 +699,10 @@ export const KnowledgeBase: React.FC = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-foreground mb-2">
-                        {service.name}
+                        {typeof service.name === 'string' ? service.name : 'Unnamed Service'}
                       </h3>
                       <p className="text-sm text-muted-foreground mb-3">
-                        {service.description}
+                        {typeof service.description === 'string' ? service.description : ''}
                       </p>
                       {service.tags && service.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-3">
