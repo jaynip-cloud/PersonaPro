@@ -369,7 +369,7 @@ Now extract the company information and return ONLY the JSON object with all ava
         "Authorization": `Bearer ${perplexityKey}`,
       },
       body: JSON.stringify({
-        model: "llama-3.1-sonar-small-128k-online",
+        model: "sonar",
         messages: [
           {
             role: "system",
