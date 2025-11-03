@@ -147,6 +147,7 @@ function parseHtml(html: string, url: string): CrawlResult {
 
   const socialPatterns = [
     /https?:\/\/(www\.)?(linkedin\.com\/company\/[^\s"'<>]+)/gi,
+    /https?:\/\/(www\.)?(linkedin\.com\/in\/[^\s"'<>]+)/gi,
     /https?:\/\/(www\.)?(twitter\.com\/[^\s"'<>]+)/gi,
     /https?:\/\/(www\.)?(x\.com\/[^\s"'<>]+)/gi,
     /https?:\/\/(www\.)?(facebook\.com\/[^\s"'<>]+)/gi,
@@ -192,6 +193,91 @@ function extractTextFromHtml(html: string): string {
     .trim();
 
   return text.substring(0, 20000);
+}
+
+async function enrichLinkedInProfiles(leadership: any[], openaiKey: string): Promise<any[]> {
+  const enrichedLeadership = [];
+
+  for (const leader of leadership) {
+    if (!leader.linkedinUrl) {
+      enrichedLeadership.push(leader);
+      continue;
+    }
+
+    try {
+      const response = await fetch(leader.linkedinUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; CompanyBot/1.0)",
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!response.ok) {
+        enrichedLeadership.push(leader);
+        continue;
+      }
+
+      const html = await response.text();
+      const profileContent = extractTextFromHtml(html).substring(0, 15000);
+
+      const enrichmentPrompt = `Extract detailed professional information from this LinkedIn profile page content for ${leader.name}.
+
+Profile Content:
+${profileContent}
+
+Extract and return ONLY valid JSON with these fields:
+{
+  "name": "${leader.name}",
+  "role": "${leader.role}",
+  "bio": "Comprehensive biography including: current role, previous positions, education, skills, achievements, certifications, and any notable accomplishments. Be detailed and thorough.",
+  "linkedinUrl": "${leader.linkedinUrl}",
+  "experience": "Detailed work experience summary",
+  "education": "Educational background",
+  "skills": ["skill1", "skill2", "skill3"]
+}`;
+
+      const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert at extracting professional information from LinkedIn profiles. Return detailed, comprehensive information in valid JSON format only.",
+            },
+            {
+              role: "user",
+              content: enrichmentPrompt,
+            },
+          ],
+          temperature: 0.1,
+          max_tokens: 1500,
+        }),
+      });
+
+      if (aiResponse.ok) {
+        const aiData = await aiResponse.json();
+        const content = aiData.choices[0].message.content;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+
+        if (jsonMatch) {
+          const enrichedData = JSON.parse(jsonMatch[0]);
+          enrichedLeadership.push(enrichedData);
+          continue;
+        }
+      }
+    } catch (error) {
+      console.error(`Error enriching LinkedIn profile for ${leader.name}:`, error);
+    }
+
+    enrichedLeadership.push(leader);
+  }
+
+  return enrichedLeadership;
 }
 
 async function extractCompanyInfo(crawlResults: CrawlResult[], openaiKey: string, rootUrl: string) {
@@ -257,7 +343,8 @@ REQUIRED JSON STRUCTURE (fill ALL fields with available data):
     {
       "name": "Full name of leader",
       "role": "Complete job title (CEO, CTO, VP Engineering, etc.)",
-      "bio": "Full biography including background, experience, education, achievements - extract everything available"
+      "bio": "Full biography including background, experience, education, achievements - extract everything available",
+      "linkedinUrl": "LinkedIn profile URL for this person (e.g., https://linkedin.com/in/username)"
     }
   ],
   "blogs": [
@@ -282,6 +369,9 @@ EXTRACTION GUIDELINES:
 3. SOCIAL: Use the discovered URLs above, also check footer and header links
 4. SERVICES: Look in services, products, solutions, what-we-do pages - extract ALL offerings
 5. LEADERSHIP: Check about, team, leadership, founders, executives pages - get ALL team members
+   - CRITICAL: Extract LinkedIn profile URLs (linkedin.com/in/username) for each leader from discovered social links
+   - Match LinkedIn URLs to leaders by name proximity in the page content
+   - Include complete bios with experience, education, and achievements
 6. BLOGS: Check blog, news, articles, insights pages - extract recent posts
 7. TECHNOLOGY: Identify tools in job postings, technical pages, case studies, about pages
 
@@ -323,11 +413,20 @@ Return ONLY the complete JSON object with ALL extracted data. Be thorough and co
     const content = data.choices[0].message.content;
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
+    let extractedData;
+
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      extractedData = JSON.parse(jsonMatch[0]);
+    } else {
+      extractedData = JSON.parse(content);
     }
 
-    return JSON.parse(content);
+    if (extractedData.leadership && extractedData.leadership.length > 0) {
+      console.log("Enriching leadership profiles from LinkedIn...");
+      extractedData.leadership = await enrichLinkedInProfiles(extractedData.leadership, openaiKey);
+    }
+
+    return extractedData;
   } catch (error) {
     console.error("Error calling OpenAI:", error);
     throw error;

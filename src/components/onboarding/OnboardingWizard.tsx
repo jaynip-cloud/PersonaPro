@@ -31,6 +31,10 @@ interface LeadershipMember {
   name: string;
   role: string;
   bio: string;
+  linkedinUrl?: string;
+  experience?: string;
+  education?: string;
+  skills?: string[];
 }
 
 interface Blog {
@@ -51,6 +55,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
   const [showFirstClientWizard, setShowFirstClientWizard] = useState(false);
   const { user, checkKnowledgeBaseStatus } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const storedKey = localStorage.getItem('openai_key');
+    if (storedKey) {
+      setOpenaiKey(storedKey);
+    }
+  }, []);
 
   const [formData, setFormData] = useState({
     companyName: '',
@@ -350,7 +361,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             id: `leader-${Date.now()}-${Math.random()}`,
             name: l.name || '',
             role: l.role || '',
-            bio: l.bio || ''
+            bio: l.bio || '',
+            linkedinUrl: l.linkedinUrl || '',
+            experience: l.experience || '',
+            education: l.education || '',
+            skills: l.skills || []
           }))
         }));
       }
