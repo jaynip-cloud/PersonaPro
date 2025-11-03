@@ -378,7 +378,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         }));
       }
 
-      alert('Data extracted successfully! Please review and edit as needed.');
+      alert('✅ Complete data extraction successful!\n\nExtracted:\n• Company information\n• Contact details\n• Social media profiles\n• Services & products\n• Leadership team\n• Blog articles\n• Technology stack, partners & integrations\n\nPlease navigate through all steps to review and edit as needed.');
     } catch (error) {
       console.error('Error extracting data:', error);
       alert('Failed to extract data. Please try again or enter details manually.');
@@ -541,7 +541,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   required
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Enter your website and click AI Autofill to extract all company details automatically
+                  Enter your website and click AI Autofill to automatically extract ALL information across all 8 steps
                 </p>
               </div>
 

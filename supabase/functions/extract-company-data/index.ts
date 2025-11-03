@@ -204,56 +204,91 @@ async function extractCompanyInfo(crawlResults: CrawlResult[], openaiKey: string
     .map(r => `PAGE: ${r.title || r.url}\nURL: ${r.url}\nCONTENT: ${r.content.substring(0, 8000)}\n\n`)
     .join('\n---\n\n');
 
-  const prompt = `Analyze the following crawled content from a company website and extract comprehensive information for ALL categories.
+  const prompt = `You are analyzing a company website to extract COMPREHENSIVE business intelligence data across ALL 8 categories.
 
 Root Domain: ${rootUrl}
-Social Media Found: ${Array.from(allSocialLinks).join(', ')}
+Social Media URLs Discovered: ${Array.from(allSocialLinks).join(', ')}
 
-Extract COMPLETE information for:
-1. Company basics (name, industry, description, value prop, founded, location, size, mission, vision)
-2. Contact details (email, phone, address)
-3. ALL social media profiles (LinkedIn, Twitter, Facebook, Instagram, YouTube)
-4. Services/Products with descriptions
-5. Leadership team members (names, titles, bios)
-6. Blog articles (title, URL, date, summary, author)
-7. Technology stack, partners, and integrations
+CRITICAL INSTRUCTIONS:
+- Extract EVERY piece of information available for ALL categories below
+- Be thorough - scan the entire content for each data point
+- For services: extract ALL services/products mentioned with full descriptions
+- For leadership: find ALL team members with complete bios from About, Team, or Leadership pages
+- For blogs: extract ALL blog posts/articles with complete metadata
+- For technology: identify ALL technologies, tools, partners, and integrations mentioned
+- Use the discovered social media URLs above for the socialProfiles section
+- If specific information is not found, use empty strings/arrays, but make a thorough attempt to find it first
 
-Return ONLY valid JSON with ALL available data. If info is unavailable, use empty strings/arrays:
+REQUIRED JSON STRUCTURE (fill ALL fields with available data):
 
 {
   "companyInfo": {
-    "name": "",
-    "industry": "",
-    "description": "",
-    "valueProposition": "",
-    "founded": "",
-    "location": "",
-    "size": "",
-    "mission": "",
-    "vision": ""
+    "name": "Full legal or trading company name",
+    "industry": "Specific industry/sector (e.g., Enterprise SaaS, HealthTech, FinTech)",
+    "description": "Comprehensive 2-3 sentence description of what the company does and who they serve",
+    "valueProposition": "Clear statement of unique value delivered to customers",
+    "founded": "Year company was founded (YYYY format)",
+    "location": "Full location: City, State/Province, Country",
+    "size": "Company size in employees (e.g., 50-100 employees, 500+ employees)",
+    "mission": "Complete mission statement - the company's purpose and what they aim to achieve",
+    "vision": "Complete vision statement - the company's aspirational future state"
   },
   "contactInfo": {
-    "email": "",
-    "phone": "",
-    "address": ""
+    "email": "Primary contact email address (look for info@, hello@, contact@ addresses)",
+    "phone": "Full phone number with country code if available",
+    "address": "Complete physical mailing address including street, city, state, ZIP, country"
   },
   "socialProfiles": {
-    "linkedin": "",
-    "twitter": "",
-    "facebook": "",
-    "instagram": "",
-    "youtube": ""
+    "linkedin": "Full LinkedIn company page URL (use from discovered URLs or extract from content)",
+    "twitter": "Full Twitter/X profile URL (use from discovered URLs or extract from content)",
+    "facebook": "Full Facebook page URL (use from discovered URLs or extract from content)",
+    "instagram": "Full Instagram profile URL (use from discovered URLs or extract from content)",
+    "youtube": "Full YouTube channel URL (use from discovered URLs or extract from content)"
   },
-  "services": [{"name": "", "description": "", "tags": [], "pricing": ""}],
-  "leadership": [{"name": "", "role": "", "bio": ""}],
-  "blogs": [{"title": "", "url": "", "date": "", "summary": "", "author": ""}],
-  "technology": {"stack": [], "partners": [], "integrations": []}
+  "services": [
+    {
+      "name": "Service/Product name",
+      "description": "Detailed description of what this service/product does and its benefits",
+      "tags": ["relevant", "category", "tags"],
+      "pricing": "Pricing info if mentioned (e.g., 'Starting at $99/mo', 'Enterprise pricing', 'Free trial available')"
+    }
+  ],
+  "leadership": [
+    {
+      "name": "Full name of leader",
+      "role": "Complete job title (CEO, CTO, VP Engineering, etc.)",
+      "bio": "Full biography including background, experience, education, achievements - extract everything available"
+    }
+  ],
+  "blogs": [
+    {
+      "title": "Complete article title",
+      "url": "Full URL to the article",
+      "date": "Publication date in YYYY-MM-DD format if available",
+      "summary": "Comprehensive 2-3 sentence summary of the article content",
+      "author": "Article author name"
+    }
+  ],
+  "technology": {
+    "stack": ["List", "ALL", "technologies", "tools", "frameworks", "mentioned", "React", "Node.js", "AWS", "etc"],
+    "partners": ["List", "ALL", "technology", "partners", "AWS", "Microsoft", "Google", "etc"],
+    "integrations": ["List", "ALL", "integrations", "Salesforce", "Slack", "Stripe", "etc"]
+  }
 }
 
-Crawled Content:
+EXTRACTION GUIDELINES:
+1. COMPANY INFO: Look in homepage, about page, meta descriptions
+2. CONTACT: Check contact page, footer, about page
+3. SOCIAL: Use the discovered URLs above, also check footer and header links
+4. SERVICES: Look in services, products, solutions, what-we-do pages - extract ALL offerings
+5. LEADERSHIP: Check about, team, leadership, founders, executives pages - get ALL team members
+6. BLOGS: Check blog, news, articles, insights pages - extract recent posts
+7. TECHNOLOGY: Identify tools in job postings, technical pages, case studies, about pages
+
+Crawled Website Content:
 ${combinedContent.substring(0, 100000)}
 
-Extract EVERYTHING available and return ONLY the JSON object.`;
+Return ONLY the complete JSON object with ALL extracted data. Be thorough and comprehensive!`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -267,7 +302,7 @@ Extract EVERYTHING available and return ONLY the JSON object.`;
         messages: [
           {
             role: "system",
-            content: "You are a data extraction expert. Extract ALL available company information from website content and return complete, detailed JSON. Be thorough - extract every piece of relevant information for all categories.",
+            content: "You are an expert business intelligence analyst specializing in comprehensive company data extraction. Your task is to extract COMPLETE and DETAILED information across ALL 8 categories: company info, contact details, social profiles, services/products, leadership team, blog articles, and technology stack/partners/integrations. Extract EVERY available detail - names, roles, bios, descriptions, URLs, dates. Be exhaustive and thorough. Return properly structured JSON with all fields populated where data exists.",
           },
           {
             role: "user",
