@@ -445,7 +445,28 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         }));
       }
 
-      alert('✅ Complete data extraction successful!\n\nExtracted:\n• Company information\n• Contact details\n• Social media profiles\n• Services & products\n• Leadership team\n• Blog articles\n• Technology stack, partners & integrations\n\nPlease navigate through all steps to review and edit as needed.');
+      const leadershipCount = extractedData.leadership?.length || 0;
+      const blogsCount = extractedData.blogs?.length || 0;
+      const servicesCount = extractedData.services?.length || 0;
+
+      let message = '✅ Data extraction complete!\n\nFound:\n';
+      message += `• Company information\n`;
+      message += `• Contact details\n`;
+      message += `• Social media profiles\n`;
+      message += `• ${servicesCount} service(s)\n`;
+      message += `• ${leadershipCount} leadership member(s)\n`;
+      message += `• ${blogsCount} blog post(s)\n`;
+      message += `• Technology & partners\n\n`;
+
+      if (leadershipCount === 0) {
+        message += '⚠️ No leadership members found. Please add them manually in Step 5.\n';
+      }
+      if (blogsCount === 0) {
+        message += '⚠️ No blog posts found. Please add them manually in Step 6.\n';
+      }
+      message += '\nNavigate through all steps to review and edit as needed.';
+
+      alert(message);
     } catch (error) {
       console.error('Error extracting data:', error);
       alert('Failed to extract data. Please try again or enter details manually.');

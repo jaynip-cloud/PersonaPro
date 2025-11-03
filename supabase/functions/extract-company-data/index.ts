@@ -356,19 +356,19 @@ REQUIRED JSON STRUCTURE (fill ALL fields with available data):
   ],
   "leadership": [
     {
-      "name": "ONLY extract names of people explicitly listed as leadership/team members",
-      "role": "Extract their ACTUAL job title from the content",
-      "bio": "Extract their ACTUAL bio/description from the content - do not make up information",
-      "linkedinUrl": "Match this person's name to LinkedIn profile URLs from discovered links above. Leave empty if no match found."
+      "name": "Full name of person (e.g., 'Sarah Johnson', 'Michael Chen')",
+      "role": "Their exact job title (e.g., 'CEO & Founder', 'Chief Technology Officer', 'VP of Engineering')",
+      "bio": "Copy the complete biographical text shown - include background, experience, education, achievements. Extract everything you find about this person.",
+      "linkedinUrl": "Match their name to a LinkedIn profile URL from the discovered links (e.g., 'https://linkedin.com/in/sarahjohnson'). Leave empty if not found."
     }
   ],
   "blogs": [
     {
-      "title": "ONLY extract actual blog post titles you find",
-      "url": "Extract the ACTUAL full URL to the blog post",
-      "date": "Extract ACTUAL publication date if visible (YYYY-MM-DD format)",
-      "summary": "Extract or summarize the ACTUAL content preview/excerpt shown",
-      "author": "Extract ACTUAL author name if shown"
+      "title": "The actual blog post title (e.g., 'How We Built Our AI Platform', '5 Tips for Cloud Migration')",
+      "url": "Full URL to the blog post (e.g., 'https://example.com/blog/our-ai-platform' or if you see '/blog/post', make it 'https://example.com/blog/post')",
+      "date": "Publication date in YYYY-MM-DD if you can parse it, or original format if not (e.g., '2024-01-15' or 'January 15, 2024')",
+      "summary": "The preview text, excerpt, or description shown for this post. Copy what you see.",
+      "author": "Author name if shown (e.g., 'John Smith', 'By Sarah Johnson')"
     }
   ],
   "technology": {
@@ -399,19 +399,39 @@ SERVICES/PRODUCTS:
 - If a service is mentioned but no description: add name only, leave description empty
 - If no services found: Return empty array []
 
-LEADERSHIP TEAM:
-- Look in: Team page, About page, Leadership page, Founders page, Our Team section
-- Extract ONLY people explicitly shown with names and titles
-- For bios: Copy the exact text shown, don't summarize unless necessary
-- For LinkedIn: Match names to the LinkedIn profile URLs discovered
-- If no team members found: Return empty array []
+LEADERSHIP TEAM (CRITICAL - READ CAREFULLY):
+- Look for sections with headers like: "Team", "Our Team", "Leadership", "About Us", "Meet the Team", "Founders", "Management"
+- Extract ALL people shown with their information:
+  * Names: Full name as shown (e.g., "John Smith", "Jane Doe")
+  * Roles: Exact job title (e.g., "CEO", "Chief Technology Officer", "VP of Sales", "Co-Founder")
+  * Bios: Copy ALL biographical text shown for each person - this may include background, experience, education, achievements
+  * LinkedIn URLs: Match the person's name to any LinkedIn profile URLs (linkedin.com/in/...) found in the discovered links
+- Example of what to look for in content:
+  * "John Smith - CEO: John has 20 years of experience in..."
+  * "Jane Doe, Chief Technology Officer, Previously worked at..."
+  * Team member cards/profiles with photos and descriptions
+- Extract EVERY team member you find - don't limit to just executives
+- If no team members found anywhere in the content: Return empty array []
 
-BLOG POSTS:
-- Look in: Blog page, News page, Insights page, Articles page
-- Extract ONLY posts that have visible titles and URLs
-- Dates: Extract if shown (common formats: "Jan 15, 2024", "2024-01-15", "January 15, 2024")
-- Summaries: Use the actual preview text or excerpt shown
-- If no blog posts found: Return empty array []
+BLOG POSTS (CRITICAL - READ CAREFULLY):
+- Look for blog/article listings with these patterns:
+  * Blog post titles (often as links)
+  * Publication dates
+  * Author names
+  * Preview text or excerpts
+  * URLs to full articles
+- Common page patterns to search:
+  * "Recent Posts", "Latest Articles", "Blog", "News", "Insights"
+  * Article list pages with multiple posts
+  * Homepage with recent blog links
+- For each blog post found, extract:
+  * Title: The actual blog post headline
+  * URL: The full link to the article (if relative URL like "/blog/post-title", prepend the root domain)
+  * Date: Look for dates near the title (formats: "January 15, 2024", "2024-01-15", "Jan 15, 2024", "3 days ago")
+  * Summary: The preview text, excerpt, or first few sentences shown
+  * Author: Look for "By [Name]", "Author: [Name]", or author byline
+- Extract ALL blog posts you can find, especially recent ones
+- If no blog posts/articles found: Return empty array []
 
 TECHNOLOGY & PARTNERS:
 - Stack: Look for mentions of programming languages, frameworks, databases, cloud providers
@@ -423,7 +443,14 @@ TECHNOLOGY & PARTNERS:
 CRAWLED WEBSITE CONTENT:
 ${combinedContent.substring(0, 100000)}
 
-CRITICAL: Return ONLY valid JSON. Extract ONLY factual information found in the content above. DO NOT fabricate, assume, or infer any data. If information is not present, use empty strings "" or arrays [].`;
+FINAL INSTRUCTIONS - PLEASE READ:
+1. LEADERSHIP: Search the content above for ANY mentions of team members, founders, executives, or staff. Look for names with job titles. Extract ALL people you find.
+2. BLOGS: Search for ANY blog posts, articles, news items, or content pieces. Look for titles, dates, and URLs. Extract ALL posts you find.
+3. If you find leadership or blog information in the content, YOU MUST include it in the JSON response.
+4. For all other fields: Extract ONLY factual information found in the content. DO NOT fabricate, assume, or infer data.
+5. Return ONLY valid JSON.
+
+Now extract the data and return the JSON:`;
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -445,7 +472,7 @@ CRITICAL: Return ONLY valid JSON. Extract ONLY factual information found in the 
           },
         ],
         temperature: 0.1,
-        max_tokens: 4096,
+        max_tokens: 6000,
       }),
     });
 
@@ -466,10 +493,10 @@ CRITICAL: Return ONLY valid JSON. Extract ONLY factual information found in the 
       extractedData = JSON.parse(content);
     }
 
-    if (extractedData.leadership && extractedData.leadership.length > 0) {
-      console.log("Enriching leadership profiles from LinkedIn...");
-      extractedData.leadership = await enrichLinkedInProfiles(extractedData.leadership, openaiKey);
-    }
+    console.log('Extraction Results:');
+    console.log('- Leadership found:', extractedData.leadership?.length || 0);
+    console.log('- Blogs found:', extractedData.blogs?.length || 0);
+    console.log('- Services found:', extractedData.services?.length || 0);
 
     return extractedData;
   } catch (error) {
