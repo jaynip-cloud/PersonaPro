@@ -306,6 +306,110 @@ export const ClientDetailNew: React.FC = () => {
     }
   };
 
+  const handleExportClientData = async () => {
+    if (!client) return;
+
+    try {
+      const exportData = {
+        client: client,
+        contacts: contacts,
+        documents: uploadedDocuments,
+        meetingTranscripts: meetingTranscripts,
+        personaMetrics: personaMetrics,
+        exportDate: new Date().toISOString()
+      };
+
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${client.name.replace(/\s+/g, '_')}_export_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast('success', 'Client data exported successfully');
+    } catch (error) {
+      console.error('Error exporting client data:', error);
+      showToast('error', 'Failed to export client data');
+    }
+  };
+
+  const handleArchiveClient = async () => {
+    if (!client || !user) return;
+
+    const confirmArchive = window.confirm(`Archive ${client.name}? This will hide the client from your active list but preserve all data.`);
+    if (!confirmArchive) return;
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ status: 'archived' })
+        .eq('id', client.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      showToast('success', 'Client archived successfully');
+      navigate('/clients');
+    } catch (error) {
+      console.error('Error archiving client:', error);
+      showToast('error', 'Failed to archive client');
+    }
+  };
+
+  const handleDeleteClient = async () => {
+    if (!client || !user) return;
+
+    const confirmDelete = window.confirm(
+      `DELETE ${client.name}?\n\nThis will permanently delete:\n- Client profile\n- All contacts\n- All documents\n- All meeting transcripts\n- All projects\n\nThis action CANNOT be undone. Type the client name to confirm.`
+    );
+
+    if (!confirmDelete) return;
+
+    const typedName = window.prompt(`Type "${client.name}" to confirm deletion:`);
+    if (typedName !== client.name) {
+      showToast('error', 'Client name did not match. Deletion cancelled.');
+      return;
+    }
+
+    try {
+      const { data: documents } = await supabase
+        .from('documents')
+        .select('source')
+        .eq('client_id', client.id)
+        .eq('user_id', user.id);
+
+      if (documents && documents.length > 0) {
+        const filePaths = documents
+          .map(doc => doc.source)
+          .filter(Boolean);
+
+        if (filePaths.length > 0) {
+          await supabase.storage
+            .from('client-documents')
+            .remove(filePaths);
+        }
+      }
+
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', client.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      showToast('success', 'Client deleted successfully');
+      navigate('/clients');
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      showToast('error', 'Failed to delete client');
+    }
+  };
+
   const handleDocumentUpload = async (files: File[]) => {
     if (!client || !user || files.length === 0) return;
 
@@ -462,28 +566,6 @@ export const ClientDetailNew: React.FC = () => {
 
   const handleEditClient = () => {
     navigate(`/clients/${id}/edit`);
-  };
-
-  const handleDeleteClient = async () => {
-    if (!client) return;
-
-    const confirmDelete = window.confirm('Are you sure you want to delete this client? This action cannot be undone.');
-    if (!confirmDelete) return;
-
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', client.id);
-
-      if (error) throw error;
-
-      showToast('success', 'Client deleted successfully');
-      navigate('/clients');
-    } catch (error) {
-      console.error('Error deleting client:', error);
-      showToast('error', 'Failed to delete client. Please try again.');
-    }
   };
 
   const handleRunPersonaAnalysis = () => {
@@ -1516,107 +1598,65 @@ Client Information:
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Client Settings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Client Status
-                    </label>
-                    <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                      <option value="prospect">Prospect</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Customer Success Manager
-                    </label>
-                    <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
-                      <option>John Williams</option>
-                      <option>Sarah Johnson</option>
-                      <option>Michael Chen</option>
-                      <option>Emily Rodriguez</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Tags
-                    </label>
-                    <div className="flex flex-wrap gap-2 p-3 border border-border rounded-md bg-background min-h-[100px]">
-                      <Badge variant="secondary">decision-maker</Badge>
-                      <Badge variant="secondary">technical</Badge>
-                      <Badge variant="secondary">high-value</Badge>
-                      <Button variant="ghost" size="sm" className="h-6 text-xs">
-                        + Add Tag
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Settings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Email Notifications</p>
-                      <p className="text-sm text-muted-foreground">Receive email updates about this client</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" defaultChecked />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Sentiment Alerts</p>
-                      <p className="text-sm text-muted-foreground">Alert when sentiment drops below threshold</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" defaultChecked />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-foreground">Deal Updates</p>
-                      <p className="text-sm text-muted-foreground">Notifications for deal stage changes</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" defaultChecked />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
                 <CardTitle>Data Management</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start">
-                    Export Client Data
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    Archive Client
-                  </Button>
-                  <Button variant="destructive" className="w-full justify-start">
-                    Delete Client
-                  </Button>
+                <div className="space-y-4">
+                  <div className="border border-border rounded-lg p-4 hover:bg-accent transition-colors">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="text-base font-semibold text-foreground mb-1">Export Client Data</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Download all client information, contacts, documents, and meeting transcripts as JSON
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-center"
+                      onClick={handleExportClientData}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Client Data
+                    </Button>
+                  </div>
+
+                  <div className="border border-border rounded-lg p-4 hover:bg-accent transition-colors">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="text-base font-semibold text-foreground mb-1">Archive Client</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Hide this client from your active list while preserving all data
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-center"
+                      onClick={handleArchiveClient}
+                    >
+                      Archive Client
+                    </Button>
+                  </div>
+
+                  <div className="border border-red-200 rounded-lg p-4 bg-red-50">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="text-base font-semibold text-red-900 mb-1">Delete Client</h3>
+                        <p className="text-sm text-red-800">
+                          Permanently delete this client and all associated data. This action cannot be undone.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-center border-red-300 text-red-600 hover:bg-red-100"
+                      onClick={handleDeleteClient}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Client
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
