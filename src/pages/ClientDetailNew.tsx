@@ -20,11 +20,13 @@ import { mockContacts, mockOpportunities, mockRelationshipMetrics } from '../dat
 import { exportPersonaReportAsPDF } from '../utils/pdfExport';
 import { useToast } from '../components/ui/Toast';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
 export const ClientDetailNew: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'opportunities' | 'projects' | 'intelligence' | 'pitch' | 'growth' | 'settings'>('overview');
   const [personaMetrics, setPersonaMetrics] = useState<PersonaMetrics | null>(null);
@@ -54,12 +56,14 @@ export const ClientDetailNew: React.FC = () => {
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
 
   useEffect(() => {
-    if (id) {
+    if (id && user) {
       loadClientData();
     }
-  }, [id]);
+  }, [id, user]);
 
   const loadClientData = async () => {
+    if (!user) return;
+
     setIsLoading(true);
     try {
       const { data: clientData, error: clientError } = await supabase
@@ -117,7 +121,8 @@ export const ClientDetailNew: React.FC = () => {
       const { data: contactsData, error: contactsError } = await supabase
         .from('contacts')
         .select('*')
-        .eq('client_id', id);
+        .eq('client_id', id)
+        .eq('user_id', user.id);
 
       if (!contactsError && contactsData) {
         setContacts(contactsData.map(c => ({
@@ -144,7 +149,7 @@ export const ClientDetailNew: React.FC = () => {
   };
 
   const handleSaveContact = async () => {
-    if (!client || !newContactForm.name || !newContactForm.email || !newContactForm.role) {
+    if (!client || !user || !newContactForm.name || !newContactForm.email || !newContactForm.role) {
       showToast('error', 'Please fill in name, email, and role');
       return;
     }
@@ -155,6 +160,7 @@ export const ClientDetailNew: React.FC = () => {
         .from('contacts')
         .insert({
           client_id: client.id,
+          user_id: user.id,
           name: newContactForm.name,
           email: newContactForm.email,
           phone: newContactForm.phone || null,
