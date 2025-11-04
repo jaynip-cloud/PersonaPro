@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { MapPin, Calendar, RefreshCw, ChevronDown, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { MapPin, Calendar, RefreshCw, ChevronDown, MoreVertical, Edit, Trash2, Phone, Mail } from 'lucide-react';
 import { Client } from '../../types';
 import { useNavigate } from 'react-router-dom';
 
@@ -32,6 +32,22 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshDat
                 <Badge variant="outline" className="border-2">Agency</Badge>
               </div>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                {client.phone && (
+                  <div className="flex items-center gap-1">
+                    <Phone className="h-4 w-4" />
+                    <a href={`tel:${client.phone}`} className="hover:text-foreground transition-colors">
+                      {client.phone}
+                    </a>
+                  </div>
+                )}
+                {client.email && (
+                  <div className="flex items-center gap-1">
+                    <Mail className="h-4 w-4" />
+                    <a href={`mailto:${client.email}`} className="hover:text-foreground transition-colors">
+                      {client.email}
+                    </a>
+                  </div>
+                )}
                 {client.location && (
                   <div className="flex items-center gap-1">
                     <MapPin className="h-4 w-4" />
