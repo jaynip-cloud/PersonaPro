@@ -316,9 +316,9 @@ export const AddClient: React.FC = () => {
         if (data.data.contactInfo?.primaryEmail && !formData.email) updates.email = data.data.contactInfo.primaryEmail;
         if (data.data.contactInfo?.primaryPhone && !formData.phone) updates.phone = data.data.contactInfo.primaryPhone;
 
-        if (data.data.businessGoals?.shortTermGoals && !formData.shortTermGoals) updates.shortTermGoals = data.data.businessGoals.shortTermGoals;
-        if (data.data.businessGoals?.longTermGoals && !formData.longTermGoals) updates.longTermGoals = data.data.businessGoals.longTermGoals;
-        if (data.data.businessGoals?.expectations && !formData.expectations) updates.expectations = data.data.businessGoals.expectations;
+        if (data.data.businessInfo?.shortTermGoals && !formData.shortTermGoals) updates.shortTermGoals = data.data.businessInfo.shortTermGoals;
+        if (data.data.businessInfo?.longTermGoals && !formData.longTermGoals) updates.longTermGoals = data.data.businessInfo.longTermGoals;
+        if (data.data.businessInfo?.expectations && !formData.expectations) updates.expectations = data.data.businessInfo.expectations;
 
         if (data.data.socialProfiles?.linkedin && !formData.linkedinUrl) updates.linkedinUrl = data.data.socialProfiles.linkedin;
         if (data.data.socialProfiles?.twitter && !formData.twitterUrl) updates.twitterUrl = data.data.socialProfiles.twitter;
@@ -329,7 +329,27 @@ export const AddClient: React.FC = () => {
 
         if (Object.keys(updates).length > 0) {
           setFormData({ ...formData, ...updates });
-          showToast('success', `Successfully populated ${Object.keys(updates).length} fields with company data!`);
+
+          const extractedInfo = [];
+          if (data.data.contacts && data.data.contacts.length > 0) {
+            extractedInfo.push(`${data.data.contacts.length} contacts`);
+          }
+          if (data.data.testimonials && data.data.testimonials.length > 0) {
+            extractedInfo.push(`${data.data.testimonials.length} testimonials`);
+          }
+
+          const infoMessage = extractedInfo.length > 0
+            ? ` Also extracted: ${extractedInfo.join(', ')}`
+            : '';
+
+          showToast('success', `Successfully populated ${Object.keys(updates).length} fields with company data!${infoMessage}`);
+
+          if (data.data.contacts && data.data.contacts.length > 0) {
+            console.log('Extracted contacts:', data.data.contacts);
+          }
+          if (data.data.testimonials && data.data.testimonials.length > 0) {
+            console.log('Extracted testimonials:', data.data.testimonials);
+          }
         } else {
           showToast('info', 'No new data found to populate. All fields are already filled or no data was available.');
         }

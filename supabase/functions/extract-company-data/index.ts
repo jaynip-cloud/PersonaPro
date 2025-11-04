@@ -84,6 +84,7 @@ Deno.serve(async (req: Request) => {
           alternatePhone: extractedInfo.contactInfo?.alternatePhone || '',
           address: extractedInfo.contactInfo?.address || '',
         },
+        contacts: extractedInfo.contacts || [],
         leadership: {
           ceo: extractedInfo.leadership?.ceo || null,
           founder: extractedInfo.leadership?.founder || null,
@@ -95,6 +96,7 @@ Deno.serve(async (req: Request) => {
           facebook: extractedInfo.socialProfiles?.facebook || '',
           instagram: extractedInfo.socialProfiles?.instagram || '',
         },
+        testimonials: extractedInfo.testimonials || [],
         services: extractedInfo.services || [],
         blogs: extractedInfo.blogs || [],
         technology: {
@@ -154,7 +156,12 @@ async function crawlWebsite(startUrl: string): Promise<CrawlResult[]> {
     'roadmap',
     'mission',
     'vision',
-    'goals'
+    'goals',
+    'testimonials',
+    'reviews',
+    'clients',
+    'customers',
+    'success-stories'
   ];
 
   const baseUrl = new URL(startUrl);
@@ -279,10 +286,12 @@ IMPORTANT: You have access to real-time web search. Use it extensively to:
 - Find missing details like contact information, founding year, company size
 - Get the latest company news and updates
 - Find leadership information (CEO, Founder, Owner) from LinkedIn, news, press releases
+- **EXTRACT ALL TEAM MEMBERS & CONTACTS**: Find ALL people listed on team/about/leadership pages with their names, titles, emails, LinkedIn profiles
 - Extract blog articles from their blog/news pages
 - Identify technology stack, partners, and integrations from their website and web sources
 - **SEARCH FOR BUSINESS GOALS**: Find recent press releases, CEO interviews, blog posts about company strategy, goals, roadmap, and future plans
 - **EXTRACT CLIENT EXPECTATIONS**: Look for what they expect from partnerships, vendors, and service providers
+- **EXTRACT TESTIMONIALS & FEEDBACK**: Find all client testimonials, reviews, case studies, success stories with specific feedback about satisfaction, expectations met, and service quality
 - Cross-reference information for accuracy
 
 ROOT DOMAIN: ${rootUrl}
@@ -299,10 +308,12 @@ CRITICAL INSTRUCTIONS:
 2. Search thoroughly through ALL provided pages for each piece of information
 3. Use web search to fill gaps and verify information
 4. For leadership, if LinkedIn URLs are found, use web search to get details about those people
-5. Extract ALL services/products mentioned on services, products, or solutions pages
-6. Extract ALL blog articles found on blog/news pages with titles, URLs, dates, and summaries
-7. Identify technology stack from "technology", "partners", or "integrations" pages
-8. Return ONLY valid JSON - no additional text or explanations
+5. **EXTRACT ALL CONTACTS**: Find every person mentioned on team, about, leadership, contact pages with name, title, email, phone, LinkedIn
+6. Extract ALL services/products mentioned on services, products, or solutions pages
+7. Extract ALL blog articles found on blog/news pages with titles, URLs, dates, and summaries
+8. **EXTRACT ALL TESTIMONIALS**: Find every client testimonial, review, case study with client name, feedback, satisfaction indicators
+9. Identify technology stack from "technology", "partners", or "integrations" pages
+10. Return ONLY valid JSON - no additional text or explanations
 
 REQUIRED JSON STRUCTURE (extract ALL available information):
 
@@ -356,6 +367,18 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
       "phone": "Their direct phone"
     }
   },
+  "contacts": [
+    {
+      "name": "Full name of person (from team, about, leadership, contact pages)",
+      "title": "Job title/role (e.g., 'VP of Sales', 'Head of Marketing', 'Customer Success Manager')",
+      "email": "Direct email if available (firstname@company.com, or department email)",
+      "phone": "Direct phone number if available",
+      "linkedin": "LinkedIn profile URL if found",
+      "department": "Department/division (e.g., 'Sales', 'Engineering', 'Marketing')",
+      "isDecisionMaker": true or false (true if C-level, VP, Director, Manager, Decision Maker, Head of, or leadership role),
+      "influenceLevel": "high", "medium", or "low" based on role seniority
+    }
+  ],
   "services": [
     {
       "name": "Service/Product name",
@@ -381,6 +404,18 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
     "longTermGoals": "Company's long-term vision, strategic goals, future aspirations, 5-year plan, mission-driven objectives (2-5 years). Examples: 'Become market leader', 'IPO by 2027', 'Expand globally to 50 countries', 'Achieve $100M ARR'",
     "expectations": "What the company expects from partnerships, client relationships, vendor services, collaboration outcomes. Examples: 'Expect 24/7 support', 'Need scalable solutions', 'Require data security compliance', 'Want strategic partnership growth'"
   },
+  "testimonials": [
+    {
+      "clientName": "Name of client/customer who gave testimonial (company or person name)",
+      "clientTitle": "Their title/role if mentioned (e.g., 'CEO at Company X', 'Marketing Director')",
+      "clientCompany": "Company they work for if different from clientName",
+      "feedback": "The full testimonial text - what they said about the service/product",
+      "satisfactionIndicators": "Extract satisfaction cues: 'exceeded expectations', 'highly satisfied', 'would recommend', 'great support', 'transformed our business', 'amazing results' etc.",
+      "rating": "Star rating if shown (e.g., '5/5', '4.5 stars')",
+      "date": "Date of testimonial if available",
+      "source": "Where found: 'website testimonials page', 'case study', 'review site', etc."
+    }
+  ],
   "socialProfiles": {
     "linkedin": "${linkedinCompanyUrls[0] || ''}",
     "twitter": "${twitterUrls[0] || ''}",
@@ -428,11 +463,43 @@ DETAILED EXTRACTION GUIDELINES:
 - For each leader: full name, title, email (if found), LinkedIn URL, brief bio
 - Prioritize: CEO > Founder > Owner > Primary Contact
 
+**Contacts (CRITICAL - EXTRACT ALL PEOPLE):**
+- Look in: team page, about page, leadership page, contact page, staff directory
+- Extract EVERY person mentioned with any of these details: name, title, email, phone, LinkedIn
+- Include: executives, managers, team leads, sales reps, account managers, support staff, any named employees
+- For each contact determine:
+  - **isDecisionMaker**: true if title contains: CEO, CTO, CFO, COO, VP, Vice President, Director, Head of, Chief, President, Owner, Founder, Manager, Lead
+  - **influenceLevel**:
+    - "high" for C-level (CEO, CTO, etc.), VP, President, Owner, Founder
+    - "medium" for Director, Head of, Manager, Lead, Senior roles
+    - "low" for Coordinator, Associate, Specialist, Junior roles
+- Extract at least 3-10 contacts if available on the website
+- Use web search to find LinkedIn profiles and additional contact details
+
 **Contact Information (CRITICAL):**
 - Email: Look for contact@, info@, hello@, support@, sales@ followed by domain
 - Search in: contact page, footer, header navigation, about page
 - Phone: Include country code (+1, +44, etc.), look in contact page and header
 - Extract both primary and alternate contact details if multiple found
+
+**Testimonials & Client Feedback (CRITICAL - EXTRACT ALL):**
+- Look in: testimonials page, reviews page, case studies, success stories, clients page, homepage testimonial section
+- Extract EVERY testimonial found on the website (aim for 5-20 if available)
+- For each testimonial extract:
+  - **clientName**: The person or company who gave the testimonial
+  - **clientTitle**: Their job title (e.g., "CEO at Acme Corp", "Marketing Director")
+  - **clientCompany**: The company they represent (if different from clientName)
+  - **feedback**: The complete testimonial text - what they said (full quotes, keep original wording)
+  - **satisfactionIndicators**: Extract positive phrases like:
+    - "exceeded expectations", "highly recommend", "best decision we made"
+    - "outstanding support", "transformed our business", "incredible results"
+    - "5-star service", "couldn't be happier", "game-changer"
+    - "responsive team", "delivered on time", "within budget"
+  - **rating**: If star rating shown (5/5, 4.5 stars, etc.)
+  - **date**: When the testimonial was given if shown
+  - **source**: "website", "case study", "Google reviews", "Trustpilot", etc.
+- Use testimonials to infer client expectations met: quality, responsiveness, expertise, support, results
+- If case studies found, extract: problem solved, solution provided, results achieved, client satisfaction
 
 **Business Goals & Expectations (IMPORTANT):**
 - **Short-term Goals** - Look in: about page, investor relations, press releases, blog posts, annual reports
@@ -448,32 +515,39 @@ DETAILED EXTRACTION GUIDELINES:
 - **Client/Partnership Expectations** - Look in: partnerships page, client testimonials, case studies, service agreements
   - Search for: "we expect", "looking for partners who", "ideal client", "what we value", "our requirements"
   - Extract what they need from vendors/partners/clients (response time, quality standards, communication style)
+  - Also infer from testimonials: what clients valued (support quality, communication, expertise, results)
   - Examples: "24/7 support availability", "Transparent communication", "Scalability and flexibility", "Data security compliance"
 
 - **Use web search extensively** to find recent press releases, CEO interviews, blog posts about company goals
 - If explicit goals not found, infer from company description, recent news, product roadmap, hiring patterns
 
 SEARCH STRATEGY:
-1. Homepage - company overview, hero description, key services, current initiatives
+1. Homepage - company overview, hero description, key services, current initiatives, featured testimonials
 2. About/About-us - company history, founding year, mission, vision, team size, strategic goals
-3. Services/Products/Solutions - ALL services and products with descriptions
-4. Team/Leadership - CEO, founders, key team members with LinkedIn profiles
-5. Blog/News/Insights - Recent articles with titles, URLs, dates, summaries, company updates, goal announcements
-6. Technology/Partners/Integrations - Tech stack, partner companies, integrations
-7. Contact - email addresses, phone numbers, physical address with zip code
-8. Footer - often contains location, social links, contact info
-9. Investor Relations/Press - company goals, growth targets, strategic direction
-10. Careers/Jobs - hiring goals, team expansion plans (indicates growth ambitions)
-11. Use web search extensively to find: press releases, CEO interviews, recent news about company goals and strategy
-12. Search for: "[Company Name] goals", "[Company Name] strategy", "[Company Name] roadmap", "[Company Name] future plans"
+3. Team/Leadership - **EXTRACT ALL PEOPLE**: names, titles, emails, phones, LinkedIn URLs, departments
+4. Contact - email addresses, phone numbers, physical address with zip code, contact persons
+5. Services/Products/Solutions - ALL services and products with descriptions
+6. **Testimonials/Reviews/Success Stories** - ALL client testimonials, feedback, ratings, satisfaction indicators
+7. **Case Studies** - client problems, solutions, results, testimonials embedded in case studies
+8. Blog/News/Insights - Recent articles with titles, URLs, dates, summaries, company updates, goal announcements
+9. Technology/Partners/Integrations - Tech stack, partner companies, integrations
+10. Footer - often contains location, social links, contact info
+11. Investor Relations/Press - company goals, growth targets, strategic direction
+12. Careers/Jobs - hiring goals, team expansion plans (indicates growth ambitions)
+13. Use web search extensively to find: press releases, CEO interviews, recent news about company goals and strategy
+14. Search for: "[Company Name] goals", "[Company Name] strategy", "[Company Name] roadmap", "[Company Name] future plans"
+15. Search for: "[Company Name] team", "[Company Name] testimonials", "[Company Name] reviews"
 
 QUALITY REQUIREMENTS:
+- **Minimum 3-10 contacts** with names and titles (extract ALL people found on team/about/leadership pages)
 - Minimum 3-5 services/products (if available on website)
+- **Minimum 5-15 testimonials** (if testimonials/reviews/case studies page exists)
 - Minimum 5-10 blog articles (if blog exists)
 - Leadership must include at least CEO or Founder with LinkedIn URL if discoverable
 - Technology stack should have 5+ items if technology page exists
 - Contact info must have at least one email and one phone number
 - All URLs must be complete and valid
+- For each contact: determine isDecisionMaker and influenceLevel accurately based on title
 
 WEBSITE CONTENT FROM MULTIPLE PAGES:
 ${combinedContent.substring(0, 75000)}
@@ -492,7 +566,7 @@ Now extract the comprehensive company information including services, blogs, tec
         messages: [
           {
             role: "system",
-            content: "You are an expert business intelligence analyst who excels at extracting comprehensive, accurate company information from website content and online sources. You have access to web search and use it extensively to find missing information, verify details, and enrich data. You are meticulous, thorough, and never fabricate data. You always return properly formatted JSON with complete, factual data. When you find LinkedIn profiles, you search for details about those people. You extract all services, blog articles, technology information, and CRITICALLY IMPORTANT: business goals, strategic objectives, and partnership expectations. You actively search for company goals in press releases, blog posts, about pages, and recent news. If explicit goals aren't stated, you intelligently infer them from company descriptions, growth indicators, and strategic direction.",
+            content: "You are an expert business intelligence analyst who excels at extracting comprehensive, accurate company information from website content and online sources. You have access to web search and use it extensively to find missing information, verify details, and enrich data. You are meticulous, thorough, and never fabricate data. You always return properly formatted JSON with complete, factual data. CRITICAL PRIORITIES: 1) Extract ALL contacts/team members with names, titles, emails, LinkedIn URLs, and accurately determine isDecisionMaker and influenceLevel. 2) Extract ALL testimonials and client feedback with complete quotes and satisfaction indicators. 3) Extract business goals, mission, vision from about pages, press releases, and CEO interviews. 4) Extract all services, blog articles, and technology information. When you find LinkedIn profiles, you search for details about those people. You actively search for company goals in press releases, blog posts, about pages, and recent news. You extract every testimonial, review, and case study found. If explicit goals aren't stated, you intelligently infer them from company descriptions, growth indicators, testimonials, and strategic direction.",
           },
           {
             role: "user",
