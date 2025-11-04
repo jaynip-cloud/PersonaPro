@@ -27,13 +27,20 @@ import {
   Youtube,
   Globe,
   Mail,
-  MapPin
+  MapPin,
+  BarChart3,
+  Lightbulb,
+  TrendingUp,
+  Target,
+  Zap,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 
-type TabType = 'ai-extract' | 'company' | 'contact' | 'social' | 'services' | 'team' | 'blogs' | 'technology';
+type TabType = 'overview' | 'ai-extract' | 'company' | 'contact' | 'social' | 'services' | 'team' | 'blogs' | 'technology';
 
 export const KnowledgeBase: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('ai-extract');
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -64,6 +71,9 @@ export const KnowledgeBase: React.FC = () => {
         .maybeSingle();
 
       if (profile) {
+        if (profile.ai_insights) {
+          setAiInsights(typeof profile.ai_insights === 'string' ? JSON.parse(profile.ai_insights) : profile.ai_insights);
+        }
         setCompanyInfo({
           name: profile.company_name || '',
           canonicalUrl: profile.website || '',
@@ -212,6 +222,9 @@ export const KnowledgeBase: React.FC = () => {
   const [newTechItem, setNewTechItem] = useState('');
   const [newPartnerItem, setNewPartnerItem] = useState('');
   const [newIntegrationItem, setNewIntegrationItem] = useState('');
+  const [aiInsights, setAiInsights] = useState<any>(null);
+  const [generatingInsights, setGeneratingInsights] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
 
   const addService = () => {
     const newService = {
@@ -323,6 +336,43 @@ export const KnowledgeBase: React.FC = () => {
 
   const removeIntegration = (index: number) => {
     setTechnology({ ...technology, integrations: technology.integrations.filter((_, i) => i !== index) });
+  };
+
+  const generateAIInsights = async () => {
+    if (!user) return;
+
+    setGeneratingInsights(true);
+    setInsightsError(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-kb-insights`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate insights');
+      }
+
+      const data = await response.json();
+      setAiInsights(data.insights);
+      setActiveTab('overview');
+    } catch (error: any) {
+      console.error('Error generating insights:', error);
+      setInsightsError(error.message || 'Failed to generate insights. Please try again.');
+    } finally {
+      setGeneratingInsights(false);
+    }
   };
 
   const handleSave = async () => {
@@ -468,6 +518,7 @@ export const KnowledgeBase: React.FC = () => {
   };
 
   const tabs = [
+    { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'ai-extract', label: 'AI Extract', icon: Sparkles },
     { id: 'company', label: 'Company', icon: Building2 },
     { id: 'contact', label: 'Contact', icon: Phone },
@@ -520,6 +571,159 @@ export const KnowledgeBase: React.FC = () => {
           );
         })}
       </div>
+
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-2">AI-Powered Insights</h2>
+                  <p className="text-muted-foreground">
+                    Get intelligent analysis of your company's knowledge base
+                  </p>
+                </div>
+                <Button
+                  variant="primary"
+                  onClick={generateAIInsights}
+                  disabled={generatingInsights}
+                >
+                  {generatingInsights ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate AI Insights
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {insightsError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-red-800">Error generating insights</p>
+                    <p className="text-sm text-red-700 mt-1">{insightsError}</p>
+                  </div>
+                </div>
+              )}
+
+              {!aiInsights && !generatingInsights && !insightsError && (
+                <div className="text-center py-12">
+                  <BarChart3 className="h-16 w-16 mx-auto mb-4 text-slate-400" />
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    No insights generated yet
+                  </h3>
+                  <p className="text-muted-foreground mb-6">
+                    Click "Generate AI Insights" to analyze your knowledge base and get actionable recommendations
+                  </p>
+                </div>
+              )}
+
+              {aiInsights && (
+                <div className="space-y-6">
+                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-6 border border-blue-100">
+                    <div className="flex items-start gap-3">
+                      <Lightbulb className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-2">Summary</h3>
+                        <p className="text-slate-700 leading-relaxed">{aiInsights.summary}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Zap className="h-5 w-5 text-green-600" />
+                          <h3 className="text-lg font-semibold text-foreground">Strengths</h3>
+                        </div>
+                        <ul className="space-y-2">
+                          {aiInsights.strengths?.map((strength: string, idx: number) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
+                              <span className="text-sm text-muted-foreground">{strength}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <TrendingUp className="h-5 w-5 text-blue-600" />
+                          <h3 className="text-lg font-semibold text-foreground">Growth Opportunities</h3>
+                        </div>
+                        <ul className="space-y-2">
+                          {aiInsights.opportunities?.map((opportunity: string, idx: number) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <Target className="h-4 w-4 text-blue-600 flex-shrink-0 mt-1" />
+                              <span className="text-sm text-muted-foreground">{opportunity}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {aiInsights.marketPosition && (
+                    <Card>
+                      <CardContent className="p-6">
+                        <h3 className="text-lg font-semibold text-foreground mb-3">Market Position</h3>
+                        <p className="text-muted-foreground leading-relaxed">{aiInsights.marketPosition}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {aiInsights.recommendations && aiInsights.recommendations.length > 0 && (
+                    <Card>
+                      <CardContent className="p-6">
+                        <h3 className="text-lg font-semibold text-foreground mb-4">Strategic Recommendations</h3>
+                        <div className="space-y-3">
+                          {aiInsights.recommendations.map((rec: string, idx: number) => (
+                            <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-semibold">
+                                {idx + 1}
+                              </span>
+                              <p className="text-sm text-muted-foreground flex-1">{rec}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {aiInsights.contentStrategy && (
+                      <Card>
+                        <CardContent className="p-6">
+                          <h3 className="text-lg font-semibold text-foreground mb-3">Content Strategy</h3>
+                          <p className="text-sm text-muted-foreground leading-relaxed">{aiInsights.contentStrategy}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {aiInsights.techStack && (
+                      <Card>
+                        <CardContent className="p-6">
+                          <h3 className="text-lg font-semibold text-foreground mb-3">Technology Assessment</h3>
+                          <p className="text-sm text-muted-foreground leading-relaxed">{aiInsights.techStack}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {activeTab === 'ai-extract' && (
         <AIDataExtractor onDataExtracted={handleDataExtracted} />
