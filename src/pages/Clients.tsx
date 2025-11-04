@@ -93,32 +93,34 @@ export const Clients: React.FC = () => {
                       onClick={() => navigate(`/clients/${client.id}`)}
                       className="flex items-center gap-4 flex-1 cursor-pointer"
                     >
-                      <Avatar name={client.company || client.name} size="lg" />
+                      <Avatar name={client.company || client.contact_name || client.name} size="lg" />
                       <div className="flex-1">
                         <h3 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">
-                          {client.company || 'No Company Name'}
+                          {client.company || client.contact_name || client.name}
                         </h3>
                         <div className="flex flex-col gap-1 mt-1">
-                          {(client.contact_name || client.name) && (
+                          {client.company && (client.contact_name || client.name) && (
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                               <span className="text-xs">👤</span>
                               {client.contact_name || client.name}
                             </p>
                           )}
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            {client.location && (
-                              <span className="flex items-center gap-1">
-                                <span className="text-xs">📍</span>
-                                {client.location}
-                              </span>
-                            )}
-                            {client.founded && (
-                              <span className="flex items-center gap-1">
-                                <span className="text-xs">📅</span>
-                                Founded {client.founded}
-                              </span>
-                            )}
-                          </div>
+                          {(client.location || client.founded) && (
+                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                              {client.location && (
+                                <span className="flex items-center gap-1">
+                                  <span className="text-xs">📍</span>
+                                  {client.location}
+                                </span>
+                              )}
+                              {client.founded && (
+                                <span className="flex items-center gap-1">
+                                  <span className="text-xs">📅</span>
+                                  Founded {client.founded}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
