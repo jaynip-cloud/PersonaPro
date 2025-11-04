@@ -96,13 +96,13 @@ export const Clients: React.FC = () => {
                       <Avatar name={client.company || client.name} size="lg" />
                       <div className="flex-1">
                         <h3 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">
-                          {client.company || client.name}
+                          {client.company || 'No Company Name'}
                         </h3>
                         <div className="flex flex-col gap-1 mt-1">
-                          {client.name && (
+                          {(client.contact_name || client.name) && (
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                               <span className="text-xs">👤</span>
-                              {client.name}
+                              {client.contact_name || client.name}
                             </p>
                           )}
                           <div className="flex items-center gap-3 text-sm text-muted-foreground">
