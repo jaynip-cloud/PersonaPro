@@ -195,8 +195,9 @@ export const ClientDetailNew: React.FC = () => {
           user_id: user.id,
           client_id: client.id,
           title: meetingTitle,
-          transcript: meetingNotes,
-          meeting_date: meetingDate
+          transcript_text: meetingNotes,
+          meeting_date: meetingDate,
+          source: 'manual'
         })
         .select()
         .single();
@@ -430,7 +431,7 @@ export const ClientDetailNew: React.FC = () => {
       const transcriptsContext = meetingTranscripts.length > 0
         ? `\n\nMeeting History (${meetingTranscripts.length} transcripts):\n` +
           meetingTranscripts.slice(0, 3).map((t, i) =>
-            `${i + 1}. ${t.title} (${new Date(t.meeting_date).toLocaleDateString()})\n${t.transcript.substring(0, 300)}${t.transcript.length > 300 ? '...' : ''}`
+            `${i + 1}. ${t.title} (${new Date(t.meeting_date).toLocaleDateString()})\n${t.transcript_text.substring(0, 300)}${t.transcript_text.length > 300 ? '...' : ''}`
           ).join('\n\n')
         : '';
 
@@ -1020,13 +1021,13 @@ Client Information:
                               </div>
                             </div>
                             <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-3">
-                              {transcript.transcript}
+                              {transcript.transcript_text}
                             </p>
                             <button
                               onClick={() => {
-                                setMeetingNotes(transcript.transcript);
+                                setMeetingNotes(transcript.transcript_text);
                                 setMeetingTitle(transcript.title);
-                                setMeetingDate(transcript.meeting_date);
+                                setMeetingDate(transcript.meeting_date.split('T')[0]);
                                 setShowTranscriptHistory(false);
                               }}
                               className="text-xs text-primary hover:underline mt-2"
