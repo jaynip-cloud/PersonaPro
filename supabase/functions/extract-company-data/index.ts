@@ -279,20 +279,37 @@ async function extractCompanyInfo(crawlResults: CrawlResult[], perplexityKey: st
   const facebookUrls = Array.from(allSocialLinks).filter(link => link.includes('facebook.com'));
   const instagramUrls = Array.from(allSocialLinks).filter(link => link.includes('instagram.com'));
 
-  const prompt = `You are an expert business intelligence analyst specializing in company research and data extraction. Your task is to extract comprehensive, accurate, and detailed company information from the provided website content AND use your web search capabilities to find additional up-to-date information.
+  const prompt = `You are an expert business intelligence analyst specializing in company research and data extraction. Your task is to extract ONLY accurate, verified company information following a strict priority order.
 
-IMPORTANT: You have access to real-time web search. Use it extensively to:
-- Verify and enhance the information from the website
-- Find missing details like contact information, founding year, company size
-- Get the latest company news and updates
-- Find leadership information (CEO, Founder, Owner) from LinkedIn, news, press releases
-- **EXTRACT ALL TEAM MEMBERS & CONTACTS**: Find ALL people listed on team/about/leadership pages with their names, titles, emails, LinkedIn profiles
-- Extract blog articles from their blog/news pages
-- Identify technology stack, partners, and integrations from their website and web sources
-- **SEARCH FOR BUSINESS GOALS**: Find recent press releases, CEO interviews, blog posts about company strategy, goals, roadmap, and future plans
-- **EXTRACT CLIENT EXPECTATIONS**: Look for what they expect from partnerships, vendors, and service providers
-- **EXTRACT TESTIMONIALS & FEEDBACK**: Find all client testimonials, reviews, case studies, success stories with specific feedback about satisfaction, expectations met, and service quality
-- Cross-reference information for accuracy
+CRITICAL: ACCURACY IS PARAMOUNT - NEVER GUESS OR INFER DATA THAT IS NOT EXPLICITLY STATED OR FOUND.
+
+DATA SOURCE PRIORITY (USE IN THIS EXACT ORDER):
+1. **PRIMARY SOURCE - LinkedIn Company Page**: ${linkedinCompanyUrls[0] || 'Not found - search for it'}
+   - Search and extract from the company's official LinkedIn page FIRST
+   - Get: company name, industry, size, founded year, headquarters location, description
+   - Get all employees listed with their titles and roles
+   - This is the MOST RELIABLE source - prioritize this data over everything else
+
+2. **SECONDARY SOURCE - Website Content**: ${rootUrl}
+   - Use the provided crawled website content
+   - Extract: contact info, services, testimonials, blog posts, team members
+   - Cross-reference with LinkedIn data - if there's a conflict, LinkedIn wins
+
+3. **TERTIARY SOURCE - Web Search** (ONLY for missing data):
+   - Use web search ONLY to fill gaps that LinkedIn and website don't have
+   - Search for: recent press releases, news articles, verified company information
+   - NEVER use web search for basic info if it's on LinkedIn or website
+
+STRICT ACCURACY RULES:
+❌ DO NOT extract data if you're not 100% certain it's correct
+❌ DO NOT infer or guess information (e.g., don't guess contact emails)
+❌ DO NOT mix data from different companies
+❌ DO NOT use outdated information - verify dates
+❌ DO NOT extract contact info unless it's explicitly shown on contact/team pages
+✅ DO verify company names match across all sources
+✅ DO prioritize LinkedIn data for company basics (name, size, industry, location)
+✅ DO extract ONLY factual data you can verify
+✅ DO leave fields empty if data is not found rather than guessing
 
 ROOT DOMAIN: ${rootUrl}
 
@@ -303,17 +320,37 @@ DISCOVERED SOCIAL MEDIA PROFILES:
 - Facebook: ${facebookUrls.join(', ') || 'Not found'}
 - Instagram: ${instagramUrls.join(', ') || 'Not found'}
 
-CRITICAL INSTRUCTIONS:
-1. Extract ONLY factual information explicitly stated in the content or found via web search
-2. Search thoroughly through ALL provided pages for each piece of information
-3. Use web search to fill gaps and verify information
-4. For leadership, if LinkedIn URLs are found, use web search to get details about those people
-5. **EXTRACT ALL CONTACTS**: Find every person mentioned on team, about, leadership, contact pages with name, title, email, phone, LinkedIn
-6. Extract ALL services/products mentioned on services, products, or solutions pages
-7. Extract ALL blog articles found on blog/news pages with titles, URLs, dates, and summaries
-8. **EXTRACT ALL TESTIMONIALS**: Find every client testimonial, review, case study with client name, feedback, satisfaction indicators
-9. Identify technology stack from "technology", "partners", or "integrations" pages
-10. Return ONLY valid JSON - no additional text or explanations
+CRITICAL EXTRACTION INSTRUCTIONS:
+1. **START WITH LINKEDIN**: Search for and extract company data from LinkedIn company page FIRST
+   - Company name, industry, company size, founded year, location from LinkedIn
+   - Employee list with titles from LinkedIn "People" section
+
+2. **THEN USE WEBSITE**: Extract from provided website content
+   - Contact information (emails, phones) from contact page only
+   - Services/products from services page only
+   - Testimonials from testimonials/reviews pages only
+   - Team members from team/about pages only
+
+3. **FINALLY WEB SEARCH**: Use for missing data only
+   - Recent news for goals/strategy
+   - Press releases for company updates
+   - Verify ambiguous information
+
+4. **ACCURACY CHECKS**:
+   - Verify company name matches across LinkedIn, website, and web search
+   - If contact info (email/phone) format looks wrong, leave it empty
+   - If employee title doesn't match company industry, skip them
+   - If testimonial doesn't clearly name the client, skip it
+
+5. **DATA VALIDATION**:
+   - Company name must be exact match across sources
+   - Email format: must contain @ and valid domain
+   - Phone format: must contain numbers (with optional + and -)
+   - Founded year: must be 4 digits between 1800-2025
+   - Company size: use LinkedIn format (e.g., "11-50 employees")
+
+6. Return ONLY valid JSON - no additional text or explanations
+7. Leave fields empty ("") rather than guessing or inferring data
 
 REQUIRED JSON STRUCTURE (extract ALL available information):
 
@@ -425,6 +462,23 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
 }
 
 DETAILED EXTRACTION GUIDELINES:
+
+**STEP 1: START WITH LINKEDIN (HIGHEST PRIORITY)**
+- LinkedIn Company URL: ${linkedinCompanyUrls[0] || 'SEARCH FOR IT'}
+- If LinkedIn URL found above, access it and extract:
+  - Official company name (exactly as shown on LinkedIn)
+  - Industry/sector (from LinkedIn company page)
+  - Company size (e.g., "51-200 employees" - use exact LinkedIn format)
+  - Founded year (from LinkedIn "About" section)
+  - Headquarters location (City, State/Province, Country)
+  - Company description (from LinkedIn "About")
+- Navigate to "People" section on LinkedIn to find:
+  - All employees with their current titles
+  - Focus on decision makers (C-level, VPs, Directors, Managers)
+- LinkedIn data ALWAYS takes precedence over website data for these fields
+- If no LinkedIn found, search: "[Company Name from website] LinkedIn company"
+
+**STEP 2: EXTRACT FROM WEBSITE (SECONDARY SOURCE)**
 
 **Services/Products:**
 - Look in: services page, products page, solutions page, homepage features section
@@ -566,7 +620,7 @@ Now extract the comprehensive company information including services, blogs, tec
         messages: [
           {
             role: "system",
-            content: "You are an expert business intelligence analyst who excels at extracting comprehensive, accurate company information from website content and online sources. You have access to web search and use it extensively to find missing information, verify details, and enrich data. You are meticulous, thorough, and never fabricate data. You always return properly formatted JSON with complete, factual data. CRITICAL PRIORITIES: 1) Extract ALL contacts/team members with names, titles, emails, LinkedIn URLs, and accurately determine isDecisionMaker and influenceLevel. 2) Extract ALL testimonials and client feedback with complete quotes and satisfaction indicators. 3) Extract business goals, mission, vision from about pages, press releases, and CEO interviews. 4) Extract all services, blog articles, and technology information. When you find LinkedIn profiles, you search for details about those people. You actively search for company goals in press releases, blog posts, about pages, and recent news. You extract every testimonial, review, and case study found. If explicit goals aren't stated, you intelligently infer them from company descriptions, growth indicators, testimonials, and strategic direction.",
+            content: "You are an expert business intelligence analyst who prioritizes ACCURACY over completeness. You NEVER guess, infer, or fabricate data. You follow a strict data source priority: 1) LinkedIn company page (most reliable), 2) Official website content, 3) Verified web search only for missing data. You validate all data: company names must match across sources, email formats must be valid, phone numbers must be real, dates must be accurate. If you cannot verify information with 100% confidence, you leave that field empty. You understand that incorrect data is worse than missing data. You always return properly formatted JSON. When extracting contacts, you only include people explicitly listed on team/leadership pages with verifiable titles. When extracting testimonials, you only include those with clear attribution. You cross-reference all information and prioritize LinkedIn data for company basics (name, industry, size, location, founded year). You are meticulous, thorough, and refuse to extract unverified information.",
           },
           {
             role: "user",
