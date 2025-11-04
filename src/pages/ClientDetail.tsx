@@ -6,7 +6,7 @@ import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { ProgressBar } from '../components/ui/ProgressBar';
-import { ArrowLeft, Mail, Phone, Calendar, Sparkles, Edit2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Calendar, Sparkles, Edit2, Loader2, Globe, Linkedin, Twitter, MapPin, Building2, User } from 'lucide-react';
 import { PersonaSummary } from '../components/persona/PersonaSummary';
 import { PersonaMetricsCards } from '../components/persona/PersonaMetricsCards';
 import { ExplainabilityPanel } from '../components/persona/ExplainabilityPanel';
@@ -174,18 +174,81 @@ export const ClientDetail: React.FC = () => {
             </div>
 
             <div className="space-y-4 mt-6">
+              {client.contact_name && (
+                <div className="flex items-center gap-3 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-foreground font-medium">{client.contact_name}</p>
+                    {client.job_title && <p className="text-xs text-muted-foreground">{client.job_title}</p>}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-3 text-sm">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{client.email}</span>
+                <div className="flex flex-col">
+                  <span className="text-foreground">{client.primary_email || client.email}</span>
+                  {client.alternate_email && (
+                    <span className="text-xs text-muted-foreground">{client.alternate_email}</span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Phone className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{client.phone}</span>
+                <div className="flex flex-col">
+                  <span className="text-foreground">{client.primary_phone || client.phone}</span>
+                  {client.alternate_phone && (
+                    <span className="text-xs text-muted-foreground">{client.alternate_phone}</span>
+                  )}
+                </div>
               </div>
+              {(client.city || client.country) && (
+                <div className="flex items-center gap-3 text-sm">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-foreground">
+                    {[client.city, client.country].filter(Boolean).join(', ')}
+                  </span>
+                </div>
+              )}
+              {client.website && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                  <a href={client.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    {client.website.replace(/^https?:\/\//, '')}
+                  </a>
+                </div>
+              )}
+              {(client.linkedin_url || client.twitter_url) && (
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="flex gap-2">
+                    {client.linkedin_url && (
+                      <a href={client.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
+                        <Linkedin className="h-4 w-4" />
+                      </a>
+                    )}
+                    {client.twitter_url && (
+                      <a href={client.twitter_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-600">
+                        <Twitter className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-3 text-sm">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="text-foreground">Last contact: {client.lastContact}</span>
               </div>
+              {client.company_size && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-foreground">{client.company_size}</span>
+                </div>
+              )}
+              {client.founded && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-foreground">Founded: {client.founded}</span>
+                </div>
+              )}
             </div>
 
             <div className="mt-6">
@@ -205,6 +268,65 @@ export const ClientDetail: React.FC = () => {
         </Card>
 
         <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Business Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {client.company_overview && (
+                  <div>
+                    <h4 className="font-medium text-sm mb-2 text-slate-700">Company Overview</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">{client.company_overview}</p>
+                  </div>
+                )}
+
+                {client.description && (
+                  <div>
+                    <h4 className="font-medium text-sm mb-2 text-slate-700">Notes</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">{client.description}</p>
+                  </div>
+                )}
+
+                {client.short_term_goals && (
+                  <div>
+                    <h4 className="font-medium text-sm mb-2 text-slate-700">Short-term Goals (6-12 months)</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">{client.short_term_goals}</p>
+                  </div>
+                )}
+
+                {client.long_term_goals && (
+                  <div>
+                    <h4 className="font-medium text-sm mb-2 text-slate-700">Long-term Goals (2-5 years)</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">{client.long_term_goals}</p>
+                  </div>
+                )}
+
+                {client.expectations && (
+                  <div>
+                    <h4 className="font-medium text-sm mb-2 text-slate-700">Client Expectations</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">{client.expectations}</p>
+                  </div>
+                )}
+
+                {client.budget_range && (
+                  <div>
+                    <h4 className="font-medium text-sm mb-2 text-slate-700">Budget Range</h4>
+                    <p className="text-sm text-slate-600">{client.budget_range}</p>
+                  </div>
+                )}
+
+                {!client.company_overview && !client.description && !client.short_term_goals &&
+                 !client.long_term_goals && !client.expectations && !client.budget_range && (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-slate-400">No business information available yet.</p>
+                    <p className="text-xs text-slate-400 mt-1">Add client details to populate this section.</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {persona && (
             <Card>
               <CardHeader>
