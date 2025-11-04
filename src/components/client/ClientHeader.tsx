@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { MapPin, Calendar, RefreshCw, ChevronDown, MoreVertical, Mail, Phone, Video, FileText } from 'lucide-react';
+import { MapPin, Calendar, RefreshCw, ChevronDown, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { Client } from '../../types';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,11 +10,13 @@ interface ClientHeaderProps {
   client: Client;
   onRefreshData: () => void;
   isRefreshing: boolean;
+  onEditClient?: () => void;
+  onDeleteClient?: () => void;
 }
 
-export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshData, isRefreshing }) => {
+export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshData, isRefreshing, onEditClient, onDeleteClient }) => {
   const navigate = useNavigate();
-  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showCsmMenu, setShowCsmMenu] = useState(false);
 
 
@@ -78,40 +80,45 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshDat
 
             <div className="relative">
               <Button
-                variant="primary"
+                variant="ghost"
                 size="sm"
-                onClick={() => setShowQuickActions(!showQuickActions)}
+                onClick={() => setShowMoreMenu(!showMoreMenu)}
               >
-                Quick Actions
-                <ChevronDown className="h-4 w-4 ml-2" />
+                <MoreVertical className="h-4 w-4" />
               </Button>
-              {showQuickActions && (
-                <div className="absolute top-full right-0 mt-2 w-56 bg-background border border-border rounded-lg shadow-lg z-10">
-                  <div className="p-2">
-                    <button className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      Send Email
-                    </button>
-                    <button className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      Schedule Call
-                    </button>
-                    <button className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2">
-                      <Video className="h-4 w-4" />
-                      Start Meeting
-                    </button>
-                    <button className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Create Proposal
-                    </button>
+              {showMoreMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowMoreMenu(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-background border border-border rounded-lg shadow-lg z-20">
+                    <div className="p-2">
+                      <button
+                        onClick={() => {
+                          if (onEditClient) onEditClient();
+                          setShowMoreMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2 text-foreground"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit Client
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (onDeleteClient) onDeleteClient();
+                          setShowMoreMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2 text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete Client
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
-
-            <Button variant="ghost" size="sm">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 

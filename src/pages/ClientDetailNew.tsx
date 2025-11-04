@@ -115,6 +115,32 @@ export const ClientDetailNew: React.FC = () => {
     handleRunPersonaAnalysis();
   };
 
+  const handleEditClient = () => {
+    navigate(`/clients/${id}/edit`);
+  };
+
+  const handleDeleteClient = async () => {
+    if (!client) return;
+
+    const confirmDelete = window.confirm('Are you sure you want to delete this client? This action cannot be undone.');
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', client.id);
+
+      if (error) throw error;
+
+      showToast('success', 'Client deleted successfully');
+      navigate('/clients');
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      showToast('error', 'Failed to delete client. Please try again.');
+    }
+  };
+
   const handleRunPersonaAnalysis = () => {
     setIsAnalyzing(true);
     setTimeout(() => {
@@ -199,6 +225,8 @@ export const ClientDetailNew: React.FC = () => {
         client={client}
         onRefreshData={handleRefreshData}
         isRefreshing={isRefreshing}
+        onEditClient={handleEditClient}
+        onDeleteClient={handleDeleteClient}
       />
 
       <div className="border-b border-border">
