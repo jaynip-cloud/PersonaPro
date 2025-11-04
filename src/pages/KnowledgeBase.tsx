@@ -93,7 +93,7 @@ export const KnowledgeBase: React.FC = () => {
 
         if (profile.services) {
           try {
-            const servicesData = JSON.parse(profile.services as string);
+            const servicesData = typeof profile.services === 'string' ? JSON.parse(profile.services) : profile.services;
             console.log('Raw servicesData from DB:', servicesData);
             if (Array.isArray(servicesData) && servicesData.length > 0) {
               setServices(servicesData.map((s: any, index: number) => {
@@ -129,7 +129,7 @@ export const KnowledgeBase: React.FC = () => {
 
         if (profile.leadership) {
           try {
-            const leadershipData = JSON.parse(profile.leadership as string);
+            const leadershipData = typeof profile.leadership === 'string' ? JSON.parse(profile.leadership) : profile.leadership;
             if (Array.isArray(leadershipData)) {
               setLeadership(leadershipData);
             }
@@ -140,7 +140,7 @@ export const KnowledgeBase: React.FC = () => {
 
         if (profile.blogs) {
           try {
-            const blogsData = JSON.parse(profile.blogs as string);
+            const blogsData = typeof profile.blogs === 'string' ? JSON.parse(profile.blogs) : profile.blogs;
             if (Array.isArray(blogsData)) {
               setBlogs(blogsData);
             }
@@ -151,7 +151,7 @@ export const KnowledgeBase: React.FC = () => {
 
         if (profile.technology) {
           try {
-            const technologyData = JSON.parse(profile.technology as string);
+            const technologyData = typeof profile.technology === 'string' ? JSON.parse(profile.technology) : profile.technology;
             setTechnology({
               stack: technologyData.stack || [],
               partners: technologyData.partners || [],
@@ -389,6 +389,7 @@ export const KnowledgeBase: React.FC = () => {
   const handleWizardComplete = async () => {
     setShowWizard(false);
     await checkKnowledgeBaseStatus();
+    await loadExistingData();
   };
 
   return (

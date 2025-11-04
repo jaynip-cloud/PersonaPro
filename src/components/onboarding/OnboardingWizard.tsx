@@ -30,6 +30,8 @@ interface Service {
   id: string;
   name: string;
   description: string;
+  tags?: string[];
+  pricing?: string;
 }
 
 interface LeadershipMember {
