@@ -11,8 +11,10 @@ import { PersonaEditor } from '../components/persona/PersonaEditor';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp } from 'lucide-react';
-import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData } from '../types';
+import { Modal } from '../components/ui/Modal';
+import { Input } from '../components/ui/Input';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone } from 'lucide-react';
+import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
 import { exportPersonaReportAsPDF } from '../utils/pdfExport';
@@ -35,8 +37,19 @@ export const ClientDetailNew: React.FC = () => {
   const [client, setClient] = useState<Client | null>(null);
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [newContactForm, setNewContactForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: '',
+    department: '',
+    isDecisionMaker: false,
+    influenceLevel: 'medium' as 'high' | 'medium' | 'low'
+  });
+  const [savingContact, setSavingContact] = useState(false);
 
-  const contacts = mockContacts.filter(c => c.clientId === id);
   const opportunities = mockOpportunities.filter(o => o.clientId === id);
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
 
@@ -100,11 +113,96 @@ export const ClientDetailNew: React.FC = () => {
           } : undefined,
         });
       }
+
+      const { data: contactsData, error: contactsError } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('client_id', id);
+
+      if (!contactsError && contactsData) {
+        setContacts(contactsData.map(c => ({
+          id: c.id,
+          clientId: c.client_id || '',
+          name: c.name,
+          email: c.email,
+          phone: c.phone || undefined,
+          role: c.role,
+          department: c.department || undefined,
+          isPrimary: c.is_primary,
+          isDecisionMaker: c.is_decision_maker,
+          influenceLevel: c.influence_level as 'high' | 'medium' | 'low' | undefined,
+          source: c.source || undefined,
+          lastContact: c.last_contact || undefined,
+        })));
+      }
     } catch (error) {
       console.error('Error loading client data:', error);
       showToast('error', 'Failed to load client data');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    if (!client || !newContactForm.name || !newContactForm.email) {
+      showToast('error', 'Please fill in name and email');
+      return;
+    }
+
+    setSavingContact(true);
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .insert({
+          client_id: client.id,
+          name: newContactForm.name,
+          email: newContactForm.email,
+          phone: newContactForm.phone || null,
+          role: newContactForm.role,
+          department: newContactForm.department || null,
+          is_primary: false,
+          is_decision_maker: newContactForm.isDecisionMaker,
+          influence_level: newContactForm.influenceLevel,
+          source: 'manual'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setContacts([...contacts, {
+          id: data.id,
+          clientId: data.client_id || '',
+          name: data.name,
+          email: data.email,
+          phone: data.phone || undefined,
+          role: data.role,
+          department: data.department || undefined,
+          isPrimary: data.is_primary,
+          isDecisionMaker: data.is_decision_maker,
+          influenceLevel: data.influence_level as 'high' | 'medium' | 'low' | undefined,
+          source: data.source || undefined,
+          lastContact: data.last_contact || undefined,
+        }]);
+
+        setNewContactForm({
+          name: '',
+          email: '',
+          phone: '',
+          role: '',
+          department: '',
+          isDecisionMaker: false,
+          influenceLevel: 'medium'
+        });
+        setShowAddContactModal(false);
+        showToast('success', 'Contact added successfully');
+      }
+    } catch (error) {
+      console.error('Error saving contact:', error);
+      showToast('error', 'Failed to save contact');
+    } finally {
+      setSavingContact(false);
     }
   };
 
@@ -372,34 +470,56 @@ export const ClientDetailNew: React.FC = () => {
 
             <Card>
               <CardHeader>
-                <CardTitle>Contacts & Decision Makers</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Contacts & Decision Makers</CardTitle>
+                  <Button variant="primary" size="sm" onClick={() => setShowAddContactModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Contact
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {contacts.map(contact => (
-                    <div key={contact.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-sm font-semibold text-primary">
-                            {contact.name.split(' ').map(n => n[0]).join('')}
-                          </span>
+                {contacts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">No contacts added yet</p>
+                    <Button variant="outline" size="sm" onClick={() => setShowAddContactModal(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Contact
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {contacts.map(contact => (
+                      <div key={contact.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <span className="text-sm font-semibold text-primary">
+                              {contact.name.split(' ').map(n => n[0]).join('')}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">{contact.name}</p>
+                            <p className="text-sm text-muted-foreground">{contact.role}</p>
+                            {contact.email && (
+                              <p className="text-xs text-muted-foreground mt-1">{contact.email}</p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-foreground">{contact.name}</p>
-                          <p className="text-sm text-muted-foreground">{contact.role}</p>
+                        <div className="flex items-center gap-2">
+                          {contact.isPrimary && (
+                            <Badge variant="default">Primary</Badge>
+                          )}
+                          {contact.isDecisionMaker && (
+                            <Badge variant="success">Decision Maker</Badge>
+                          )}
+                          {contact.influenceLevel && (
+                            <Badge variant="secondary">{contact.influenceLevel} influence</Badge>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {contact.isDecisionMaker && (
-                          <Badge variant="success">Decision Maker</Badge>
-                        )}
-                        {contact.influenceLevel && (
-                          <Badge variant="secondary">{contact.influenceLevel} influence</Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -984,6 +1104,131 @@ export const ClientDetailNew: React.FC = () => {
           onSave={setPersonaMetrics}
         />
       )}
+
+      <Modal
+        isOpen={showAddContactModal}
+        onClose={() => setShowAddContactModal(false)}
+        title="Add New Contact"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Name <span className="text-red-600">*</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="John Doe"
+                value={newContactForm.name}
+                onChange={(e) => setNewContactForm({ ...newContactForm, name: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Email <span className="text-red-600">*</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <Input
+                type="email"
+                placeholder="john@example.com"
+                value={newContactForm.email}
+                onChange={(e) => setNewContactForm({ ...newContactForm, email: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Phone
+            </label>
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <Input
+                type="tel"
+                placeholder="+1 (555) 123-4567"
+                value={newContactForm.phone}
+                onChange={(e) => setNewContactForm({ ...newContactForm, phone: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Job Title / Role
+            </label>
+            <Input
+              placeholder="VP of Engineering"
+              value={newContactForm.role}
+              onChange={(e) => setNewContactForm({ ...newContactForm, role: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Department
+            </label>
+            <Input
+              placeholder="Engineering"
+              value={newContactForm.department}
+              onChange={(e) => setNewContactForm({ ...newContactForm, department: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Influence Level
+            </label>
+            <select
+              value={newContactForm.influenceLevel}
+              onChange={(e) => setNewContactForm({ ...newContactForm, influenceLevel: e.target.value as 'high' | 'medium' | 'low' })}
+              className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="isDecisionMaker"
+              checked={newContactForm.isDecisionMaker}
+              onChange={(e) => setNewContactForm({ ...newContactForm, isDecisionMaker: e.target.checked })}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            <label htmlFor="isDecisionMaker" className="text-sm font-medium text-foreground">
+              Decision Maker
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={() => setShowAddContactModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSaveContact}
+              disabled={savingContact || !newContactForm.name || !newContactForm.email}
+            >
+              {savingContact ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Contact
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

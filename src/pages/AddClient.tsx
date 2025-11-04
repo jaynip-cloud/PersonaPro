@@ -482,6 +482,27 @@ export const AddClient: React.FC = () => {
 
         if (updateError) throw updateError;
 
+        const { error: contactUpdateError } = await supabase
+          .from('contacts')
+          .upsert({
+            client_id: id,
+            user_id: user.id,
+            name: formData.contactName,
+            email: formData.primaryEmail,
+            phone: formData.primaryPhone || null,
+            role: formData.jobTitle,
+            is_primary: true,
+            is_decision_maker: false,
+            source: 'manual'
+          }, {
+            onConflict: 'client_id,email',
+            ignoreDuplicates: false
+          });
+
+        if (contactUpdateError) {
+          console.error('Error updating contact:', contactUpdateError);
+        }
+
         if (uploadedFiles.length > 0) {
           try {
             await uploadFilesToStorage(id);
@@ -504,6 +525,26 @@ export const AddClient: React.FC = () => {
           .single();
 
         if (insertError) throw insertError;
+
+        if (newClient && formData.contactName && formData.primaryEmail) {
+          const { error: contactError } = await supabase
+            .from('contacts')
+            .insert({
+              client_id: newClient.id,
+              user_id: user.id,
+              name: formData.contactName,
+              email: formData.primaryEmail,
+              phone: formData.primaryPhone || null,
+              role: formData.jobTitle,
+              is_primary: true,
+              is_decision_maker: false,
+              source: 'manual'
+            });
+
+          if (contactError) {
+            console.error('Error creating contact:', contactError);
+          }
+        }
 
         if (uploadedFiles.length > 0 && newClient) {
           try {
