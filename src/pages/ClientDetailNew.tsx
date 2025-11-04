@@ -13,7 +13,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone } from 'lucide-react';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
@@ -52,6 +52,9 @@ export const ClientDetailNew: React.FC = () => {
     influenceLevel: 'medium' as 'high' | 'medium' | 'low'
   });
   const [savingContact, setSavingContact] = useState(false);
+  const [meetingNotes, setMeetingNotes] = useState('');
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [uploadedDocuments, setUploadedDocuments] = useState<any[]>([]);
 
   const opportunities = mockOpportunities.filter(o => o.clientId === id);
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
@@ -141,11 +144,54 @@ export const ClientDetailNew: React.FC = () => {
           lastContact: c.last_contact || undefined,
         })));
       }
+
+      const { data: documentsData, error: documentsError } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('client_id', id)
+        .eq('user_id', user.id)
+        .order('uploaded_at', { ascending: false });
+
+      if (!documentsError && documentsData) {
+        setUploadedDocuments(documentsData);
+      }
+
+      const { data: notesData } = await supabase
+        .from('clients')
+        .select('meeting_notes')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (notesData?.meeting_notes) {
+        setMeetingNotes(notesData.meeting_notes);
+      }
     } catch (error) {
       console.error('Error loading client data:', error);
       showToast('error', 'Failed to load client data');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveMeetingNotes = async () => {
+    if (!client || !user || !meetingNotes.trim()) return;
+
+    setSavingNotes(true);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ meeting_notes: meetingNotes })
+        .eq('id', client.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      showToast('success', 'Meeting notes saved successfully');
+    } catch (error) {
+      console.error('Error saving meeting notes:', error);
+      showToast('error', 'Failed to save meeting notes');
+    } finally {
+      setSavingNotes(false);
     }
   };
 
@@ -274,21 +320,30 @@ export const ClientDetailNew: React.FC = () => {
         similarityThreshold: similarityThreshold,
       });
 
+      const clientContext = `
+Client Information:
+• Company: ${client?.company || 'N/A'}
+• Industry: ${client?.industry || 'N/A'}
+• Status: ${client?.status || 'N/A'}
+• Location: ${client?.location || 'N/A'}
+• Contact: ${client?.email || 'N/A'}${meetingNotes ? `\n\nRecent Meeting Notes:\n${meetingNotes.substring(0, 500)}${meetingNotes.length > 500 ? '...' : ''}` : ''}
+`;
+
       if (searchResults && searchResults.length > 0) {
-        const context = searchResults
+        const documentContext = searchResults
           .map((result, index) => `[${index + 1}] ${result.content_chunk} (from ${result.document_name}, similarity: ${(result.similarity * 100).toFixed(1)}%)`)
           .join('\n\n');
 
         const response = mode === 'deep'
-          ? `Based on semantic analysis of documents for ${client?.company || 'this client'}:\n\n${context}\n\nKey Insights:\n• Found ${searchResults.length} relevant document sections\n• Analysis based on uploaded documents and client materials\n• Similarity scores range from ${(searchResults[searchResults.length - 1].similarity * 100).toFixed(1)}% to ${(searchResults[0].similarity * 100).toFixed(1)}%`
-          : `Found ${searchResults.length} relevant insights:\n\n${searchResults[0].content_chunk.substring(0, 300)}${searchResults[0].content_chunk.length > 300 ? '...' : ''}\n\n(Source: ${searchResults[0].document_name}, ${(searchResults[0].similarity * 100).toFixed(1)}% relevant)`;
+          ? `${clientContext}\n\nDocument Analysis:\n${documentContext}\n\nKey Insights:\n• Found ${searchResults.length} relevant document sections\n• Analysis includes client profile and ${uploadedDocuments.length} uploaded documents\n• Similarity scores range from ${(searchResults[searchResults.length - 1].similarity * 100).toFixed(1)}% to ${(searchResults[0].similarity * 100).toFixed(1)}%`
+          : `${clientContext}\n\nTop Document Match:\n${searchResults[0].content_chunk.substring(0, 300)}${searchResults[0].content_chunk.length > 300 ? '...' : ''}\n\n(Source: ${searchResults[0].document_name}, ${(searchResults[0].similarity * 100).toFixed(1)}% relevant)`;
 
         setIsProcessingQuery(false);
         return response;
       } else {
         const fallbackResponse = mode === 'deep'
-          ? `No relevant documents found for "${query}".\n\nTo get better insights:\n• Upload client documents (proposals, contracts, notes)\n• Add more detailed client information\n• Try a different search query\n\nOnce documents are uploaded, I can provide comprehensive analysis based on actual client data.`
-          : `No documents found matching your query. Upload client documents to enable intelligent search and insights.`;
+          ? `${clientContext}\n\nNo matching documents found for "${query}".\n\nAvailable Information:\n• Client profile data shown above\n• ${uploadedDocuments.length} document(s) uploaded${meetingNotes ? '\n• Meeting notes available' : ''}\n\nTo improve search results:\n• Upload more client documents\n• Add detailed meeting notes\n• Try a different search query`
+          : `${clientContext}\n\nNo documents matched "${query}". ${uploadedDocuments.length === 0 ? 'Upload documents to enable document search.' : 'Try a different query or check uploaded documents.'}`;
 
         setIsProcessingQuery(false);
         return fallbackResponse;
@@ -747,11 +802,116 @@ export const ClientDetailNew: React.FC = () => {
 
         {activeTab === 'intelligence' && (
           <div className="space-y-6">
-            <IntelligenceAgent
-              clientId={client.id}
-              onQuery={handleQuery}
-              isProcessing={isProcessingQuery}
-            />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="lg:col-span-1">
+                <IntelligenceAgent
+                  clientId={client.id}
+                  onQuery={handleQuery}
+                  isProcessing={isProcessingQuery}
+                />
+              </div>
+
+              <div className="lg:col-span-1 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Meeting Notes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <textarea
+                      value={meetingNotes}
+                      onChange={(e) => setMeetingNotes(e.target.value)}
+                      placeholder="Add meeting notes, key discussion points, action items..."
+                      className="w-full h-64 p-3 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    />
+                    <div className="flex justify-end gap-2 mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setMeetingNotes('')}
+                        disabled={!meetingNotes || savingNotes}
+                      >
+                        Clear
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleSaveMeetingNotes}
+                        disabled={!meetingNotes || savingNotes}
+                      >
+                        {savingNotes ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Notes
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Upload className="h-5 w-5" />
+                      Documents & Assets
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {uploadedDocuments.length === 0 ? (
+                      <div className="text-center py-8">
+                        <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                        <p className="text-sm text-muted-foreground mb-4">
+                          No documents uploaded yet
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Upload documents in the Settings & Admin tab
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {uploadedDocuments.map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-start gap-3 p-3 border border-border rounded-lg hover:bg-accent transition-colors"
+                          >
+                            <FileText className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {doc.name}
+                              </p>
+                              <div className="flex items-center gap-3 mt-1">
+                                <Badge variant="secondary" className="text-xs">
+                                  {doc.type}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(doc.uploaded_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                            <a
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:text-primary/80 transition-colors"
+                            >
+                              <Download className="h-4 w-4" />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
         )}
 
