@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -72,6 +72,7 @@ interface ClientFormData {
 
 export const AddClient: React.FC = () => {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const { showToast } = useToast();
   const { user } = useAuth();
   const { refreshClients } = useApp();
@@ -79,8 +80,10 @@ export const AddClient: React.FC = () => {
   const [completedTabs, setCompletedTabs] = useState<Set<string>>(new Set());
   const [newTag, setNewTag] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [aiPrefilling, setAiPrefilling] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const isEditMode = !!id;
 
   const [formData, setFormData] = useState<ClientFormData>({
     company: '',
@@ -119,6 +122,72 @@ export const AddClient: React.FC = () => {
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof ClientFormData, string>>>({});
+
+  useEffect(() => {
+    if (isEditMode && id && user) {
+      loadClientData();
+    }
+  }, [id, user, isEditMode]);
+
+  const loadClientData = async () => {
+    if (!id || !user) return;
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setFormData({
+          company: data.company || '',
+          website: data.website || '',
+          industry: data.industry || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          city: data.city || '',
+          country: data.country || '',
+          zipCode: data.zip_code || '',
+          founded: data.founded || '',
+          companySize: data.company_size || '',
+          linkedinUrl: data.linkedin_url || '',
+          twitterUrl: data.twitter_url || '',
+          instagramUrl: data.instagram_url || '',
+          facebookUrl: data.facebook_url || '',
+          logoUrl: data.logo_url || '',
+          contactName: data.contact_name || '',
+          primaryEmail: data.primary_email || '',
+          alternateEmail: data.alternate_email || '',
+          primaryPhone: data.primary_phone || '',
+          alternatePhone: data.alternate_phone || '',
+          jobTitle: data.job_title || '',
+          preferredContactMethod: data.preferred_contact_method || 'email',
+          companyOverview: data.company_overview || '',
+          budgetRange: data.budget_range || '',
+          shortTermGoals: data.short_term_goals || '',
+          longTermGoals: data.long_term_goals || '',
+          expectations: data.expectations || '',
+          satisfactionScore: data.satisfaction_score || 0,
+          satisfactionFeedback: data.satisfaction_feedback || '',
+          status: data.status || 'prospect',
+          tags: data.tags || [],
+          description: data.description || '',
+          csm: data.csm || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error loading client:', error);
+      showToast('error', 'Failed to load client data');
+      navigate('/clients');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const validateBasicInfo = () => {
     const newErrors: Partial<Record<keyof ClientFormData, string>> = {};
@@ -353,7 +422,7 @@ export const AddClient: React.FC = () => {
 
   const handleSave = async () => {
     if (!user) {
-      showToast('error', 'You must be logged in to create a client');
+      showToast('error', 'You must be logged in to ' + (isEditMode ? 'update' : 'create') + ' a client');
       return;
     }
 
@@ -364,62 +433,89 @@ export const AddClient: React.FC = () => {
 
     setSaving(true);
     try {
-      const { data: newClient, error: insertError } = await supabase
-        .from('clients')
-        .insert({
-          user_id: user.id,
-          name: formData.contactName || formData.company,
-          company: formData.company,
-          website: formData.website,
-          industry: formData.industry,
-          email: formData.primaryEmail,
-          phone: formData.primaryPhone,
-          city: formData.city,
-          country: formData.country,
-          zip_code: formData.zipCode,
-          founded: formData.founded,
-          company_size: formData.companySize,
-          linkedin_url: formData.linkedinUrl,
-          twitter_url: formData.twitterUrl,
-          instagram_url: formData.instagramUrl,
-          facebook_url: formData.facebookUrl,
-          logo_url: formData.logoUrl,
-          contact_name: formData.contactName,
-          primary_email: formData.primaryEmail,
-          alternate_email: formData.alternateEmail,
-          primary_phone: formData.primaryPhone,
-          alternate_phone: formData.alternatePhone,
-          job_title: formData.jobTitle,
-          preferred_contact_method: formData.preferredContactMethod,
-          company_overview: formData.companyOverview,
-          budget_range: formData.budgetRange,
-          short_term_goals: formData.shortTermGoals,
-          long_term_goals: formData.longTermGoals,
-          expectations: formData.expectations,
-          satisfaction_score: formData.satisfactionScore > 0 ? formData.satisfactionScore : null,
-          satisfaction_feedback: formData.satisfactionFeedback,
-          status: formData.status,
-          tags: formData.tags,
-          description: formData.description,
-          csm: formData.csm,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      const clientData = {
+        user_id: user.id,
+        name: formData.contactName || formData.company,
+        company: formData.company,
+        website: formData.website,
+        industry: formData.industry,
+        email: formData.primaryEmail,
+        phone: formData.primaryPhone,
+        city: formData.city,
+        country: formData.country,
+        zip_code: formData.zipCode,
+        founded: formData.founded,
+        company_size: formData.companySize,
+        linkedin_url: formData.linkedinUrl,
+        twitter_url: formData.twitterUrl,
+        instagram_url: formData.instagramUrl,
+        facebook_url: formData.facebookUrl,
+        logo_url: formData.logoUrl,
+        contact_name: formData.contactName,
+        primary_email: formData.primaryEmail,
+        alternate_email: formData.alternateEmail,
+        primary_phone: formData.primaryPhone,
+        alternate_phone: formData.alternatePhone,
+        job_title: formData.jobTitle,
+        preferred_contact_method: formData.preferredContactMethod,
+        company_overview: formData.companyOverview,
+        budget_range: formData.budgetRange,
+        short_term_goals: formData.shortTermGoals,
+        long_term_goals: formData.longTermGoals,
+        expectations: formData.expectations,
+        satisfaction_score: formData.satisfactionScore > 0 ? formData.satisfactionScore : null,
+        satisfaction_feedback: formData.satisfactionFeedback,
+        status: formData.status,
+        tags: formData.tags,
+        description: formData.description,
+        csm: formData.csm,
+        location: formData.city && formData.country ? `${formData.city}, ${formData.country}` : formData.city || formData.country || '',
+        updated_at: new Date().toISOString()
+      };
 
-      if (insertError) throw insertError;
+      if (isEditMode && id) {
+        const { error: updateError } = await supabase
+          .from('clients')
+          .update(clientData)
+          .eq('id', id)
+          .eq('user_id', user.id);
 
-      if (uploadedFiles.length > 0 && newClient) {
-        try {
-          await uploadFilesToStorage(newClient.id);
-          showToast('success', `Client created successfully with ${uploadedFiles.length} document(s)`);
-        } catch (uploadError) {
-          console.error('Error uploading documents:', uploadError);
-          showToast('warning', 'Client created but documents failed to upload');
+        if (updateError) throw updateError;
+
+        if (uploadedFiles.length > 0) {
+          try {
+            await uploadFilesToStorage(id);
+            showToast('success', `Client updated successfully with ${uploadedFiles.length} new document(s)`);
+          } catch (uploadError) {
+            console.error('Error uploading documents:', uploadError);
+            showToast('warning', 'Client updated but documents failed to upload');
+          }
+        } else {
+          showToast('success', 'Client updated successfully');
         }
       } else {
-        showToast('success', 'Client created successfully');
+        const { data: newClient, error: insertError } = await supabase
+          .from('clients')
+          .insert({
+            ...clientData,
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        if (uploadedFiles.length > 0 && newClient) {
+          try {
+            await uploadFilesToStorage(newClient.id);
+            showToast('success', `Client created successfully with ${uploadedFiles.length} document(s)`);
+          } catch (uploadError) {
+            console.error('Error uploading documents:', uploadError);
+            showToast('warning', 'Client created but documents failed to upload');
+          }
+        } else {
+          showToast('success', 'Client created successfully');
+        }
       }
 
       await refreshClients();
@@ -451,6 +547,17 @@ export const AddClient: React.FC = () => {
     { id: 'goals', label: 'Goals & Satisfaction', icon: Target }
   ];
 
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading client data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -464,9 +571,11 @@ export const AddClient: React.FC = () => {
             <ArrowLeft className="h-4 w-4" />
             Back to Clients
           </Button>
-          <h1 className="text-3xl font-bold text-foreground">Add New Client</h1>
+          <h1 className="text-3xl font-bold text-foreground">
+            {isEditMode ? 'Edit Client' : 'Add New Client'}
+          </h1>
           <p className="text-muted-foreground mt-1">
-            Complete all steps to create a comprehensive client profile
+            {isEditMode ? 'Update client information' : 'Complete all steps to create a comprehensive client profile'}
           </p>
         </div>
         <div className="flex items-center gap-3">

@@ -1,22 +1,53 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardContent } from '../components/ui/Card';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { Search, Plus, MoreVertical, Edit, Trash2, Eye } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export const Clients: React.FC = () => {
-  const { clients } = useApp();
+  const { clients, refreshClients } = useApp();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const filteredClients = clients.filter(client => {
     const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           client.company.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
+
+  const handleDeleteClient = async (clientId: string) => {
+    if (!user) return;
+
+    const confirmDelete = window.confirm('Are you sure you want to delete this client? This action cannot be undone.');
+    if (!confirmDelete) return;
+
+    setDeleting(clientId);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      await refreshClients();
+      alert('Client deleted successfully');
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      alert('Failed to delete client. Please try again.');
+    } finally {
+      setDeleting(null);
+      setOpenMenuId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -62,21 +93,32 @@ export const Clients: React.FC = () => {
                       onClick={() => navigate(`/clients/${client.id}`)}
                       className="flex items-center gap-4 flex-1 cursor-pointer"
                     >
-                      <Avatar name={client.name} size="lg" />
+                      <Avatar name={client.company || client.name} size="lg" />
                       <div className="flex-1">
                         <h3 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">
-                          {client.name}
+                          {client.company || client.name}
                         </h3>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          {client.company} • {client.role}
-                        </p>
+                        <div className="flex flex-col gap-1 mt-1">
+                          {client.location && (
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <span className="text-xs">📍</span>
+                              {client.location}
+                            </p>
+                          )}
+                          {client.name && (
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                              <span className="text-xs">👤</span>
+                              {client.name} {client.role && `• ${client.role}`}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-8">
                       <div className="text-right">
-                        <p className="text-sm text-muted-foreground mb-1">Persona Score</p>
-                        <p className="text-3xl font-bold text-primary">{client.personaScore}</p>
+                        <p className="text-sm text-muted-foreground mb-1">Fit Score</p>
+                        <p className="text-3xl font-bold text-primary">{client.personaScore || 0}</p>
                       </div>
 
                       <div className="relative">
@@ -124,15 +166,13 @@ export const Clients: React.FC = () => {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm('Are you sure you want to delete this client?')) {
-                                      console.log('Delete client', client.id);
-                                    }
-                                    setOpenMenuId(null);
+                                    handleDeleteClient(client.id);
                                   }}
-                                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2 text-red-600"
+                                  disabled={deleting === client.id}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded flex items-center gap-2 text-red-600 disabled:opacity-50"
                                 >
                                   <Trash2 className="h-4 w-4" />
-                                  Delete Client
+                                  {deleting === client.id ? 'Deleting...' : 'Delete Client'}
                                 </button>
                               </div>
                             </div>
