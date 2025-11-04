@@ -207,6 +207,11 @@ export const KnowledgeBase: React.FC = () => {
   });
 
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+  const [editingLeaderId, setEditingLeaderId] = useState<string | null>(null);
+  const [editingBlogId, setEditingBlogId] = useState<string | null>(null);
+  const [newTechItem, setNewTechItem] = useState('');
+  const [newPartnerItem, setNewPartnerItem] = useState('');
+  const [newIntegrationItem, setNewIntegrationItem] = useState('');
 
   const addService = () => {
     const newService = {
@@ -231,6 +236,93 @@ export const KnowledgeBase: React.FC = () => {
       const updatedServices = services.filter((_, i) => i !== index);
       setServices(updatedServices);
     }
+  };
+
+  const addLeader = () => {
+    const newLeader = {
+      id: `leader-${Date.now()}`,
+      name: '',
+      role: '',
+      bio: '',
+      linkedinUrl: '',
+      experience: '',
+      education: '',
+      skills: []
+    };
+    setLeadership([...leadership, newLeader]);
+    setEditingLeaderId(newLeader.id);
+  };
+
+  const updateLeader = (index: number, field: string, value: any) => {
+    const updatedLeadership = [...leadership];
+    updatedLeadership[index] = { ...updatedLeadership[index], [field]: value };
+    setLeadership(updatedLeadership);
+  };
+
+  const deleteLeader = (index: number) => {
+    if (confirm('Are you sure you want to delete this leader?')) {
+      const updatedLeadership = leadership.filter((_, i) => i !== index);
+      setLeadership(updatedLeadership);
+    }
+  };
+
+  const addBlog = () => {
+    const newBlog = {
+      id: `blog-${Date.now()}`,
+      title: '',
+      url: '',
+      date: '',
+      summary: '',
+      author: ''
+    };
+    setBlogs([...blogs, newBlog]);
+    setEditingBlogId(newBlog.id);
+  };
+
+  const updateBlog = (index: number, field: string, value: any) => {
+    const updatedBlogs = [...blogs];
+    updatedBlogs[index] = { ...updatedBlogs[index], [field]: value };
+    setBlogs(updatedBlogs);
+  };
+
+  const deleteBlog = (index: number) => {
+    if (confirm('Are you sure you want to delete this blog?')) {
+      const updatedBlogs = blogs.filter((_, i) => i !== index);
+      setBlogs(updatedBlogs);
+    }
+  };
+
+  const addTechItem = () => {
+    if (newTechItem.trim()) {
+      setTechnology({ ...technology, stack: [...technology.stack, newTechItem.trim()] });
+      setNewTechItem('');
+    }
+  };
+
+  const removeTechItem = (index: number) => {
+    setTechnology({ ...technology, stack: technology.stack.filter((_, i) => i !== index) });
+  };
+
+  const addPartner = () => {
+    if (newPartnerItem.trim()) {
+      setTechnology({ ...technology, partners: [...technology.partners, newPartnerItem.trim()] });
+      setNewPartnerItem('');
+    }
+  };
+
+  const removePartner = (index: number) => {
+    setTechnology({ ...technology, partners: technology.partners.filter((_, i) => i !== index) });
+  };
+
+  const addIntegration = () => {
+    if (newIntegrationItem.trim()) {
+      setTechnology({ ...technology, integrations: [...technology.integrations, newIntegrationItem.trim()] });
+      setNewIntegrationItem('');
+    }
+  };
+
+  const removeIntegration = (index: number) => {
+    setTechnology({ ...technology, integrations: technology.integrations.filter((_, i) => i !== index) });
   };
 
   const handleSave = async () => {
@@ -858,88 +950,293 @@ export const KnowledgeBase: React.FC = () => {
       {activeTab === 'team' && (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <Button variant="primary">
+            <Button variant="primary" onClick={addLeader}>
               <Plus className="h-4 w-4 mr-2" />
               Add Leader
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {leadership.map((member) => (
-              <Card key={member.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground mb-1">
-                        {member.name}
-                      </h3>
-                      <p className="text-sm text-primary font-medium mb-2">
-                        {member.role}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+          {leadership.length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Users className="h-12 w-12 mx-auto mb-3 text-slate-400" />
+                <p className="text-slate-600 mb-2">No leadership members added yet</p>
+                <p className="text-sm text-slate-500">Click "Add Leader" to add team members</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {leadership.map((member, index) => {
+                const isEditing = editingLeaderId === member.id;
+                return (
+                  <Card key={member.id}>
+                    <CardContent className="p-6">
+                      {isEditing ? (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Name</label>
+                            <Input
+                              type="text"
+                              value={member.name}
+                              onChange={(e) => updateLeader(index, 'name', e.target.value)}
+                              placeholder="Full name"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Role/Title</label>
+                            <Input
+                              type="text"
+                              value={member.role}
+                              onChange={(e) => updateLeader(index, 'role', e.target.value)}
+                              placeholder="e.g., CEO, CTO, Founder"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">LinkedIn URL</label>
+                            <Input
+                              type="url"
+                              value={member.linkedinUrl || ''}
+                              onChange={(e) => updateLeader(index, 'linkedinUrl', e.target.value)}
+                              placeholder="https://linkedin.com/in/..."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Bio</label>
+                            <textarea
+                              className="w-full min-h-[80px] p-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                              value={member.bio}
+                              onChange={(e) => updateLeader(index, 'bio', e.target.value)}
+                              placeholder="Brief biography..."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Experience</label>
+                            <Input
+                              type="text"
+                              value={member.experience || ''}
+                              onChange={(e) => updateLeader(index, 'experience', e.target.value)}
+                              placeholder="Years of experience or background"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setEditingLeaderId(null)}>
+                              Done
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <h3 className="text-lg font-semibold text-foreground mb-1">
+                                {member.name || 'Unnamed Leader'}
+                              </h3>
+                              <p className="text-sm text-primary font-medium mb-2">
+                                {member.role || 'No role specified'}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" onClick={() => setEditingLeaderId(member.id)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => deleteLeader(index)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
 
-                  <div className="space-y-2 text-sm">
-                    {member.bio && (
-                      <div>
-                        <span className="font-medium text-foreground">Bio:</span>
-                        <p className="text-muted-foreground">{member.bio}</p>
-                      </div>
-                    )}
-                    {member.experience && (
-                      <div>
-                        <span className="font-medium text-foreground">Experience:</span>
-                        <span className="text-muted-foreground ml-2">{member.experience}</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                          <div className="space-y-2 text-sm">
+                            {member.bio && (
+                              <div>
+                                <span className="font-medium text-foreground">Bio:</span>
+                                <p className="text-muted-foreground">{member.bio}</p>
+                              </div>
+                            )}
+                            {member.experience && (
+                              <div>
+                                <span className="font-medium text-foreground">Experience:</span>
+                                <span className="text-muted-foreground ml-2">{member.experience}</span>
+                              </div>
+                            )}
+                            {member.linkedinUrl && (
+                              <div>
+                                <a href={member.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs">
+                                  <Linkedin className="h-3 w-3 inline mr-1" />
+                                  LinkedIn Profile
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {leadership.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
+                {saved ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Saved!
+                  </>
+                ) : saving ? (
+                  'Saving...'
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Leadership
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
       {activeTab === 'blogs' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4">
-            {blogs.map((blog) => (
-              <Card key={blog.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-foreground mb-2">
-                        {blog.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        {blog.summary}
-                      </p>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        {blog.date && <span>{blog.date}</span>}
-                        {blog.author && <span>By {blog.author}</span>}
-                        {blog.url && (
-                          <a href={blog.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                            Read More →
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex justify-end">
+            <Button variant="primary" onClick={addBlog}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Blog Article
+            </Button>
           </div>
+
+          {blogs.length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <FileText className="h-12 w-12 mx-auto mb-3 text-slate-400" />
+                <p className="text-slate-600 mb-2">No blog articles added yet</p>
+                <p className="text-sm text-slate-500">Click "Add Blog Article" to add content</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {blogs.map((blog, index) => {
+                const isEditing = editingBlogId === blog.id;
+                return (
+                  <Card key={blog.id}>
+                    <CardContent className="p-6">
+                      {isEditing ? (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Title</label>
+                            <Input
+                              type="text"
+                              value={blog.title}
+                              onChange={(e) => updateBlog(index, 'title', e.target.value)}
+                              placeholder="Article title"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">URL</label>
+                            <Input
+                              type="url"
+                              value={blog.url}
+                              onChange={(e) => updateBlog(index, 'url', e.target.value)}
+                              placeholder="https://yourblog.com/article"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-foreground mb-2">Date</label>
+                              <Input
+                                type="text"
+                                value={blog.date}
+                                onChange={(e) => updateBlog(index, 'date', e.target.value)}
+                                placeholder="e.g., Jan 15, 2024"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-foreground mb-2">Author</label>
+                              <Input
+                                type="text"
+                                value={blog.author}
+                                onChange={(e) => updateBlog(index, 'author', e.target.value)}
+                                placeholder="Author name"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">Summary</label>
+                            <textarea
+                              className="w-full min-h-[80px] p-3 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                              value={blog.summary}
+                              onChange={(e) => updateBlog(index, 'summary', e.target.value)}
+                              placeholder="Brief summary of the article..."
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setEditingBlogId(null)}>
+                              Done
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-foreground mb-2">
+                              {blog.title || 'Untitled Article'}
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-3">
+                              {blog.summary}
+                            </p>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              {blog.date && <span>{blog.date}</span>}
+                              {blog.author && <span>By {blog.author}</span>}
+                              {blog.url && (
+                                <a
+                                  href={blog.url.startsWith('http') ? blog.url : `https://${blog.url}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline"
+                                >
+                                  Read More →
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setEditingBlogId(blog.id)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => deleteBlog(index)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {blogs.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
+                {saved ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Saved!
+                  </>
+                ) : saving ? (
+                  'Saving...'
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Blogs
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -951,42 +1248,123 @@ export const KnowledgeBase: React.FC = () => {
           <CardContent>
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label className="block text-sm font-medium text-foreground mb-3">
                   Technology Stack
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {technology.stack.map((tech, idx) => (
-                    <Badge key={idx} variant="secondary">
-                      {tech}
-                    </Badge>
-                  ))}
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    type="text"
+                    value={newTechItem}
+                    onChange={(e) => setNewTechItem(e.target.value)}
+                    placeholder="e.g., React, Node.js, Python"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addTechItem();
+                      }
+                    }}
+                  />
+                  <Button variant="primary" onClick={addTechItem}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
+                {technology.stack.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No technologies added yet</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {technology.stack.map((tech, idx) => (
+                      <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm">
+                        <span>{tech}</span>
+                        <button
+                          onClick={() => removeTechItem(idx)}
+                          className="hover:text-blue-900"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label className="block text-sm font-medium text-foreground mb-3">
                   Partners
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {technology.partners.map((partner, idx) => (
-                    <Badge key={idx} variant="secondary">
-                      {partner}
-                    </Badge>
-                  ))}
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    type="text"
+                    value={newPartnerItem}
+                    onChange={(e) => setNewPartnerItem(e.target.value)}
+                    placeholder="e.g., AWS, Microsoft, Google"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addPartner();
+                      }
+                    }}
+                  />
+                  <Button variant="primary" onClick={addPartner}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
+                {technology.partners.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No partners added yet</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {technology.partners.map((partner, idx) => (
+                      <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm">
+                        <span>{partner}</span>
+                        <button
+                          onClick={() => removePartner(idx)}
+                          className="hover:text-green-900"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
+                <label className="block text-sm font-medium text-foreground mb-3">
                   Integrations
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {technology.integrations.map((integration, idx) => (
-                    <Badge key={idx} variant="secondary">
-                      {integration}
-                    </Badge>
-                  ))}
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    type="text"
+                    value={newIntegrationItem}
+                    onChange={(e) => setNewIntegrationItem(e.target.value)}
+                    placeholder="e.g., Salesforce, Slack, Zapier"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addIntegration();
+                      }
+                    }}
+                  />
+                  <Button variant="primary" onClick={addIntegration}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
+                {technology.integrations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No integrations added yet</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {technology.integrations.map((integration, idx) => (
+                      <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-purple-50 text-purple-700 rounded-full text-sm">
+                        <span>{integration}</span>
+                        <button
+                          onClick={() => removeIntegration(idx)}
+                          className="hover:text-purple-900"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
