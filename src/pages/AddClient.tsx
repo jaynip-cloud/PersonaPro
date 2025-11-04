@@ -398,7 +398,10 @@ export const AddClient: React.FC = () => {
 
     for (const file of uploadedFiles) {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${clientId}/${Date.now()}-${file.name}`;
+      const sanitizedFileName = file.name
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .replace(/_{2,}/g, '_');
+      const fileName = `${user.id}/${clientId}/${Date.now()}_${sanitizedFileName}`;
 
       const { data, error } = await supabase.storage
         .from('client-documents')
