@@ -32,6 +32,7 @@ export const Settings: React.FC = () => {
   const [showPerplexityKey, setShowPerplexityKey] = useState(false);
   const [isLoadingKeys, setIsLoadingKeys] = useState(false);
   const [isSavingKeys, setIsSavingKeys] = useState(false);
+  const [keysLoaded, setKeysLoaded] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -44,10 +45,22 @@ export const Settings: React.FC = () => {
     }
   }, [user, activeTab]);
 
+  useEffect(() => {
+    if (!user || activeTab !== 'api' || !keysLoaded) return;
+    if (!openaiKey && !perplexityKey) return;
+
+    const timeoutId = setTimeout(() => {
+      saveApiKeys();
+    }, 1500);
+
+    return () => clearTimeout(timeoutId);
+  }, [openaiKey, perplexityKey, keysLoaded]);
+
   const loadApiKeys = async () => {
     if (!user) return;
 
     setIsLoadingKeys(true);
+    setKeysLoaded(false);
     try {
       const { data, error } = await supabase
         .from('api_keys')
@@ -65,6 +78,7 @@ export const Settings: React.FC = () => {
       console.error('Error loading API keys:', error);
     } finally {
       setIsLoadingKeys(false);
+      setTimeout(() => setKeysLoaded(true), 100);
     }
   };
 
@@ -614,40 +628,56 @@ export const Settings: React.FC = () => {
                     </div>
 
                     <div className="flex items-center justify-between pt-4 border-t border-border">
-                      <div className="text-sm text-muted-foreground">
-                        {openaiKey && perplexityKey ? (
-                          <span className="text-green-600 flex items-center gap-1">
-                            <CheckCircle className="h-4 w-4" />
-                            Both keys configured (Full features)
-                          </span>
-                        ) : openaiKey ? (
-                          <span className="text-blue-600 flex items-center gap-1">
-                            <CheckCircle className="h-4 w-4" />
-                            OpenAI configured (Basic features)
-                          </span>
-                        ) : (
-                          <span className="text-orange-600 flex items-center gap-1">
-                            <AlertTriangle className="h-4 w-4" />
-                            No keys configured
-                          </span>
-                        )}
+                      <div className="flex items-center gap-4">
+                        <div className="text-sm text-muted-foreground">
+                          {openaiKey && perplexityKey ? (
+                            <span className="text-green-600 flex items-center gap-1">
+                              <CheckCircle className="h-4 w-4" />
+                              Both keys configured (Full features)
+                            </span>
+                          ) : openaiKey ? (
+                            <span className="text-blue-600 flex items-center gap-1">
+                              <CheckCircle className="h-4 w-4" />
+                              OpenAI configured (Basic features)
+                            </span>
+                          ) : (
+                            <span className="text-orange-600 flex items-center gap-1">
+                              <AlertTriangle className="h-4 w-4" />
+                              No keys configured
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-1">
+                          {isSavingKeys ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                              <span>Auto-saving...</span>
+                            </>
+                          ) : saved ? (
+                            <>
+                              <CheckCircle className="h-3 w-3 text-green-600" />
+                              <span className="text-green-600">Saved automatically</span>
+                            </>
+                          ) : keysLoaded && (openaiKey || perplexityKey) ? (
+                            <span className="text-slate-400">Changes save automatically</span>
+                          ) : null}
+                        </div>
                       </div>
                       <Button
-                        variant="primary"
+                        variant="outline"
                         onClick={handleSave}
-                        disabled={saved || isSavingKeys || (!openaiKey && !perplexityKey)}
+                        disabled={isSavingKeys || (!openaiKey && !perplexityKey)}
+                        className="text-sm"
                       >
                         {isSavingKeys ? (
-                          'Saving...'
-                        ) : saved ? (
                           <>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Saved!
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                            Saving...
                           </>
                         ) : (
                           <>
                             <Save className="h-4 w-4 mr-2" />
-                            Save API Keys
+                            Save Now
                           </>
                         )}
                       </Button>
