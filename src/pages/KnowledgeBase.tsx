@@ -34,7 +34,15 @@ import {
   Target,
   Zap,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Activity,
+  Brain,
+  Shield,
+  Award,
+  Smile,
+  Meh,
+  Frown,
+  Gauge
 } from 'lucide-react';
 
 type TabType = 'overview' | 'ai-extract' | 'company' | 'contact' | 'social' | 'services' | 'team' | 'blogs' | 'technology';
@@ -714,6 +722,191 @@ export const KnowledgeBase: React.FC = () => {
                         <CardContent className="p-6">
                           <h3 className="text-lg font-semibold text-foreground mb-3">Technology Assessment</h3>
                           <p className="text-sm text-muted-foreground leading-relaxed">{aiInsights.techStack}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+
+                  {aiInsights.kpis && (
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-2 mb-6">
+                          <Gauge className="h-5 w-5 text-blue-600" />
+                          <h3 className="text-lg font-semibold text-foreground">Key Performance Indicators</h3>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          {Object.entries(aiInsights.kpis).map(([key, value]: [string, any]) => {
+                            const score = typeof value === 'number' ? value : 0;
+                            const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                            const getColor = (score: number) => {
+                              if (score >= 75) return 'text-green-600 bg-green-50 border-green-200';
+                              if (score >= 50) return 'text-blue-600 bg-blue-50 border-blue-200';
+                              if (score >= 25) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+                              return 'text-red-600 bg-red-50 border-red-200';
+                            };
+                            return (
+                              <div key={key} className={`p-4 rounded-lg border-2 ${getColor(score)}`}>
+                                <div className="text-xs font-medium mb-2">{label}</div>
+                                <div className="flex items-end gap-2">
+                                  <span className="text-3xl font-bold">{score}</span>
+                                  <span className="text-sm pb-1">/100</span>
+                                </div>
+                                <div className="mt-2 h-2 bg-white rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-current transition-all"
+                                    style={{ width: `${score}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {aiInsights.sentiment && (
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-2 mb-6">
+                          <Activity className="h-5 w-5 text-purple-600" />
+                          <h3 className="text-lg font-semibold text-foreground">Sentiment Analysis</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                {aiInsights.sentiment.overall === 'positive' && <Smile className="h-8 w-8 text-green-600" />}
+                                {aiInsights.sentiment.overall === 'neutral' && <Meh className="h-8 w-8 text-yellow-600" />}
+                                {aiInsights.sentiment.overall === 'negative' && <Frown className="h-8 w-8 text-red-600" />}
+                                <div>
+                                  <div className="text-sm text-muted-foreground">Overall Sentiment</div>
+                                  <div className="text-lg font-semibold text-foreground capitalize">
+                                    {aiInsights.sentiment.overall}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-2xl font-bold text-foreground">{aiInsights.sentiment.score}</div>
+                                <div className="text-xs text-muted-foreground">Score</div>
+                              </div>
+                            </div>
+                            <div className="p-4 bg-slate-50 rounded-lg">
+                              <div className="text-sm text-muted-foreground mb-1">Brand Tone</div>
+                              <div className="text-base font-semibold text-foreground capitalize">
+                                {aiInsights.sentiment.brandTone}
+                              </div>
+                            </div>
+                            <div className="p-4 bg-slate-50 rounded-lg">
+                              <div className="text-sm text-muted-foreground mb-1">Confidence Level</div>
+                              <div className="text-base font-semibold text-foreground capitalize">
+                                {aiInsights.sentiment.confidenceLevel}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center">
+                            <div className="w-full">
+                              <div className="text-sm font-medium text-foreground mb-2">Market Perception</div>
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                {aiInsights.sentiment.marketPerception}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {aiInsights.behaviorAnalysis && (
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-2 mb-6">
+                          <Brain className="h-5 w-5 text-indigo-600" />
+                          <h3 className="text-lg font-semibold text-foreground">Behavioral Analysis</h3>
+                        </div>
+                        <div className="space-y-4">
+                          {aiInsights.behaviorAnalysis.contentBehavior && (
+                            <div className="p-4 bg-slate-50 rounded-lg">
+                              <div className="text-sm font-medium text-foreground mb-2">Content Behavior</div>
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                {aiInsights.behaviorAnalysis.contentBehavior}
+                              </p>
+                            </div>
+                          )}
+                          {aiInsights.behaviorAnalysis.marketApproach && (
+                            <div className="p-4 bg-slate-50 rounded-lg">
+                              <div className="text-sm font-medium text-foreground mb-2">Market Approach</div>
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                {aiInsights.behaviorAnalysis.marketApproach}
+                              </p>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-3 gap-4">
+                            {aiInsights.behaviorAnalysis.innovationLevel && (
+                              <div className="p-4 bg-slate-50 rounded-lg text-center">
+                                <div className="text-xs text-muted-foreground mb-1">Innovation</div>
+                                <div className="text-sm font-semibold text-foreground capitalize">
+                                  {aiInsights.behaviorAnalysis.innovationLevel}
+                                </div>
+                              </div>
+                            )}
+                            {aiInsights.behaviorAnalysis.customerFocus && (
+                              <div className="p-4 bg-slate-50 rounded-lg">
+                                <div className="text-xs text-muted-foreground mb-2">Customer Focus</div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  {aiInsights.behaviorAnalysis.customerFocus}
+                                </p>
+                              </div>
+                            )}
+                            {aiInsights.behaviorAnalysis.growthOrientation && (
+                              <div className="p-4 bg-slate-50 rounded-lg">
+                                <div className="text-xs text-muted-foreground mb-2">Growth Orientation</div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  {aiInsights.behaviorAnalysis.growthOrientation}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {aiInsights.riskFactors && aiInsights.riskFactors.length > 0 && (
+                      <Card>
+                        <CardContent className="p-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Shield className="h-5 w-5 text-orange-600" />
+                            <h3 className="text-lg font-semibold text-foreground">Risk Factors</h3>
+                          </div>
+                          <ul className="space-y-2">
+                            {aiInsights.riskFactors.map((risk: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <AlertCircle className="h-4 w-4 text-orange-600 flex-shrink-0 mt-1" />
+                                <span className="text-sm text-muted-foreground">{risk}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {aiInsights.competitiveEdge && aiInsights.competitiveEdge.length > 0 && (
+                      <Card>
+                        <CardContent className="p-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Award className="h-5 w-5 text-yellow-600" />
+                            <h3 className="text-lg font-semibold text-foreground">Competitive Edge</h3>
+                          </div>
+                          <ul className="space-y-2">
+                            {aiInsights.competitiveEdge.map((edge: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <Award className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-1" />
+                                <span className="text-sm text-muted-foreground">{edge}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </CardContent>
                       </Card>
                     )}

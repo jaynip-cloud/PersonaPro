@@ -60,7 +60,7 @@ Deno.serve(async (req: Request) => {
 
     const companyData: CompanyProfile = profile;
 
-    const prompt = `You are a business intelligence analyst. Analyze the following company data and provide comprehensive insights.
+    const prompt = `You are a business intelligence analyst specializing in behavioral analysis, sentiment analysis, and KPI assessment. Analyze the following company data comprehensively.
 
 Company: ${companyData.company_name || 'Not specified'}
 Industry: ${companyData.industry || 'Not specified'}
@@ -74,7 +74,7 @@ Technology Stack: ${JSON.stringify(companyData.technology?.stack || [])}
 Partners: ${JSON.stringify(companyData.technology?.partners || [])}
 Integrations: ${JSON.stringify(companyData.technology?.integrations || [])}
 
-Provide insights in the following JSON format:
+Provide comprehensive insights in the following JSON format:
 {
   "summary": "Brief 2-3 sentence overview of the company",
   "strengths": ["List of 3-5 key strengths"],
@@ -82,10 +82,34 @@ Provide insights in the following JSON format:
   "marketPosition": "Analysis of market position and competitive advantage",
   "recommendations": ["List of 3-5 strategic recommendations"],
   "contentStrategy": "Insights based on blog content and thought leadership",
-  "techStack": "Analysis of technology choices and capabilities"
+  "techStack": "Analysis of technology choices and capabilities",
+  "kpis": {
+    "contentScore": number (0-100, based on blog quality and quantity),
+    "teamStrength": number (0-100, based on leadership experience and size),
+    "techModernity": number (0-100, based on technology stack modernity),
+    "marketReadiness": number (0-100, based on services and positioning),
+    "brandPresence": number (0-100, based on overall online presence),
+    "growthPotential": number (0-100, based on opportunities and capabilities)
+  },
+  "sentiment": {
+    "overall": "positive" | "neutral" | "negative",
+    "score": number (0-100, overall sentiment score),
+    "brandTone": "professional" | "casual" | "technical" | "innovative" | "traditional",
+    "marketPerception": "Analysis of how the company is likely perceived in the market",
+    "confidenceLevel": "high" | "medium" | "low"
+  },
+  "behaviorAnalysis": {
+    "contentBehavior": "Analysis of content creation patterns and thought leadership approach",
+    "marketApproach": "Analysis of market positioning and targeting strategy",
+    "innovationLevel": "conservative" | "moderate" | "aggressive",
+    "customerFocus": "Analysis of customer-centric approach based on services and messaging",
+    "growthOrientation": "Analysis of growth mindset and expansion readiness"
+  },
+  "riskFactors": ["List of 2-4 potential risks or challenges"],
+  "competitiveEdge": ["List of 2-3 unique differentiators"]
 }
 
-Respond ONLY with valid JSON.`;
+Respond ONLY with valid JSON. Ensure all scores are realistic and based on the actual data provided.`;
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -98,7 +122,7 @@ Respond ONLY with valid JSON.`;
         messages: [
           {
             role: 'system',
-            content: 'You are a business intelligence analyst providing actionable insights. Always respond with valid JSON only.',
+            content: 'You are a business intelligence analyst providing actionable insights with behavioral and sentiment analysis. Always respond with valid JSON only.',
           },
           {
             role: 'user',
@@ -106,7 +130,7 @@ Respond ONLY with valid JSON.`;
           },
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 3000,
       }),
     });
 
