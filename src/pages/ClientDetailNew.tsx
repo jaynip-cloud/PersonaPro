@@ -273,6 +273,39 @@ export const ClientDetailNew: React.FC = () => {
     }
   };
 
+  const handleDeleteDocument = async (document: any) => {
+    if (!user) return;
+
+    const confirmDelete = window.confirm(`Are you sure you want to delete "${document.name}"? This action cannot be undone.`);
+    if (!confirmDelete) return;
+
+    try {
+      if (document.source) {
+        const { error: storageError } = await supabase.storage
+          .from('client-documents')
+          .remove([document.source]);
+
+        if (storageError) {
+          console.error('Error deleting file from storage:', storageError);
+        }
+      }
+
+      const { error } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', document.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setUploadedDocuments(prev => prev.filter(d => d.id !== document.id));
+      showToast('success', 'Document deleted successfully');
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      showToast('error', 'Failed to delete document');
+    }
+  };
+
   const handleDocumentUpload = async (files: File[]) => {
     if (!client || !user || files.length === 0) return;
 
@@ -1191,14 +1224,24 @@ Client Information:
                                 </span>
                               </div>
                             </div>
-                            <a
-                              href={doc.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary hover:text-primary/80 transition-colors"
-                            >
-                              <Download className="h-4 w-4" />
-                            </a>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={doc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:text-primary/80 transition-colors"
+                                title="Download document"
+                              >
+                                <Download className="h-4 w-4" />
+                              </a>
+                              <button
+                                onClick={() => handleDeleteDocument(doc)}
+                                className="text-muted-foreground hover:text-red-600 transition-colors"
+                                title="Delete document"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
