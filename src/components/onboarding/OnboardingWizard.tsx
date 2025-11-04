@@ -326,14 +326,65 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     }
   };
 
-  const handleNext = () => {
+  const autoSaveData = async () => {
+    if (!user) return;
+
+    try {
+      const servicesJson = formData.services.map(service => ({
+        id: service.id || `service-${Date.now()}-${Math.random()}`,
+        name: service.name || '',
+        description: service.description || '',
+        tags: service.tags || [],
+        pricing: service.pricing || ''
+      }));
+
+      await supabase
+        .from('company_profiles')
+        .update({
+          company_name: formData.companyName,
+          website: formData.website,
+          industry: formData.industry,
+          about: formData.description,
+          value_proposition: formData.valueProposition,
+          founded: formData.founded,
+          location: formData.location,
+          size: formData.size,
+          mission: formData.mission,
+          vision: formData.vision,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          linkedin_url: formData.linkedinUrl,
+          twitter_url: formData.twitterUrl,
+          facebook_url: formData.facebookUrl,
+          instagram_url: formData.instagramUrl,
+          youtube_url: formData.youtubeUrl,
+          services: servicesJson,
+          leadership: formData.leadership,
+          blogs: formData.blogs,
+          technology: {
+            stack: formData.techStack,
+            partners: formData.partners,
+            integrations: formData.integrations
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+    } catch (error) {
+      console.error('Error auto-saving data:', error);
+    }
+  };
+
+  const handleNext = async () => {
     if (currentStep < totalSteps) {
+      await autoSaveData();
       setCurrentStep(prev => prev + 1);
     }
   };
 
-  const handleBack = () => {
+  const handleBack = async () => {
     if (currentStep > 1) {
+      await autoSaveData();
       setCurrentStep(prev => prev - 1);
     }
   };
