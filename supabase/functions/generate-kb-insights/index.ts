@@ -78,29 +78,84 @@ Deno.serve(async (req: Request) => {
       console.log('No documents found');
     }
 
-    // Perform web search for company information
+    // Perform web search for company information using Perplexity API
     let webSearchContext = '';
     if (companyData.company_name) {
       try {
-        const searchQuery = `${companyData.company_name} ${companyData.industry || ''} company information`;
-        const searchResponse = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(searchQuery)}`, {
-          headers: {
-            'Accept': 'application/json',
-            'X-Subscription-Token': Deno.env.get('BRAVE_SEARCH_API_KEY') || ''
-          }
-        });
+        const perplexityKey = Deno.env.get('PERPLEXITY_API_KEY');
 
-        if (searchResponse.ok) {
-          const searchData = await searchResponse.json();
-          if (searchData.web?.results?.length > 0) {
-            webSearchContext = '\n\nExternal Web Search Results:\n';
-            searchData.web.results.slice(0, 5).forEach((result: any) => {
-              webSearchContext += `\nTitle: ${result.title}\nURL: ${result.url}\nDescription: ${result.description}\n`;
-            });
+        if (perplexityKey) {
+          const searchQuery = `Find comprehensive information about ${companyData.company_name}, a company in the ${companyData.industry || 'technology'} industry. Include: company overview, recent news, market presence, funding information, notable achievements, and online visibility.`;
+
+          const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${perplexityKey}`
+            },
+            body: JSON.stringify({
+              model: 'llama-3.1-sonar-small-128k-online',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a research assistant. Provide factual, concise information about companies based on current web data.'
+                },
+                {
+                  role: 'user',
+                  content: searchQuery
+                }
+              ],
+              temperature: 0.2,
+              max_tokens: 1000
+            })
+          });
+
+          if (perplexityResponse.ok) {
+            const perplexityData = await perplexityResponse.json();
+            const searchResults = perplexityData.choices[0]?.message?.content;
+
+            if (searchResults) {
+              webSearchContext = `\n\nExternal Web Research (via Perplexity):\n${searchResults}\n`;
+            }
+          }
+        } else {
+          // Fallback to OpenAI for web information (using existing openaiKey)
+          const searchQuery = `Based on your knowledge, provide a brief overview of ${companyData.company_name} in the ${companyData.industry || 'technology'} industry. Include any known information about their market presence, reputation, and notable characteristics. If you don't have specific information, indicate that.`;
+
+          const fallbackResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${openaiKey}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a business research assistant. Provide factual information if known, or clearly state if information is not available.'
+                },
+                {
+                  role: 'user',
+                  content: searchQuery
+                }
+              ],
+              temperature: 0.3,
+              max_tokens: 500
+            })
+          });
+
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            const searchResults = fallbackData.choices[0]?.message?.content;
+
+            if (searchResults) {
+              webSearchContext = `\n\nExternal Context (OpenAI Knowledge Base):\n${searchResults}\n`;
+            }
           }
         }
       } catch (e) {
-        console.log('Web search not available:', e);
+        console.log('External search not available:', e);
       }
     }
 
