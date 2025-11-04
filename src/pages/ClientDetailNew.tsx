@@ -144,8 +144,8 @@ export const ClientDetailNew: React.FC = () => {
   };
 
   const handleSaveContact = async () => {
-    if (!client || !newContactForm.name || !newContactForm.email) {
-      showToast('error', 'Please fill in name and email');
+    if (!client || !newContactForm.name || !newContactForm.email || !newContactForm.role) {
+      showToast('error', 'Please fill in name, email, and role');
       return;
     }
 
@@ -1157,7 +1157,7 @@ export const ClientDetailNew: React.FC = () => {
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Job Title / Role
+              Job Title / Role <span className="text-red-600">*</span>
             </label>
             <Input
               placeholder="VP of Engineering"
@@ -1212,7 +1212,7 @@ export const ClientDetailNew: React.FC = () => {
             <Button
               variant="primary"
               onClick={handleSaveContact}
-              disabled={savingContact || !newContactForm.name || !newContactForm.email}
+              disabled={savingContact || !newContactForm.name || !newContactForm.email || !newContactForm.role}
             >
               {savingContact ? (
                 <>
