@@ -459,21 +459,11 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Industry <span className="text-red-600">*</span>
                   </label>
-                  <select
+                  <Input
+                    placeholder="e.g., Technology, Healthcare, Finance"
                     value={formData.industry}
                     onChange={(e) => handleChange('industry', e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Industry</option>
-                    <option value="Technology">Technology</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Healthcare">Healthcare</option>
-                    <option value="Retail">Retail</option>
-                    <option value="Manufacturing">Manufacturing</option>
-                    <option value="Education">Education</option>
-                    <option value="Real Estate">Real Estate</option>
-                    <option value="Other">Other</option>
-                  </select>
+                  />
                   {errors.industry && (
                     <p className="text-xs text-red-600 mt-1">{errors.industry}</p>
                   )}
@@ -483,19 +473,11 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   <label className="block text-sm font-medium text-slate-700 mb-2">
                     Company Size
                   </label>
-                  <select
+                  <Input
+                    placeholder="e.g., 50-200 employees, 1000+ employees"
                     value={formData.companySize}
                     onChange={(e) => handleChange('companySize', e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Size</option>
-                    <option value="1-10">1-10 employees</option>
-                    <option value="11-50">11-50 employees</option>
-                    <option value="51-200">51-200 employees</option>
-                    <option value="201-500">201-500 employees</option>
-                    <option value="501-1000">501-1000 employees</option>
-                    <option value="1000+">1000+ employees</option>
-                  </select>
+                  />
                 </div>
 
                 <div>
@@ -539,33 +521,6 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                     placeholder="2020"
                     value={formData.founded}
                     onChange={(e) => handleChange('founded', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Status
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => handleChange('status', e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="prospect">Prospect</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="churned">Churned</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Assigned CSM
-                  </label>
-                  <Input
-                    placeholder="John Doe"
-                    value={formData.csm}
-                    onChange={(e) => handleChange('csm', e.target.value)}
                   />
                 </div>
 
