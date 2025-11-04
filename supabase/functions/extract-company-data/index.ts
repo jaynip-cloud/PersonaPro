@@ -8,6 +8,7 @@ const corsHeaders = {
 
 interface RequestBody {
   url: string;
+  perplexityKey?: string;
 }
 
 interface CrawlResult {
@@ -27,7 +28,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { url }: RequestBody = await req.json();
+    const { url, perplexityKey: requestKey }: RequestBody = await req.json();
 
     if (!url) {
       return new Response(
@@ -39,13 +40,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const perplexityKey = Deno.env.get('PERPLEXITY_API_KEY');
+    const perplexityKey = requestKey || Deno.env.get('PERPLEXITY_API_KEY');
 
     if (!perplexityKey) {
       return new Response(
-        JSON.stringify({ success: false, error: "Perplexity API key not configured" }),
+        JSON.stringify({ success: false, error: "Perplexity API key not provided. Please provide it in the request or configure it as an environment variable." }),
         {
-          status: 500,
+          status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );

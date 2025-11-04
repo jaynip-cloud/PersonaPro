@@ -354,105 +354,45 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          url: formData.website
+          url: formData.website,
+          perplexityKey: perplexityKey
         })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to extract data');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to extract data');
       }
 
-      const extractedData = await response.json();
+      const result = await response.json();
 
-      if (extractedData.companyInfo) {
-        setFormData(prev => ({
-          ...prev,
-          companyName: extractedData.companyInfo.name || prev.companyName,
-          industry: extractedData.companyInfo.industry || prev.industry,
-          description: extractedData.companyInfo.description || prev.description,
-          valueProposition: extractedData.companyInfo.valueProposition || prev.valueProposition,
-          founded: extractedData.companyInfo.founded || prev.founded,
-          location: extractedData.companyInfo.location || prev.location,
-          size: extractedData.companyInfo.size || prev.size,
-          mission: extractedData.companyInfo.mission || prev.mission,
-          vision: extractedData.companyInfo.vision || prev.vision,
-        }));
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to extract data');
       }
 
-      if (extractedData.contactInfo) {
-        setFormData(prev => ({
-          ...prev,
-          email: extractedData.contactInfo.email || prev.email,
-          phone: extractedData.contactInfo.phone || prev.phone,
-          address: extractedData.contactInfo.address || prev.address,
-        }));
-      }
+      const extractedData = result.data;
 
-      if (extractedData.socialProfiles) {
-        setFormData(prev => ({
-          ...prev,
-          linkedinUrl: extractedData.socialProfiles.linkedin || prev.linkedinUrl,
-          twitterUrl: extractedData.socialProfiles.twitter || prev.twitterUrl,
-          facebookUrl: extractedData.socialProfiles.facebook || prev.facebookUrl,
-          instagramUrl: extractedData.socialProfiles.instagram || prev.instagramUrl,
-          youtubeUrl: extractedData.socialProfiles.youtube || prev.youtubeUrl,
-        }));
-      }
+      setFormData(prev => ({
+        ...prev,
+        companyName: extractedData.name || prev.companyName,
+        industry: extractedData.industry || prev.industry,
+        description: extractedData.description || prev.description,
+        founded: extractedData.founded || prev.founded,
+        size: extractedData.companySize || prev.size,
+        location: extractedData.location?.city && extractedData.location?.country
+          ? `${extractedData.location.city}, ${extractedData.location.country}`
+          : prev.location,
+        email: extractedData.contactInfo?.primaryEmail || prev.email,
+        phone: extractedData.contactInfo?.primaryPhone || prev.phone,
+        linkedinUrl: extractedData.socialProfiles?.linkedin || prev.linkedinUrl,
+        twitterUrl: extractedData.socialProfiles?.twitter || prev.twitterUrl,
+        facebookUrl: extractedData.socialProfiles?.facebook || prev.facebookUrl,
+        instagramUrl: extractedData.socialProfiles?.instagram || prev.instagramUrl,
+      }));
 
-      if (extractedData.services && extractedData.services.length > 0) {
-        const newServices = extractedData.services.map((s: any) => ({
-          id: `service-${Date.now()}-${Math.random()}`,
-          name: s.name || '',
-          description: s.description || ''
-        }));
-        setFormData(prev => ({
-          ...prev,
-          services: [...prev.services, ...newServices]
-        }));
-      }
-
-      if (extractedData.leadership && extractedData.leadership.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          leadership: extractedData.leadership.map((l: any) => ({
-            id: `leader-${Date.now()}-${Math.random()}`,
-            name: l.name || '',
-            role: l.role || '',
-            bio: l.bio || '',
-            linkedinUrl: l.linkedinUrl || '',
-            experience: l.experience || '',
-            education: l.education || '',
-            skills: l.skills || []
-          }))
-        }));
-      }
-
-      if (extractedData.blogs && extractedData.blogs.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          blogs: extractedData.blogs.map((b: any) => ({
-            id: `blog-${Date.now()}-${Math.random()}`,
-            title: b.title || '',
-            url: b.url || '',
-            date: b.date || '',
-            summary: b.summary || '',
-            author: b.author || ''
-          }))
-        }));
-      }
-
-      if (extractedData.technology) {
-        setFormData(prev => ({
-          ...prev,
-          techStack: extractedData.technology.stack || [],
-          partners: extractedData.technology.partners || [],
-          integrations: extractedData.technology.integrations || []
-        }));
-      }
-
-      const leadershipCount = extractedData.leadership?.length || 0;
-      const blogsCount = extractedData.blogs?.length || 0;
-      const servicesCount = extractedData.services?.length || 0;
+      const leadershipCount = 0;
+      const blogsCount = 0;
+      const servicesCount = 0;
 
       let message = '✅ Data extraction complete!\n\nFound:\n';
       message += `• Company information\n`;
