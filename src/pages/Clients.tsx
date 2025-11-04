@@ -99,18 +99,26 @@ export const Clients: React.FC = () => {
                           {client.company || client.name}
                         </h3>
                         <div className="flex flex-col gap-1 mt-1">
-                          {client.location && (
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              <span className="text-xs">📍</span>
-                              {client.location}
-                            </p>
-                          )}
                           {client.name && (
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
                               <span className="text-xs">👤</span>
-                              {client.name} {client.role && `• ${client.role}`}
+                              {client.name}
                             </p>
                           )}
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            {client.location && (
+                              <span className="flex items-center gap-1">
+                                <span className="text-xs">📍</span>
+                                {client.location}
+                              </span>
+                            )}
+                            {client.founded && (
+                              <span className="flex items-center gap-1">
+                                <span className="text-xs">📅</span>
+                                Founded {client.founded}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

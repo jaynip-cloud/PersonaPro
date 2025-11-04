@@ -118,7 +118,19 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         .maybeSingle();
 
       if (profile) {
-        const services = profile.services ? JSON.parse(profile.services as string) : [];
+        const parseJsonField = (field: any) => {
+          if (!field) return null;
+          if (typeof field === 'string') {
+            try {
+              return JSON.parse(field);
+            } catch {
+              return null;
+            }
+          }
+          return field;
+        };
+
+        const services = parseJsonField(profile.services) || [];
         const servicesArray = services.map((s: any) => {
           if (typeof s === 'string') {
             return { id: `service-${Date.now()}-${Math.random()}`, name: s, description: '' };
@@ -130,15 +142,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           };
         });
 
-        const leadership = profile.leadership && typeof profile.leadership === 'string' && profile.leadership.trim() !== ''
-          ? JSON.parse(profile.leadership)
-          : [];
-        const blogs = profile.blogs && typeof profile.blogs === 'string' && profile.blogs.trim() !== ''
-          ? JSON.parse(profile.blogs)
-          : [];
-        const technology = profile.technology && typeof profile.technology === 'string' && profile.technology.trim() !== ''
-          ? JSON.parse(profile.technology)
-          : {};
+        const leadership = parseJsonField(profile.leadership) || [];
+        const blogs = parseJsonField(profile.blogs) || [];
+        const technology = parseJsonField(profile.technology) || {};
 
         setFormData(prev => ({
           ...prev,
@@ -518,14 +524,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           facebook_url: formData.facebookUrl,
           instagram_url: formData.instagramUrl,
           youtube_url: formData.youtubeUrl,
-          services: JSON.stringify(servicesJson),
-          leadership: JSON.stringify(formData.leadership),
-          blogs: JSON.stringify(formData.blogs),
-          technology: JSON.stringify({
+          services: servicesJson,
+          leadership: formData.leadership,
+          blogs: formData.blogs,
+          technology: {
             stack: formData.techStack,
             partners: formData.partners,
             integrations: formData.integrations
-          }),
+          },
           onboarding_completed: true,
           updated_at: new Date().toISOString()
         })

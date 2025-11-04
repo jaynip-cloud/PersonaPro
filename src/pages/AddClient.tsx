@@ -373,11 +373,11 @@ export const AddClient: React.FC = () => {
   };
 
   const uploadFilesToStorage = async (clientId: string): Promise<void> => {
-    if (uploadedFiles.length === 0) return;
+    if (uploadedFiles.length === 0 || !user) return;
 
     for (const file of uploadedFiles) {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${clientId}/${Date.now()}-${file.name}`;
+      const fileName = `${user.id}/${clientId}/${Date.now()}-${file.name}`;
 
       const { data, error } = await supabase.storage
         .from('client-documents')
@@ -403,7 +403,7 @@ export const AddClient: React.FC = () => {
         .from('documents')
         .insert({
           client_id: clientId,
-          user_id: user!.id,
+          user_id: user.id,
           name: file.name,
           type: documentType,
           size: file.size,
