@@ -388,11 +388,63 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         twitterUrl: extractedData.socialProfiles?.twitter || prev.twitterUrl,
         facebookUrl: extractedData.socialProfiles?.facebook || prev.facebookUrl,
         instagramUrl: extractedData.socialProfiles?.instagram || prev.instagramUrl,
+        services: extractedData.services?.map((s: any) => ({
+          id: `service-${Date.now()}-${Math.random()}`,
+          name: s.name || '',
+          description: s.description || ''
+        })) || prev.services,
+        leadership: extractedData.leadership ? [
+          extractedData.leadership.ceo ? {
+            id: `leader-ceo-${Date.now()}`,
+            name: extractedData.leadership.ceo.name || '',
+            role: extractedData.leadership.ceo.title || 'CEO',
+            bio: extractedData.leadership.ceo.bio || '',
+            linkedinUrl: extractedData.leadership.ceo.linkedin || '',
+            email: extractedData.leadership.ceo.email || '',
+            experience: '',
+            education: '',
+            skills: []
+          } : null,
+          extractedData.leadership.founder ? {
+            id: `leader-founder-${Date.now()}`,
+            name: extractedData.leadership.founder.name || '',
+            role: extractedData.leadership.founder.title || 'Founder',
+            bio: extractedData.leadership.founder.bio || '',
+            linkedinUrl: extractedData.leadership.founder.linkedin || '',
+            email: extractedData.leadership.founder.email || '',
+            experience: '',
+            education: '',
+            skills: []
+          } : null,
+          extractedData.leadership.owner ? {
+            id: `leader-owner-${Date.now()}`,
+            name: extractedData.leadership.owner.name || '',
+            role: extractedData.leadership.owner.title || 'Owner',
+            bio: extractedData.leadership.owner.bio || '',
+            linkedinUrl: extractedData.leadership.owner.linkedin || '',
+            email: extractedData.leadership.owner.email || '',
+            experience: '',
+            education: '',
+            skills: []
+          } : null
+        ].filter(Boolean) : prev.leadership,
+        blogs: extractedData.blogs?.map((b: any) => ({
+          id: `blog-${Date.now()}-${Math.random()}`,
+          title: b.title || '',
+          url: b.url || '',
+          date: b.date || '',
+          summary: b.summary || '',
+          author: b.author || ''
+        })) || prev.blogs,
+        techStack: extractedData.technology?.stack || prev.techStack,
+        partners: extractedData.technology?.partners || prev.partners,
+        integrations: extractedData.technology?.integrations || prev.integrations,
       }));
 
-      const leadershipCount = 0;
-      const blogsCount = 0;
-      const servicesCount = 0;
+      const leadershipCount = extractedData.leadership ?
+        [extractedData.leadership.ceo, extractedData.leadership.founder, extractedData.leadership.owner].filter(Boolean).length : 0;
+      const blogsCount = extractedData.blogs?.length || 0;
+      const servicesCount = extractedData.services?.length || 0;
 
       let message = '✅ Data extraction complete!\n\nFound:\n';
       message += `• Company information\n`;

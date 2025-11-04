@@ -92,6 +92,13 @@ Deno.serve(async (req: Request) => {
           facebook: extractedInfo.socialProfiles?.facebook || '',
           instagram: extractedInfo.socialProfiles?.instagram || '',
         },
+        services: extractedInfo.services || [],
+        blogs: extractedInfo.blogs || [],
+        technology: {
+          stack: extractedInfo.technology?.stack || [],
+          partners: extractedInfo.technology?.partners || [],
+          integrations: extractedInfo.technology?.integrations || []
+        },
         logo: findLogoUrl(crawledData),
       }
     };
@@ -256,29 +263,33 @@ async function extractCompanyInfo(crawlResults: CrawlResult[], perplexityKey: st
 
   const prompt = `You are an expert business intelligence analyst specializing in company research and data extraction. Your task is to extract comprehensive, accurate, and detailed company information from the provided website content AND use your web search capabilities to find additional up-to-date information.
 
-IMPORTANT: You have access to real-time web search. Use it to:
+IMPORTANT: You have access to real-time web search. Use it extensively to:
 - Verify and enhance the information from the website
 - Find missing details like contact information, founding year, company size
 - Get the latest company news and updates
-- Find leadership information (CEO, Founder, Owner)
+- Find leadership information (CEO, Founder, Owner) from LinkedIn, news, press releases
+- Extract blog articles from their blog/news pages
+- Identify technology stack, partners, and integrations from their website and web sources
 - Cross-reference information for accuracy
 
 ROOT DOMAIN: ${rootUrl}
 
 DISCOVERED SOCIAL MEDIA PROFILES:
 - LinkedIn Company: ${linkedinCompanyUrls.join(', ') || 'Not found'}
+- LinkedIn Profiles (Leadership): ${linkedinProfileUrls.slice(0, 5).join(', ') || 'Not found'}
 - Twitter/X: ${twitterUrls.join(', ') || 'Not found'}
 - Facebook: ${facebookUrls.join(', ') || 'Not found'}
 - Instagram: ${instagramUrls.join(', ') || 'Not found'}
 
 CRITICAL INSTRUCTIONS:
-1. Extract ONLY factual information explicitly stated in the content - DO NOT make assumptions or infer data
+1. Extract ONLY factual information explicitly stated in the content or found via web search
 2. Search thoroughly through ALL provided pages for each piece of information
-3. Be precise and complete - capture full details, not summaries
-4. For missing information, leave the field as an empty string "" - DO NOT fabricate data
-5. Use your web search to find leadership details (CEO, Founder, Owner) from LinkedIn, news, press releases
-6. Cross-reference information across multiple pages for accuracy
-7. Return ONLY valid JSON - no additional text or explanations
+3. Use web search to fill gaps and verify information
+4. For leadership, if LinkedIn URLs are found, use web search to get details about those people
+5. Extract ALL services/products mentioned on services, products, or solutions pages
+6. Extract ALL blog articles found on blog/news pages with titles, URLs, dates, and summaries
+7. Identify technology stack from "technology", "partners", or "integrations" pages
+8. Return ONLY valid JSON - no additional text or explanations
 
 REQUIRED JSON STRUCTURE (extract ALL available information):
 
@@ -305,19 +316,22 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
       "name": "CEO full name",
       "title": "CEO" or actual title,
       "email": "CEO email if found",
-      "linkedin": "CEO LinkedIn profile URL"
+      "linkedin": "CEO LinkedIn profile URL from discovered profiles",
+      "bio": "Brief bio if available from website or LinkedIn"
     },
     "founder": {
       "name": "Founder full name",
       "title": "Founder" or "Co-Founder",
       "email": "Founder email if found",
-      "linkedin": "Founder LinkedIn profile URL"
+      "linkedin": "Founder LinkedIn profile URL from discovered profiles",
+      "bio": "Brief bio if available"
     },
     "owner": {
       "name": "Owner full name",
       "title": "Owner" or actual title,
       "email": "Owner email if found",
-      "linkedin": "Owner LinkedIn profile URL"
+      "linkedin": "Owner LinkedIn profile URL from discovered profiles",
+      "bio": "Brief bio if available"
     },
     "primaryContact": {
       "name": "Primary contact person name (from contact page, team page)",
@@ -325,6 +339,26 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
       "email": "Their direct email",
       "phone": "Their direct phone"
     }
+  },
+  "services": [
+    {
+      "name": "Service/Product name",
+      "description": "What this service/product does, key features and benefits"
+    }
+  ],
+  "blogs": [
+    {
+      "title": "Blog article title",
+      "url": "Full URL to the blog post",
+      "date": "Publication date if available (any format)",
+      "summary": "Brief 1-2 sentence summary of the article",
+      "author": "Author name if mentioned"
+    }
+  ],
+  "technology": {
+    "stack": ["Technology 1", "Technology 2", "Framework 1"],
+    "partners": ["Partner Company 1", "Partner Company 2"],
+    "integrations": ["Integration 1", "Integration 2", "Platform 1"]
   },
   "businessInfo": {
     "shortTermGoals": "Company's short-term goals/objectives if mentioned (next 6-12 months)",
@@ -339,104 +373,74 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
   }
 }
 
-EXTRACTION GUIDELINES BY FIELD:
+DETAILED EXTRACTION GUIDELINES:
 
-**Company Name:**
-- Look for the official company name in: page title tags, main header, about page heading, footer
-- Use the most formal/official version (e.g., "Acme Corporation" not just "Acme")
-- Avoid taglines or slogans
+**Services/Products:**
+- Look in: services page, products page, solutions page, homepage features section
+- Extract ALL services/products listed (minimum 3-5 if available, up to 10)
+- For each service: extract name and comprehensive description (what it does, key features, benefits)
+- Example: {"name": "Cloud Migration Service", "description": "End-to-end cloud migration services helping enterprises move legacy systems to AWS, Azure, or GCP with zero downtime, automated backups, and security compliance."}
 
-**Industry:**
-- Be specific and descriptive (avoid generic terms like "Technology" or "Services")
-- Good examples: "B2B SaaS for Marketing Automation", "AI-Powered Healthcare Analytics", "Cloud Infrastructure Management"
-- Look in: meta descriptions, about page first paragraph, service descriptions
-- Use web search to verify and get more accurate industry classification
+**Blog Articles:**
+- Look in: /blog, /news, /insights, /resources pages
+- Extract recent articles (at least 5-10 if available)
+- For each article: title, full URL, publication date, 1-2 sentence summary, author name
+- If blog listing page found, extract article previews and metadata
+- Example: {"title": "How AI is Transforming Healthcare", "url": "https://example.com/blog/ai-healthcare", "date": "March 15, 2024", "summary": "Exploring the impact of artificial intelligence on patient care and medical diagnostics.", "author": "Dr. Jane Smith"}
 
-**Zip Code:**
-- Extract from full address on contact page or footer
-- Format varies by country: US (12345 or 12345-6789), UK (SW1A 1AA), Canada (A1A 1A1)
-- Look in: contact page full address, footer address block, location information
+**Technology Stack:**
+- Look in: technology page, about page, partners page, integration pages, footer
+- Identify: programming languages, frameworks, platforms, tools they use or integrate with
+- Examples: ["React", "Node.js", "AWS", "PostgreSQL", "Docker", "Kubernetes"]
+- Also search their job postings for technology requirements
 
-**Description:**
-- Write 2-4 complete sentences capturing:
-  1. What the company does (core business)
-  2. Who they serve (target customers/market)
-  3. Key value proposition (how they help)
-  4. What makes them unique (if mentioned)
-- Synthesize from: homepage hero section, about page, meta description
-- Be comprehensive but concise
+**Partners:**
+- Look in: partners page, about page, integration pages
+- Extract: partner company names, technology partners, strategic alliances
+- Examples: ["Salesforce", "Microsoft", "Google Cloud", "Stripe"]
 
-**Location:**
-- Format: "City, State/Province, Country"
-- If only city and country: "City, Country"
-- Use full names: "United States" not "US", "United Kingdom" not "UK"
-- Look in: contact page (often has full address), footer, about page
+**Integrations:**
+- Look in: integrations page, features page, API documentation
+- Extract: third-party platforms/services they integrate with
+- Examples: ["Slack", "Zapier", "HubSpot", "QuickBooks", "Shopify"]
 
-**Company Size:**
-- Use ranges: "1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"
-- Add "employees" (e.g., "51-200 employees")
-- Look for phrases like: "team of X", "X+ employees", on careers or about pages
+**Leadership (CRITICAL - USE WEB SEARCH):**
+- Use the discovered LinkedIn profile URLs: ${linkedinProfileUrls.slice(0, 5).join(', ')}
+- Search the web for these LinkedIn profiles to get names, titles, and bios
+- Also search: "[Company Name] CEO", "[Company Name] Founder" to find leadership
+- Extract from: team page, about page, leadership section, press releases
+- For each leader: full name, title, email (if found), LinkedIn URL, brief bio
+- Prioritize: CEO > Founder > Owner > Primary Contact
 
-**Founded Year:**
-- Four-digit year only (e.g., "2015")
-- Look in: about page ("founded in...", "established in...", "since..."), footer copyright, company timeline
-
-**Email:**
-- Must be a valid email format: name@domain.com
-- Common patterns to search for:
-  - contact@, info@, hello@, support@, sales@, inquiries@ followed by company domain
-  - Email links (mailto: links in contact sections)
-  - Email addresses in contact forms or contact page text
-- Check: contact page, footer, header, support section, about page
-- If multiple emails found, prioritize: contact@ or info@ over department-specific emails
-
-**Phone:**
-- Include country code if visible: +1, +44, etc.
-- Preserve formatting as shown: parentheses, dashes, spaces
-- Look in: contact page, header (often in top bar), footer, support section
-- If multiple phones found: primaryPhone = main line, alternatePhone = secondary/toll-free/department
-
-**Leadership (CEO/Founder/Owner):**
-- Use web search to find leadership information on LinkedIn, company news, press releases
-- Look for: CEO, Founder, Co-Founder, Owner, President
-- Check: about page, team page, leadership section, LinkedIn company page
-- Extract: full name, title, email (if found), LinkedIn profile URL
-- For primaryContact: use main contact person from contact page if leadership not found
-
-**Business Goals & Expectations:**
-- shortTermGoals: Near-term objectives, current initiatives (look in: about, blog, news, press releases)
-- longTermGoals: Vision statements, strategic goals, future plans (look in: about, mission, vision sections)
-- expectations: What they seek in partnerships, services, or client relationships (look in: about, partner pages)
-- These are often aspirational statements - extract if clearly stated, otherwise leave empty
-
-**Social Profiles:**
-- Use the discovered URLs provided above
-- Verify these are company pages, not individual employee profiles
-- If URL is discovered, include it; otherwise leave empty
+**Contact Information (CRITICAL):**
+- Email: Look for contact@, info@, hello@, support@, sales@ followed by domain
+- Search in: contact page, footer, header navigation, about page
+- Phone: Include country code (+1, +44, etc.), look in contact page and header
+- Extract both primary and alternate contact details if multiple found
 
 SEARCH STRATEGY:
-1. Start with homepage - look for company name, tagline, hero description
-2. Check about/about-us page - usually has: company description, founding year, team size, mission, leadership
-3. Review team/leadership page - CEO, founders, key contacts
-4. Review contact page - typically has: email, phone, physical address with zip code, contact person
-5. Scan footer across all pages - often contains: location, copyright year, social links, contact info
-6. Check careers/jobs page - may mention company size, culture, benefits
-7. Look at meta tags in page source - description and title tags often have good company info
-8. Use web search for: industry classification, company size, leadership names and roles
+1. Homepage - company overview, hero description, key services
+2. About/About-us - company history, founding year, mission, vision, team size
+3. Services/Products/Solutions - ALL services and products with descriptions
+4. Team/Leadership - CEO, founders, key team members with LinkedIn profiles
+5. Blog/News/Insights - Recent articles with titles, URLs, dates, summaries
+6. Technology/Partners/Integrations - Tech stack, partner companies, integrations
+7. Contact - email addresses, phone numbers, physical address with zip code
+8. Footer - often contains location, social links, contact info
+9. Use web search to fill gaps in leadership, technology, and company information
 
-QUALITY CHECKS:
-- Company name should not include taglines or generic words like "Official Site"
-- Industry should be specific and descriptive (3-6 words ideal)
-- Description should be 2-4 sentences, professional, and comprehensive
-- Location should be properly formatted with commas
-- Email must match pattern: text@domain.ext
-- Phone should include area code or country code when possible
-- All social URLs should be company pages (not personal profiles)
+QUALITY REQUIREMENTS:
+- Minimum 3-5 services/products (if available on website)
+- Minimum 5-10 blog articles (if blog exists)
+- Leadership must include at least CEO or Founder with LinkedIn URL if discoverable
+- Technology stack should have 5+ items if technology page exists
+- Contact info must have at least one email and one phone number
+- All URLs must be complete and valid
 
 WEBSITE CONTENT FROM MULTIPLE PAGES:
-${combinedContent.substring(0, 80000)}
+${combinedContent.substring(0, 75000)}
 
-Now extract the company information and return ONLY the JSON object with all available data:`;
+Now extract the comprehensive company information including services, blogs, technology, and leadership details. Use web search extensively to fill gaps. Return ONLY the JSON object:`;
 
   try {
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
@@ -450,7 +454,7 @@ Now extract the company information and return ONLY the JSON object with all ava
         messages: [
           {
             role: "system",
-            content: "You are an expert business intelligence analyst who excels at extracting comprehensive, accurate company information from website content and online sources. You are meticulous, thorough, and never fabricate data. You search through all provided content carefully to find every piece of requested information. You can also search the web for additional up-to-date information about the company. You always return properly formatted JSON with complete, factual data. When information is not found, you leave fields empty rather than guessing.",
+            content: "You are an expert business intelligence analyst who excels at extracting comprehensive, accurate company information from website content and online sources. You have access to web search and use it extensively to find missing information, verify details, and enrich data. You are meticulous, thorough, and never fabricate data. You always return properly formatted JSON with complete, factual data. When you find LinkedIn profiles, you search for details about those people. You extract all services, blog articles, and technology information available on the website.",
           },
           {
             role: "user",
@@ -458,7 +462,7 @@ Now extract the company information and return ONLY the JSON object with all ava
           },
         ],
         temperature: 0.1,
-        max_tokens: 3000,
+        max_tokens: 4000,
       }),
     });
 
