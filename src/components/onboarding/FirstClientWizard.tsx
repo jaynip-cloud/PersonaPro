@@ -38,10 +38,26 @@ interface FirstClientWizardProps {
   onSkip: () => void;
 }
 
+interface ExtractionStep {
+  id: string;
+  label: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'error';
+  message?: string;
+}
+
 export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, onComplete, onSkip }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [aiPrefilling, setAiPrefilling] = useState(false);
+  const [extractionProgress, setExtractionProgress] = useState(0);
+  const [extractionSteps, setExtractionSteps] = useState<ExtractionStep[]>([
+    { id: 'crawl', label: 'Crawling client website', status: 'pending' },
+    { id: 'company', label: 'Extracting company details', status: 'pending' },
+    { id: 'contact', label: 'Finding contact information', status: 'pending' },
+    { id: 'social', label: 'Discovering social profiles', status: 'pending' },
+    { id: 'business', label: 'Analyzing business goals', status: 'pending' },
+    { id: 'finalize', label: 'Finalizing client data', status: 'pending' },
+  ]);
   const { user } = useAuth();
   const { refreshClients } = useApp();
   const navigate = useNavigate();
@@ -105,12 +121,40 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const updateStepStatus = (stepId: string, status: ExtractionStep['status'], message?: string) => {
+    setExtractionSteps(prev => prev.map(step =>
+      step.id === stepId ? { ...step, status, message } : step
+    ));
+  };
+
+  const simulateClientProgress = async () => {
+    const steps = ['crawl', 'company', 'contact', 'social', 'business', 'finalize'];
+
+    for (let i = 0; i < steps.length; i++) {
+      const stepId = steps[i];
+      updateStepStatus(stepId, 'in_progress');
+      setExtractionProgress(((i + 0.5) / steps.length) * 100);
+
+      await new Promise(resolve => setTimeout(resolve, 700 + Math.random() * 400));
+
+      if (i < steps.length - 1) {
+        updateStepStatus(stepId, 'completed');
+        setExtractionProgress(((i + 1) / steps.length) * 100);
+      }
+    }
+  };
+
   const handleAIPrefill = async () => {
     const urlToExtract = formData.website || formData.linkedinUrl;
 
     if (!urlToExtract || !user) return;
 
     setAiPrefilling(true);
+    setExtractionProgress(0);
+    setExtractionSteps(prev => prev.map(step => ({ ...step, status: 'pending' as const })));
+
+    const progressPromise = simulateClientProgress();
+
     try {
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-company-data`,
@@ -128,10 +172,20 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
         const errorData = await response.json();
         console.error('AI Prefill error:', errorData);
         alert(`AI Autofill failed: ${errorData.error || 'Unknown error'}`);
+        setExtractionSteps(prev => prev.map(step =>
+          step.status === 'in_progress'
+            ? { ...step, status: 'error' as const, message: 'Failed' }
+            : step
+        ));
         return;
       }
 
       const data = await response.json();
+
+      await progressPromise;
+
+      updateStepStatus('finalize', 'completed');
+      setExtractionProgress(100);
 
       if (data.success && data.data) {
         const updates: any = {};
@@ -176,9 +230,18 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
       }
     } catch (error) {
       console.error('AI Prefill error:', error);
+      setExtractionSteps(prev => prev.map(step =>
+        step.status === 'in_progress'
+          ? { ...step, status: 'error' as const, message: 'Failed' }
+          : step
+      ));
       alert('AI Autofill encountered an error. Please try again or fill in manually.');
     } finally {
       setAiPrefilling(false);
+      setTimeout(() => {
+        setExtractionProgress(0);
+        setExtractionSteps(prev => prev.map(step => ({ ...step, status: 'pending' as const, message: undefined })));
+      }, 3000);
     }
   };
 
@@ -439,6 +502,70 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   )}
                 </Button>
               </div>
+
+              {aiPrefilling && (
+                <div className="bg-white border-2 border-blue-500 rounded-lg p-6 shadow-lg mb-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <h4 className="text-lg font-semibold text-slate-900">Extracting Client Data...</h4>
+                  </div>
+
+                  <div className="mb-6">
+                    <div className="flex justify-between text-sm text-slate-600 mb-2">
+                      <span>Overall Progress</span>
+                      <span className="font-medium">{Math.round(extractionProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-3">
+                      <div
+                        className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${extractionProgress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {extractionSteps.map((step) => (
+                      <div
+                        key={step.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                          step.status === 'in_progress'
+                            ? 'bg-blue-50 border border-blue-200'
+                            : step.status === 'completed'
+                            ? 'bg-green-50 border border-green-200'
+                            : step.status === 'error'
+                            ? 'bg-red-50 border border-red-200'
+                            : 'bg-slate-50 border border-slate-200'
+                        }`}
+                      >
+                        <div className="flex-shrink-0">
+                          {step.status === 'completed' ? (
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                          ) : step.status === 'in_progress' ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                          ) : step.status === 'error' ? (
+                            <div className="h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">!</div>
+                          ) : (
+                            <div className="h-5 w-5 rounded-full border-2 border-slate-300"></div>
+                          )}
+                        </div>
+                        <span className={`text-sm font-medium ${
+                          step.status === 'completed' ? 'text-green-700' :
+                          step.status === 'in_progress' ? 'text-blue-700' :
+                          step.status === 'error' ? 'text-red-700' :
+                          'text-slate-500'
+                        }`}>
+                          {step.label}
+                          {step.message && <span className="ml-2 text-xs">({step.message})</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-slate-500 mt-4 text-center">
+                    This may take 20-30 seconds. Please wait...
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
