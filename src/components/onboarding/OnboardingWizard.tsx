@@ -54,10 +54,28 @@ interface Blog {
   author: string;
 }
 
+interface ExtractionStep {
+  id: string;
+  label: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'error';
+  message?: string;
+}
+
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onComplete }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [extractionProgress, setExtractionProgress] = useState(0);
+  const [extractionSteps, setExtractionSteps] = useState<ExtractionStep[]>([
+    { id: 'crawl', label: 'Crawling website pages', status: 'pending' },
+    { id: 'basic', label: 'Extracting company information', status: 'pending' },
+    { id: 'contact', label: 'Finding contact details', status: 'pending' },
+    { id: 'services', label: 'Discovering services & products', status: 'pending' },
+    { id: 'leadership', label: 'Identifying leadership team', status: 'pending' },
+    { id: 'blogs', label: 'Extracting blog articles', status: 'pending' },
+    { id: 'tech', label: 'Analyzing technology stack', status: 'pending' },
+    { id: 'finalize', label: 'Finalizing data extraction', status: 'pending' },
+  ]);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [perplexityKey, setPerplexityKey] = useState('');
   const [showFirstClientWizard, setShowFirstClientWizard] = useState(false);
@@ -391,6 +409,29 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     }
   };
 
+  const updateStepStatus = (stepId: string, status: ExtractionStep['status'], message?: string) => {
+    setExtractionSteps(prev => prev.map(step =>
+      step.id === stepId ? { ...step, status, message } : step
+    ));
+  };
+
+  const simulateProgress = async () => {
+    const steps = ['crawl', 'basic', 'contact', 'services', 'leadership', 'blogs', 'tech', 'finalize'];
+
+    for (let i = 0; i < steps.length; i++) {
+      const stepId = steps[i];
+      updateStepStatus(stepId, 'in_progress');
+      setExtractionProgress(((i + 0.5) / steps.length) * 100);
+
+      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
+
+      if (i < steps.length - 1) {
+        updateStepStatus(stepId, 'completed');
+        setExtractionProgress(((i + 1) / steps.length) * 100);
+      }
+    }
+  };
+
   const handleAutoFill = async () => {
     if (!formData.website) {
       alert('Please enter a website URL first');
@@ -403,6 +444,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     }
 
     setExtracting(true);
+    setExtractionProgress(0);
+    setExtractionSteps(prev => prev.map(step => ({ ...step, status: 'pending' as const })));
+
+    const progressPromise = simulateProgress();
+
     try {
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-company-data`;
 
@@ -429,6 +475,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         throw new Error(result.error || 'Failed to extract data');
       }
 
+      await progressPromise;
+
+      updateStepStatus('finalize', 'completed');
+      setExtractionProgress(100);
+
       const extractedData = result.data;
 
       setFormData(prev => ({
@@ -441,6 +492,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         location: extractedData.location?.city && extractedData.location?.country
           ? `${extractedData.location.city}, ${extractedData.location.country}`
           : prev.location,
+        mission: extractedData.businessInfo?.mission || prev.mission,
+        vision: extractedData.businessInfo?.vision || prev.vision,
+        address: extractedData.contactInfo?.address || (extractedData.location?.city
+          ? `${extractedData.location.city}, ${extractedData.location.country || ''}${extractedData.location.zipCode ? ' ' + extractedData.location.zipCode : ''}`
+          : prev.address),
         email: extractedData.contactInfo?.primaryEmail || prev.email,
         phone: extractedData.contactInfo?.primaryPhone || prev.phone,
         linkedinUrl: extractedData.socialProfiles?.linkedin || prev.linkedinUrl,
@@ -525,9 +581,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
       alert(message);
     } catch (error) {
       console.error('Error extracting data:', error);
+      setExtractionSteps(prev => prev.map(step =>
+        step.status === 'in_progress'
+          ? { ...step, status: 'error' as const, message: 'Failed' }
+          : step
+      ));
       alert('Failed to extract data. Please try again or enter details manually.');
     } finally {
       setExtracting(false);
+      setTimeout(() => {
+        setExtractionProgress(0);
+        setExtractionSteps(prev => prev.map(step => ({ ...step, status: 'pending' as const, message: undefined })));
+      }, 3000);
     }
   };
 
@@ -646,7 +711,71 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                 </Button>
               </div>
 
-              {showApiKeyInput && !perplexityKey && (
+              {extracting && (
+                <div className="bg-white border-2 border-blue-500 rounded-lg p-6 shadow-lg">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <h4 className="text-lg font-semibold text-slate-900">Extracting Company Data...</h4>
+                  </div>
+
+                  <div className="mb-6">
+                    <div className="flex justify-between text-sm text-slate-600 mb-2">
+                      <span>Overall Progress</span>
+                      <span className="font-medium">{Math.round(extractionProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-3">
+                      <div
+                        className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${extractionProgress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {extractionSteps.map((step) => (
+                      <div
+                        key={step.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
+                          step.status === 'in_progress'
+                            ? 'bg-blue-50 border border-blue-200'
+                            : step.status === 'completed'
+                            ? 'bg-green-50 border border-green-200'
+                            : step.status === 'error'
+                            ? 'bg-red-50 border border-red-200'
+                            : 'bg-slate-50 border border-slate-200'
+                        }`}
+                      >
+                        <div className="flex-shrink-0">
+                          {step.status === 'completed' ? (
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                          ) : step.status === 'in_progress' ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                          ) : step.status === 'error' ? (
+                            <div className="h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">!</div>
+                          ) : (
+                            <div className="h-5 w-5 rounded-full border-2 border-slate-300"></div>
+                          )}
+                        </div>
+                        <span className={`text-sm font-medium ${
+                          step.status === 'completed' ? 'text-green-700' :
+                          step.status === 'in_progress' ? 'text-blue-700' :
+                          step.status === 'error' ? 'text-red-700' :
+                          'text-slate-500'
+                        }`}>
+                          {step.label}
+                          {step.message && <span className="ml-2 text-xs">({step.message})</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-slate-500 mt-4 text-center">
+                    This may take 30-60 seconds. Please don't close this window.
+                  </p>
+                </div>
+              )}
+
+              {showApiKeyInput && !perplexityKey && !extracting && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
                   <p className="text-sm text-blue-900">
                     To use AI autofill, please enter your Perplexity API key. Your key is stored locally for future use.

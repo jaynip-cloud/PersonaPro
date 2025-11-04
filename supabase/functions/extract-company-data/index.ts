@@ -68,6 +68,13 @@ Deno.serve(async (req: Request) => {
           country: extractLocationCountry(extractedInfo.companyInfo?.location || ''),
           zipCode: extractedInfo.companyInfo?.zipCode || '',
         },
+        businessInfo: {
+          mission: extractedInfo.companyInfo?.mission || extractedInfo.businessInfo?.mission || '',
+          vision: extractedInfo.companyInfo?.vision || extractedInfo.businessInfo?.vision || '',
+          shortTermGoals: extractedInfo.businessInfo?.shortTermGoals || '',
+          longTermGoals: extractedInfo.businessInfo?.longTermGoals || '',
+          expectations: extractedInfo.businessInfo?.expectations || '',
+        },
         contactInfo: {
           contactName: extractedInfo.leadership?.primaryContact?.name || extractedInfo.leadership?.ceo?.name || extractedInfo.leadership?.founder?.name || '',
           jobTitle: extractedInfo.leadership?.primaryContact?.title || extractedInfo.leadership?.ceo?.title || extractedInfo.leadership?.founder?.title || '',
@@ -75,16 +82,12 @@ Deno.serve(async (req: Request) => {
           alternateEmail: extractedInfo.contactInfo?.alternateEmail || '',
           primaryPhone: extractedInfo.contactInfo?.primaryPhone || extractedInfo.contactInfo?.phone || '',
           alternatePhone: extractedInfo.contactInfo?.alternatePhone || '',
+          address: extractedInfo.contactInfo?.address || '',
         },
         leadership: {
           ceo: extractedInfo.leadership?.ceo || null,
           founder: extractedInfo.leadership?.founder || null,
           owner: extractedInfo.leadership?.owner || null,
-        },
-        businessGoals: {
-          shortTermGoals: extractedInfo.businessInfo?.shortTermGoals || '',
-          longTermGoals: extractedInfo.businessInfo?.longTermGoals || '',
-          expectations: extractedInfo.businessInfo?.expectations || '',
         },
         socialProfiles: {
           linkedin: extractedInfo.socialProfiles?.linkedin || '',
@@ -301,7 +304,9 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
     "location": "Full location: 'City, State/Province, Country'",
     "zipCode": "Postal/Zip code (e.g., '94102', 'SW1A 1AA'). Look in: contact page, footer address",
     "size": "Company size (e.g., '1-10 employees', '50-200 employees')",
-    "founded": "Year founded in YYYY format (e.g., '2020')"
+    "founded": "Year founded in YYYY format (e.g., '2020')",
+    "mission": "Company mission statement if found (what they aim to do)",
+    "vision": "Company vision statement if found (where they want to be in the future)"
   },
   "contactInfo": {
     "email": "Primary general contact email (contact@, info@, hello@)",
@@ -309,7 +314,8 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
     "alternateEmail": "Secondary/alternate email if found (sales@, support@, different department)",
     "phone": "Primary phone number with country code",
     "primaryPhone": "Primary phone number",
-    "alternatePhone": "Secondary/alternate phone if found (different departments, toll-free)"
+    "alternatePhone": "Secondary/alternate phone if found (different departments, toll-free)",
+    "address": "Full physical address (street, city, state, country, zip). Look in: contact page, footer, about page"
   },
   "leadership": {
     "ceo": {
