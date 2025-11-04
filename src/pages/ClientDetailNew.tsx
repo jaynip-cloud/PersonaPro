@@ -54,10 +54,14 @@ export const ClientDetailNew: React.FC = () => {
   });
   const [savingContact, setSavingContact] = useState(false);
   const [meetingNotes, setMeetingNotes] = useState('');
+  const [meetingTitle, setMeetingTitle] = useState('');
+  const [meetingDate, setMeetingDate] = useState(new Date().toISOString().split('T')[0]);
   const [savingNotes, setSavingNotes] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState<any[]>([]);
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [meetingTranscripts, setMeetingTranscripts] = useState<any[]>([]);
+  const [showTranscriptHistory, setShowTranscriptHistory] = useState(false);
 
   const opportunities = mockOpportunities.filter(o => o.clientId === id);
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
@@ -159,14 +163,15 @@ export const ClientDetailNew: React.FC = () => {
         setUploadedDocuments(documentsData);
       }
 
-      const { data: notesData } = await supabase
-        .from('clients')
-        .select('meeting_notes')
-        .eq('id', id)
-        .maybeSingle();
+      const { data: transcriptsData, error: transcriptsError } = await supabase
+        .from('meeting_transcripts')
+        .select('*')
+        .eq('client_id', id)
+        .eq('user_id', user.id)
+        .order('meeting_date', { ascending: false });
 
-      if (notesData?.meeting_notes) {
-        setMeetingNotes(notesData.meeting_notes);
+      if (!transcriptsError && transcriptsData) {
+        setMeetingTranscripts(transcriptsData);
       }
     } catch (error) {
       console.error('Error loading client data:', error);
@@ -177,22 +182,38 @@ export const ClientDetailNew: React.FC = () => {
   };
 
   const handleSaveMeetingNotes = async () => {
-    if (!client || !user || !meetingNotes.trim()) return;
+    if (!client || !user || !meetingNotes.trim() || !meetingTitle.trim()) {
+      showToast('error', 'Please provide both a title and transcript');
+      return;
+    }
 
     setSavingNotes(true);
     try {
-      const { error } = await supabase
-        .from('clients')
-        .update({ meeting_notes: meetingNotes })
-        .eq('id', client.id)
-        .eq('user_id', user.id);
+      const { data, error } = await supabase
+        .from('meeting_transcripts')
+        .insert({
+          user_id: user.id,
+          client_id: client.id,
+          title: meetingTitle,
+          transcript: meetingNotes,
+          meeting_date: meetingDate
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      showToast('success', 'Meeting notes saved successfully');
+      if (data) {
+        setMeetingTranscripts(prev => [data, ...prev]);
+      }
+
+      setMeetingNotes('');
+      setMeetingTitle('');
+      setMeetingDate(new Date().toISOString().split('T')[0]);
+      showToast('success', 'Meeting transcript saved successfully');
     } catch (error) {
-      console.error('Error saving meeting notes:', error);
-      showToast('error', 'Failed to save meeting notes');
+      console.error('Error saving meeting transcript:', error);
+      showToast('error', 'Failed to save meeting transcript');
     } finally {
       setSavingNotes(false);
     }
@@ -406,13 +427,20 @@ export const ClientDetailNew: React.FC = () => {
         similarityThreshold: similarityThreshold,
       });
 
+      const transcriptsContext = meetingTranscripts.length > 0
+        ? `\n\nMeeting History (${meetingTranscripts.length} transcripts):\n` +
+          meetingTranscripts.slice(0, 3).map((t, i) =>
+            `${i + 1}. ${t.title} (${new Date(t.meeting_date).toLocaleDateString()})\n${t.transcript.substring(0, 300)}${t.transcript.length > 300 ? '...' : ''}`
+          ).join('\n\n')
+        : '';
+
       const clientContext = `
 Client Information:
 • Company: ${client?.company || 'N/A'}
 • Industry: ${client?.industry || 'N/A'}
 • Status: ${client?.status || 'N/A'}
 • Location: ${client?.location || 'N/A'}
-• Contact: ${client?.email || 'N/A'}${meetingNotes ? `\n\nRecent Meeting Notes:\n${meetingNotes.substring(0, 500)}${meetingNotes.length > 500 ? '...' : ''}` : ''}
+• Contact: ${client?.email || 'N/A'}${transcriptsContext}
 `;
 
       if (searchResults && searchResults.length > 0) {
@@ -428,7 +456,7 @@ Client Information:
         return response;
       } else {
         const fallbackResponse = mode === 'deep'
-          ? `${clientContext}\n\nNo matching documents found for "${query}".\n\nAvailable Information:\n• Client profile data shown above\n• ${uploadedDocuments.length} document(s) uploaded${meetingNotes ? '\n• Meeting notes available' : ''}\n\nTo improve search results:\n• Upload more client documents\n• Add detailed meeting notes\n• Try a different search query`
+          ? `${clientContext}\n\nNo matching documents found for "${query}".\n\nAvailable Information:\n• Client profile data shown above\n• ${uploadedDocuments.length} document(s) uploaded\n• ${meetingTranscripts.length} meeting transcript(s) saved\n\nTo improve search results:\n• Upload more client documents\n• Add meeting transcripts\n• Try a different search query`
           : `${clientContext}\n\nNo documents matched "${query}". ${uploadedDocuments.length === 0 ? 'Upload documents to enable document search.' : 'Try a different query or check uploaded documents.'}`;
 
         setIsProcessingQuery(false);
@@ -900,46 +928,115 @@ Client Information:
               <div className="lg:col-span-1 space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Meeting Notes
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Meeting Notes
+                      </CardTitle>
+                      {meetingTranscripts.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowTranscriptHistory(!showTranscriptHistory)}
+                        >
+                          {showTranscriptHistory ? 'New Note' : `History (${meetingTranscripts.length})`}
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <textarea
-                      value={meetingNotes}
-                      onChange={(e) => setMeetingNotes(e.target.value)}
-                      placeholder="Add meeting notes, key discussion points, action items..."
-                      className="w-full h-64 p-3 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                    />
-                    <div className="flex justify-end gap-2 mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setMeetingNotes('')}
-                        disabled={!meetingNotes || savingNotes}
-                      >
-                        Clear
-                      </Button>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={handleSaveMeetingNotes}
-                        disabled={!meetingNotes || savingNotes}
-                      >
-                        {savingNotes ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            Save Notes
-                          </>
-                        )}
-                      </Button>
-                    </div>
+                    {!showTranscriptHistory ? (
+                      <div className="space-y-3">
+                        <Input
+                          value={meetingTitle}
+                          onChange={(e) => setMeetingTitle(e.target.value)}
+                          placeholder="Meeting title (e.g., Q4 Planning Review)"
+                          disabled={savingNotes}
+                        />
+                        <input
+                          type="date"
+                          value={meetingDate}
+                          onChange={(e) => setMeetingDate(e.target.value)}
+                          className="w-full p-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          disabled={savingNotes}
+                        />
+                        <textarea
+                          value={meetingNotes}
+                          onChange={(e) => setMeetingNotes(e.target.value)}
+                          placeholder="Add meeting transcript, key discussion points, action items..."
+                          className="w-full h-48 p-3 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                          disabled={savingNotes}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setMeetingNotes('');
+                              setMeetingTitle('');
+                              setMeetingDate(new Date().toISOString().split('T')[0]);
+                            }}
+                            disabled={(!meetingNotes && !meetingTitle) || savingNotes}
+                          >
+                            Clear
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={handleSaveMeetingNotes}
+                            disabled={!meetingNotes.trim() || !meetingTitle.trim() || savingNotes}
+                          >
+                            {savingNotes ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="h-4 w-4 mr-2" />
+                                Save Transcript
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                        {meetingTranscripts.map((transcript) => (
+                          <div
+                            key={transcript.id}
+                            className="p-4 border border-border rounded-lg hover:bg-accent transition-colors"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-foreground">{transcript.title}</h4>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(transcript.meeting_date).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-3">
+                              {transcript.transcript}
+                            </p>
+                            <button
+                              onClick={() => {
+                                setMeetingNotes(transcript.transcript);
+                                setMeetingTitle(transcript.title);
+                                setMeetingDate(transcript.meeting_date);
+                                setShowTranscriptHistory(false);
+                              }}
+                              className="text-xs text-primary hover:underline mt-2"
+                            >
+                              View full transcript
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
