@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/Badge';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
+import { processAndEmbedDocument } from '../utils/documentEmbeddings';
 import {
   ArrowLeft,
   Save,
@@ -436,6 +437,20 @@ export const AddClient: React.FC = () => {
       if (dbError) {
         console.error('Error saving document to database:', dbError);
         throw new Error(`Failed to save ${file.name} to database: ${dbError.message}`);
+      }
+
+      try {
+        await processAndEmbedDocument(file, {
+          clientId: clientId,
+          metadata: {
+            documentType: documentType,
+            fileName: file.name,
+            clientId: clientId,
+          }
+        });
+        console.log(`Successfully generated embeddings for ${file.name}`);
+      } catch (embedError) {
+        console.error(`Failed to generate embeddings for ${file.name}:`, embedError);
       }
     }
   };

@@ -21,6 +21,7 @@ import { exportPersonaReportAsPDF } from '../utils/pdfExport';
 import { useToast } from '../components/ui/Toast';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { semanticSearch } from '../utils/documentEmbeddings';
 
 export const ClientDetailNew: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -262,18 +263,41 @@ export const ClientDetailNew: React.FC = () => {
 
   const handleQuery = async (query: string, mode: 'quick' | 'deep'): Promise<string> => {
     setIsProcessingQuery(true);
-    const processingTime = mode === 'deep' ? 8000 : 3000;
 
-    return new Promise((resolve) => {
-      setTimeout(() => {
+    try {
+      const searchLimit = mode === 'deep' ? 10 : 5;
+      const similarityThreshold = mode === 'deep' ? 0.6 : 0.7;
+
+      const searchResults = await semanticSearch(query, {
+        clientId: id,
+        limit: searchLimit,
+        similarityThreshold: similarityThreshold,
+      });
+
+      if (searchResults && searchResults.length > 0) {
+        const context = searchResults
+          .map((result, index) => `[${index + 1}] ${result.content_chunk} (from ${result.document_name}, similarity: ${(result.similarity * 100).toFixed(1)}%)`)
+          .join('\n\n');
+
         const response = mode === 'deep'
-          ? `Based on comprehensive analysis of TechCorp Solutions:\n\nThe client demonstrates strong technical expertise and decision-making authority. Recent interactions indicate high satisfaction with current services, with particular interest in ML/AI capabilities. Communication patterns show consistent engagement and quick response times.\n\nKey behavioral patterns include preference for technical depth in discussions, data-driven decision making, and forward-thinking approach to technology adoption.\n\nRecommendations:\n• Schedule ML capabilities demo within next 2 weeks\n• Create proposal for Enterprise ML Integration\n• Follow up on Q4 roadmap discussion`
-          : `TechCorp Solutions shows positive engagement trends. Recent sentiment is favorable (score: +0.78). Primary contact Sarah Mitchell is highly responsive with avg response time of 2 hours. Key opportunity identified for ML integration services.`;
+          ? `Based on semantic analysis of documents for ${client?.company || 'this client'}:\n\n${context}\n\nKey Insights:\n• Found ${searchResults.length} relevant document sections\n• Analysis based on uploaded documents and client materials\n• Similarity scores range from ${(searchResults[searchResults.length - 1].similarity * 100).toFixed(1)}% to ${(searchResults[0].similarity * 100).toFixed(1)}%`
+          : `Found ${searchResults.length} relevant insights:\n\n${searchResults[0].content_chunk.substring(0, 300)}${searchResults[0].content_chunk.length > 300 ? '...' : ''}\n\n(Source: ${searchResults[0].document_name}, ${(searchResults[0].similarity * 100).toFixed(1)}% relevant)`;
 
         setIsProcessingQuery(false);
-        resolve(response);
-      }, processingTime);
-    });
+        return response;
+      } else {
+        const fallbackResponse = mode === 'deep'
+          ? `No relevant documents found for "${query}".\n\nTo get better insights:\n• Upload client documents (proposals, contracts, notes)\n• Add more detailed client information\n• Try a different search query\n\nOnce documents are uploaded, I can provide comprehensive analysis based on actual client data.`
+          : `No documents found matching your query. Upload client documents to enable intelligent search and insights.`;
+
+        setIsProcessingQuery(false);
+        return fallbackResponse;
+      }
+    } catch (error) {
+      console.error('Error processing query:', error);
+      setIsProcessingQuery(false);
+      return `An error occurred while processing your query. Please ensure:\n• You have an OpenAI API key configured in Settings\n• Documents have been uploaded for this client\n• You have a stable internet connection\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
   };
 
   const tabs = [
