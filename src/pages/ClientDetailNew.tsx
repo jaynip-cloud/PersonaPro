@@ -14,7 +14,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { DocumentUpload } from '../components/data-sources/DocumentUpload';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save } from 'lucide-react';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2 } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
@@ -62,6 +62,7 @@ export const ClientDetailNew: React.FC = () => {
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [meetingTranscripts, setMeetingTranscripts] = useState<any[]>([]);
   const [showTranscriptHistory, setShowTranscriptHistory] = useState(false);
+  const [editingTranscriptId, setEditingTranscriptId] = useState<string | null>(null);
 
   const opportunities = mockOpportunities.filter(o => o.clientId === id);
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
@@ -189,34 +190,83 @@ export const ClientDetailNew: React.FC = () => {
 
     setSavingNotes(true);
     try {
-      const { data, error } = await supabase
-        .from('meeting_transcripts')
-        .insert({
-          user_id: user.id,
-          client_id: client.id,
-          title: meetingTitle,
-          transcript_text: meetingNotes,
-          meeting_date: meetingDate,
-          source: 'manual'
-        })
-        .select()
-        .single();
+      if (editingTranscriptId) {
+        const { data, error } = await supabase
+          .from('meeting_transcripts')
+          .update({
+            title: meetingTitle,
+            transcript_text: meetingNotes,
+            meeting_date: meetingDate
+          })
+          .eq('id', editingTranscriptId)
+          .eq('user_id', user.id)
+          .select()
+          .single();
 
-      if (error) throw error;
+        if (error) throw error;
 
-      if (data) {
-        setMeetingTranscripts(prev => [data, ...prev]);
+        if (data) {
+          setMeetingTranscripts(prev =>
+            prev.map(t => t.id === editingTranscriptId ? data : t)
+          );
+        }
+
+        showToast('success', 'Meeting transcript updated successfully');
+      } else {
+        const { data, error } = await supabase
+          .from('meeting_transcripts')
+          .insert({
+            user_id: user.id,
+            client_id: client.id,
+            title: meetingTitle,
+            transcript_text: meetingNotes,
+            meeting_date: meetingDate,
+            source: 'manual'
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setMeetingTranscripts(prev => [data, ...prev]);
+        }
+
+        showToast('success', 'Meeting transcript saved successfully');
       }
 
       setMeetingNotes('');
       setMeetingTitle('');
       setMeetingDate(new Date().toISOString().split('T')[0]);
-      showToast('success', 'Meeting transcript saved successfully');
+      setEditingTranscriptId(null);
     } catch (error) {
       console.error('Error saving meeting transcript:', error);
       showToast('error', 'Failed to save meeting transcript');
     } finally {
       setSavingNotes(false);
+    }
+  };
+
+  const handleDeleteTranscript = async (transcriptId: string) => {
+    if (!user) return;
+
+    const confirmDelete = window.confirm('Are you sure you want to delete this transcript? This action cannot be undone.');
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('meeting_transcripts')
+        .delete()
+        .eq('id', transcriptId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setMeetingTranscripts(prev => prev.filter(t => t.id !== transcriptId));
+      showToast('success', 'Transcript deleted successfully');
+    } catch (error) {
+      console.error('Error deleting transcript:', error);
+      showToast('error', 'Failed to delete transcript');
     }
   };
 
@@ -938,7 +988,15 @@ Client Information:
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setShowTranscriptHistory(!showTranscriptHistory)}
+                          onClick={() => {
+                            setShowTranscriptHistory(!showTranscriptHistory);
+                            if (!showTranscriptHistory) {
+                              setMeetingNotes('');
+                              setMeetingTitle('');
+                              setMeetingDate(new Date().toISOString().split('T')[0]);
+                              setEditingTranscriptId(null);
+                            }
+                          }}
                         >
                           {showTranscriptHistory ? 'New Note' : `History (${meetingTranscripts.length})`}
                         </Button>
@@ -968,37 +1026,43 @@ Client Information:
                           className="w-full h-48 p-3 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                           disabled={savingNotes}
                         />
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setMeetingNotes('');
-                              setMeetingTitle('');
-                              setMeetingDate(new Date().toISOString().split('T')[0]);
-                            }}
-                            disabled={(!meetingNotes && !meetingTitle) || savingNotes}
-                          >
-                            Clear
-                          </Button>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={handleSaveMeetingNotes}
-                            disabled={!meetingNotes.trim() || !meetingTitle.trim() || savingNotes}
-                          >
-                            {savingNotes ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Saving...
-                              </>
-                            ) : (
-                              <>
-                                <Save className="h-4 w-4 mr-2" />
-                                Save Transcript
-                              </>
-                            )}
-                          </Button>
+                        <div className="flex justify-between items-center gap-2">
+                          {editingTranscriptId && (
+                            <span className="text-sm text-muted-foreground">Editing transcript</span>
+                          )}
+                          <div className="flex gap-2 ml-auto">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setMeetingNotes('');
+                                setMeetingTitle('');
+                                setMeetingDate(new Date().toISOString().split('T')[0]);
+                                setEditingTranscriptId(null);
+                              }}
+                              disabled={(!meetingNotes && !meetingTitle) || savingNotes}
+                            >
+                              {editingTranscriptId ? 'Cancel' : 'Clear'}
+                            </Button>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={handleSaveMeetingNotes}
+                              disabled={!meetingNotes.trim() || !meetingTitle.trim() || savingNotes}
+                            >
+                              {savingNotes ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="h-4 w-4 mr-2" />
+                                  {editingTranscriptId ? 'Update Transcript' : 'Save Transcript'}
+                                </>
+                              )}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1019,6 +1083,28 @@ Client Information:
                                   })}
                                 </p>
                               </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setMeetingNotes(transcript.transcript_text);
+                                    setMeetingTitle(transcript.title);
+                                    setMeetingDate(transcript.meeting_date.split('T')[0]);
+                                    setEditingTranscriptId(transcript.id);
+                                    setShowTranscriptHistory(false);
+                                  }}
+                                  className="p-1 text-muted-foreground hover:text-primary transition-colors"
+                                  title="Edit transcript"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTranscript(transcript.id)}
+                                  className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
+                                  title="Delete transcript"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
                             </div>
                             <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-3">
                               {transcript.transcript_text}
@@ -1028,6 +1114,7 @@ Client Information:
                                 setMeetingNotes(transcript.transcript_text);
                                 setMeetingTitle(transcript.title);
                                 setMeetingDate(transcript.meeting_date.split('T')[0]);
+                                setEditingTranscriptId(transcript.id);
                                 setShowTranscriptHistory(false);
                               }}
                               className="text-xs text-primary hover:underline mt-2"
