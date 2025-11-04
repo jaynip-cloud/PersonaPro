@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 export const Settings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'api' | 'data-sources'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'api' | 'data-management'>('profile');
   const [saved, setSaved] = useState(false);
   const [openaiKey, setOpenaiKey] = useState('');
   const [perplexityKey, setPerplexityKey] = useState('');
@@ -197,7 +197,7 @@ export const Settings: React.FC = () => {
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'privacy', label: 'Data Privacy', icon: Shield },
     { id: 'api', label: 'API Keys', icon: Key },
-    { id: 'data-sources', label: 'Data Sources', icon: Database }
+    { id: 'data-management', label: 'Data Management', icon: Database }
   ];
 
   return (
@@ -688,54 +688,93 @@ export const Settings: React.FC = () => {
             </Card>
           )}
 
-          {activeTab === 'data-sources' && (
+          {activeTab === 'data-management' && (
             <Card>
               <CardHeader>
-                <CardTitle>Data Sources & Integrations</CardTitle>
+                <CardTitle>Data Management</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm text-muted-foreground">
-                      Connect data sources to automatically sync client information and insights.
-                    </p>
+                <div className="space-y-6">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <Database className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-900 mb-1">
+                          Export and manage your data
+                        </p>
+                        <p className="text-xs text-blue-800">
+                          Download all your client data, meeting transcripts, and documents. Import data from other systems.
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { name: 'Salesforce', status: 'connected', logo: '☁️' },
-                      { name: 'HubSpot', status: 'connected', logo: '🧲' },
-                      { name: 'Gmail', status: 'not_connected', logo: '📧' },
-                      { name: 'LinkedIn', status: 'not_connected', logo: '💼' },
-                      { name: 'Zoom', status: 'not_connected', logo: '📹' },
-                      { name: 'Google Drive', status: 'connected', logo: '📁' },
-                    ].map((source) => (
-                      <div
-                        key={source.name}
-                        className="p-4 border border-border rounded-lg hover:border-primary/50 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="text-2xl">{source.logo}</div>
-                            <div>
-                              <p className="font-medium text-foreground">{source.name}</p>
-                              <Badge
-                                variant={source.status === 'connected' ? 'success' : 'secondary'}
-                                className="text-xs"
-                              >
-                                {source.status === 'connected' ? 'Connected' : 'Not Connected'}
-                              </Badge>
-                            </div>
-                          </div>
-                          <Button
-                            variant={source.status === 'connected' ? 'outline' : 'primary'}
-                            size="sm"
-                          >
-                            {source.status === 'connected' ? 'Configure' : 'Connect'}
-                          </Button>
+                  <div className="space-y-4">
+                    <div className="border border-border rounded-lg p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-foreground mb-2">Export All Data</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Download a complete copy of all your data including clients, contacts, projects, meeting transcripts, and documents.
+                          </p>
                         </div>
                       </div>
-                    ))}
+                      <div className="flex gap-3">
+                        <Button variant="outline" className="flex-1">
+                          <Download className="h-4 w-4 mr-2" />
+                          Export as JSON
+                        </Button>
+                        <Button variant="outline" className="flex-1">
+                          <Download className="h-4 w-4 mr-2" />
+                          Export as CSV
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="border border-border rounded-lg p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-foreground mb-2">Export Clients</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Download only your client list with all associated data, contacts, and insights.
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="outline">
+                        <Download className="h-4 w-4 mr-2" />
+                        Export Clients
+                      </Button>
+                    </div>
+
+                    <div className="border border-border rounded-lg p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-foreground mb-2">Export Meeting Transcripts</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Download all meeting notes and transcripts in a structured format.
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="outline">
+                        <Download className="h-4 w-4 mr-2" />
+                        Export Transcripts
+                      </Button>
+                    </div>
+
+                    <div className="border border-red-200 rounded-lg p-6 bg-red-50">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-red-900 mb-2">Clear All Data</h3>
+                          <p className="text-sm text-red-800">
+                            Permanently delete all clients, projects, documents, and meeting transcripts. This action cannot be undone.
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-100">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Clear All Data
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>

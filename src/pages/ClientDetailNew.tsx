@@ -200,18 +200,21 @@ export const ClientDetailNew: React.FC = () => {
           })
           .eq('id', editingTranscriptId)
           .eq('user_id', user.id)
-          .select()
-          .single();
+          .select();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
 
-        if (data) {
+        if (data && data.length > 0) {
           setMeetingTranscripts(prev =>
-            prev.map(t => t.id === editingTranscriptId ? data : t)
+            prev.map(t => t.id === editingTranscriptId ? data[0] : t)
           );
         }
 
         showToast('success', 'Meeting transcript updated successfully');
+        setShowTranscriptHistory(true);
       } else {
         const { data, error } = await supabase
           .from('meeting_transcripts')
