@@ -19,30 +19,6 @@ export interface Client {
   tier?: 'platinum' | 'gold' | 'silver' | 'bronze';
   healthScore?: number;
   csm?: string;
-  website?: string;
-  company_size?: string;
-  linkedin_url?: string;
-  twitter_url?: string;
-  instagram_url?: string;
-  facebook_url?: string;
-  logo_url?: string;
-  city?: string;
-  country?: string;
-  zip_code?: string;
-  primary_email?: string;
-  alternate_email?: string;
-  primary_phone?: string;
-  alternate_phone?: string;
-  job_title?: string;
-  preferred_contact_method?: string;
-  company_overview?: string;
-  budget_range?: string;
-  short_term_goals?: string;
-  long_term_goals?: string;
-  expectations?: string;
-  satisfaction_score?: number;
-  satisfaction_feedback?: string;
-  description?: string;
 }
 
 export interface Persona {
