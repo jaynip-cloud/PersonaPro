@@ -296,36 +296,36 @@ export const AddClient: React.FC = () => {
       if (data.success && data.data) {
         const updates: Partial<ClientFormData> = {};
 
-        if (data.data.name && !formData.company) updates.company = data.data.name;
-        if (data.data.industry && !formData.industry) updates.industry = data.data.industry;
-        if (data.data.description && !formData.companyOverview) updates.companyOverview = data.data.description;
-        if (data.data.founded && !formData.founded) updates.founded = data.data.founded;
-        if (data.data.companySize && !formData.companySize) updates.companySize = data.data.companySize;
+        if (data.data.name) updates.company = data.data.name;
+        if (data.data.industry) updates.industry = data.data.industry;
+        if (data.data.description) updates.companyOverview = data.data.description;
+        if (data.data.founded) updates.founded = data.data.founded;
+        if (data.data.companySize) updates.companySize = data.data.companySize;
 
-        if (data.data.location?.city && !formData.city) updates.city = data.data.location.city;
-        if (data.data.location?.country && !formData.country) updates.country = data.data.location.country;
-        if (data.data.location?.zipCode && !formData.zipCode) updates.zipCode = data.data.location.zipCode;
+        if (data.data.location?.city) updates.city = data.data.location.city;
+        if (data.data.location?.country) updates.country = data.data.location.country;
+        if (data.data.location?.zipCode) updates.zipCode = data.data.location.zipCode;
 
-        if (data.data.contactInfo?.contactName && !formData.contactName) updates.contactName = data.data.contactInfo.contactName;
-        if (data.data.contactInfo?.jobTitle && !formData.jobTitle) updates.jobTitle = data.data.contactInfo.jobTitle;
-        if (data.data.contactInfo?.primaryEmail && !formData.primaryEmail) updates.primaryEmail = data.data.contactInfo.primaryEmail;
-        if (data.data.contactInfo?.alternateEmail && !formData.alternateEmail) updates.alternateEmail = data.data.contactInfo.alternateEmail;
-        if (data.data.contactInfo?.primaryPhone && !formData.primaryPhone) updates.primaryPhone = data.data.contactInfo.primaryPhone;
-        if (data.data.contactInfo?.alternatePhone && !formData.alternatePhone) updates.alternatePhone = data.data.contactInfo.alternatePhone;
+        if (data.data.contactInfo?.contactName) updates.contactName = data.data.contactInfo.contactName;
+        if (data.data.contactInfo?.jobTitle) updates.jobTitle = data.data.contactInfo.jobTitle;
+        if (data.data.contactInfo?.primaryEmail) updates.primaryEmail = data.data.contactInfo.primaryEmail;
+        if (data.data.contactInfo?.alternateEmail) updates.alternateEmail = data.data.contactInfo.alternateEmail;
+        if (data.data.contactInfo?.primaryPhone) updates.primaryPhone = data.data.contactInfo.primaryPhone;
+        if (data.data.contactInfo?.alternatePhone) updates.alternatePhone = data.data.contactInfo.alternatePhone;
 
-        if (data.data.contactInfo?.primaryEmail && !formData.email) updates.email = data.data.contactInfo.primaryEmail;
-        if (data.data.contactInfo?.primaryPhone && !formData.phone) updates.phone = data.data.contactInfo.primaryPhone;
+        if (data.data.contactInfo?.primaryEmail) updates.email = data.data.contactInfo.primaryEmail;
+        if (data.data.contactInfo?.primaryPhone) updates.phone = data.data.contactInfo.primaryPhone;
 
-        if (data.data.businessInfo?.shortTermGoals && !formData.shortTermGoals) updates.shortTermGoals = data.data.businessInfo.shortTermGoals;
-        if (data.data.businessInfo?.longTermGoals && !formData.longTermGoals) updates.longTermGoals = data.data.businessInfo.longTermGoals;
-        if (data.data.businessInfo?.expectations && !formData.expectations) updates.expectations = data.data.businessInfo.expectations;
+        if (data.data.businessInfo?.shortTermGoals) updates.shortTermGoals = data.data.businessInfo.shortTermGoals;
+        if (data.data.businessInfo?.longTermGoals) updates.longTermGoals = data.data.businessInfo.longTermGoals;
+        if (data.data.businessInfo?.expectations) updates.expectations = data.data.businessInfo.expectations;
 
-        if (data.data.socialProfiles?.linkedin && !formData.linkedinUrl) updates.linkedinUrl = data.data.socialProfiles.linkedin;
-        if (data.data.socialProfiles?.twitter && !formData.twitterUrl) updates.twitterUrl = data.data.socialProfiles.twitter;
-        if (data.data.socialProfiles?.facebook && !formData.facebookUrl) updates.facebookUrl = data.data.socialProfiles.facebook;
-        if (data.data.socialProfiles?.instagram && !formData.instagramUrl) updates.instagramUrl = data.data.socialProfiles.instagram;
+        if (data.data.socialProfiles?.linkedin) updates.linkedinUrl = data.data.socialProfiles.linkedin;
+        if (data.data.socialProfiles?.twitter) updates.twitterUrl = data.data.socialProfiles.twitter;
+        if (data.data.socialProfiles?.facebook) updates.facebookUrl = data.data.socialProfiles.facebook;
+        if (data.data.socialProfiles?.instagram) updates.instagramUrl = data.data.socialProfiles.instagram;
 
-        if (data.data.logo && !formData.logoUrl) updates.logoUrl = data.data.logo;
+        if (data.data.logo) updates.logoUrl = data.data.logo;
 
         if (Object.keys(updates).length > 0) {
           setFormData({ ...formData, ...updates });
@@ -342,7 +342,7 @@ export const AddClient: React.FC = () => {
             ? ` Also extracted: ${extractedInfo.join(', ')}`
             : '';
 
-          showToast('success', `Successfully populated ${Object.keys(updates).length} fields with company data!${infoMessage}`);
+          showToast('success', `Successfully extracted and populated ${Object.keys(updates).length} fields with company data!${infoMessage}`);
 
           if (data.data.contacts && data.data.contacts.length > 0) {
             console.log('Extracted contacts:', data.data.contacts);
@@ -351,7 +351,7 @@ export const AddClient: React.FC = () => {
             console.log('Extracted testimonials:', data.data.testimonials);
           }
         } else {
-          showToast('info', 'No new data found to populate. All fields are already filled or no data was available.');
+          showToast('warning', 'No data could be extracted from the provided URL. Please check the URL and try again.');
         }
       } else {
         showToast('warning', 'No company data could be extracted from the website.');
