@@ -32,11 +32,6 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const openaiKey = Deno.env.get('OPENAI_API_KEY');
-
-    if (!openaiKey) {
-      throw new Error('OPENAI_API_KEY is not configured');
-    }
 
     const authHeader = req.headers.get('Authorization')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
@@ -46,6 +41,24 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       throw new Error('Unauthorized');
+    }
+
+    // Get user's API keys from database
+    const { data: apiKeys, error: keysError } = await supabase
+      .from('api_keys')
+      .select('openai_api_key, perplexity_api_key')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (keysError) {
+      console.error('Error fetching API keys:', keysError);
+    }
+
+    const openaiKey = apiKeys?.openai_api_key || Deno.env.get('OPENAI_API_KEY');
+    const perplexityKey = apiKeys?.perplexity_api_key || Deno.env.get('PERPLEXITY_API_KEY');
+
+    if (!openaiKey) {
+      throw new Error('OpenAI API key is not configured. Please add your API key in Settings.');
     }
 
     const { data: profile, error: profileError } = await supabase
@@ -82,8 +95,6 @@ Deno.serve(async (req: Request) => {
     let webSearchContext = '';
     if (companyData.company_name) {
       try {
-        const perplexityKey = Deno.env.get('PERPLEXITY_API_KEY');
-
         if (perplexityKey) {
           const searchQuery = `Find comprehensive information about ${companyData.company_name}, a company in the ${companyData.industry || 'technology'} industry. Include: company overview, recent news, market presence, funding information, notable achievements, and online visibility.`;
 

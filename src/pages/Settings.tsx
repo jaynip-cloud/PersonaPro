@@ -27,7 +27,11 @@ export const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'privacy' | 'api' | 'data-sources'>('profile');
   const [saved, setSaved] = useState(false);
   const [openaiKey, setOpenaiKey] = useState('');
+  const [perplexityKey, setPerplexityKey] = useState('');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+  const [showPerplexityKey, setShowPerplexityKey] = useState(false);
+  const [isLoadingKeys, setIsLoadingKeys] = useState(false);
+  const [isSavingKeys, setIsSavingKeys] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -35,11 +39,77 @@ export const Settings: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedKey = localStorage.getItem('openai_key');
-    if (storedKey) {
-      setOpenaiKey(storedKey);
+    if (user && activeTab === 'api') {
+      loadApiKeys();
     }
-  }, []);
+  }, [user, activeTab]);
+
+  const loadApiKeys = async () => {
+    if (!user) return;
+
+    setIsLoadingKeys(true);
+    try {
+      const { data, error } = await supabase
+        .from('api_keys')
+        .select('openai_api_key, perplexity_api_key')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setOpenaiKey(data.openai_api_key || '');
+        setPerplexityKey(data.perplexity_api_key || '');
+      }
+    } catch (error) {
+      console.error('Error loading API keys:', error);
+    } finally {
+      setIsLoadingKeys(false);
+    }
+  };
+
+  const saveApiKeys = async () => {
+    if (!user) return;
+
+    setIsSavingKeys(true);
+    try {
+      const { data: existing } = await supabase
+        .from('api_keys')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from('api_keys')
+          .update({
+            openai_api_key: openaiKey || null,
+            perplexity_api_key: perplexityKey || null,
+          })
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('api_keys')
+          .insert({
+            user_id: user.id,
+            openai_api_key: openaiKey || null,
+            perplexity_api_key: perplexityKey || null,
+          });
+
+        if (error) throw error;
+      }
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      console.error('Error saving API keys:', error);
+      alert('Failed to save API keys. Please try again.');
+    } finally {
+      setIsSavingKeys(false);
+    }
+  };
 
   const [profile, setProfile] = useState({
     name: 'John Williams',
@@ -67,11 +137,12 @@ export const Settings: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
 
   const handleSave = () => {
-    if (activeTab === 'api' && openaiKey) {
-      localStorage.setItem('openai_key', openaiKey);
+    if (activeTab === 'api') {
+      saveApiKeys();
+    } else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const handleDeleteAccount = async () => {
@@ -419,96 +490,170 @@ export const Settings: React.FC = () => {
           {activeTab === 'api' && (
             <Card>
               <CardHeader>
-                <CardTitle>API Keys & Integrations</CardTitle>
+                <CardTitle>API Keys Configuration</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-medium text-foreground mb-4">OpenAI Configuration</h3>
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
-                      <p className="text-sm text-blue-900">
-                        Configure your OpenAI API key to enable AI-powered features like automatic data extraction in Knowledge Base.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        OpenAI API Key
-                      </label>
-                      <div className="flex gap-2">
-                        <Input
-                          type={showOpenaiKey ? 'text' : 'password'}
-                          value={openaiKey}
-                          onChange={(e) => setOpenaiKey(e.target.value)}
-                          placeholder="sk-..."
-                          className="font-mono"
-                        />
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowOpenaiKey(!showOpenaiKey)}
-                        >
-                          {showOpenaiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">OpenAI Platform</a>
-                      </p>
-                    </div>
-
-                    <Button variant="primary" onClick={handleSave} disabled={saved} className="mt-4">
-                      {saved ? (
-                        <>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Saved!
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4 mr-2" />
-                          Save API Key
-                        </>
-                      )}
-                    </Button>
+                {isLoadingKeys ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-muted-foreground">Loading API keys...</div>
                   </div>
-
-                  <div className="pt-6 border-t border-border">
-                    <h3 className="text-lg font-medium text-foreground mb-4">Other API Keys</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">
-                          Production API Key
-                        </label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="password"
-                            value="pk_live_1234567890abcdefghijklmnop"
-                            readOnly
-                            className="font-mono"
-                          />
-                          <Button variant="outline">
-                            Reveal
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">
-                          Development API Key
-                        </label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="password"
-                            value="pk_dev_abcdefghijklmnopqrstuvwxyz"
-                            readOnly
-                            className="font-mono"
-                          />
-                          <Button variant="outline">
-                            Reveal
-                          </Button>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <Key className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-blue-900 mb-1">
+                            Configure Your AI API Keys
+                          </p>
+                          <p className="text-xs text-blue-800">
+                            Add your own API keys to enable AI-powered features. Your keys are stored securely and never shared.
+                          </p>
                         </div>
                       </div>
                     </div>
+
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                          <span className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-sm">1</span>
+                          OpenAI API Key (Required)
+                        </h3>
+                        <div className="pl-10 space-y-3">
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <p className="text-sm text-slate-700 mb-2">
+                              <strong>Used for:</strong> AI Insights, Data Extraction, Analysis
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              This key is required for all AI features to work properly.
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              OpenAI API Key
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={showOpenaiKey ? 'text' : 'password'}
+                                value={openaiKey}
+                                onChange={(e) => setOpenaiKey(e.target.value)}
+                                placeholder="sk-proj-..."
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() => setShowOpenaiKey(!showOpenaiKey)}
+                              >
+                                {showOpenaiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              Get your API key from{' '}
+                              <a
+                                href="https://platform.openai.com/api-keys"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-medium"
+                              >
+                                OpenAI Platform →
+                              </a>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-border pt-6">
+                        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                          <span className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-sm">2</span>
+                          Perplexity API Key (Optional)
+                        </h3>
+                        <div className="pl-10 space-y-3">
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <p className="text-sm text-slate-700 mb-2">
+                              <strong>Used for:</strong> Real-time Web Search, Current Company Information
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              Without this key, the system will use OpenAI's knowledge base (limited to training data cutoff).
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Perplexity API Key
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={showPerplexityKey ? 'text' : 'password'}
+                                value={perplexityKey}
+                                onChange={(e) => setPerplexityKey(e.target.value)}
+                                placeholder="pplx-..."
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() => setShowPerplexityKey(!showPerplexityKey)}
+                              >
+                                {showPerplexityKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              Get your API key from{' '}
+                              <a
+                                href="https://www.perplexity.ai/settings/api"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-medium"
+                              >
+                                Perplexity AI Settings →
+                              </a>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-border">
+                      <div className="text-sm text-muted-foreground">
+                        {openaiKey && perplexityKey ? (
+                          <span className="text-green-600 flex items-center gap-1">
+                            <CheckCircle className="h-4 w-4" />
+                            Both keys configured (Full features)
+                          </span>
+                        ) : openaiKey ? (
+                          <span className="text-blue-600 flex items-center gap-1">
+                            <CheckCircle className="h-4 w-4" />
+                            OpenAI configured (Basic features)
+                          </span>
+                        ) : (
+                          <span className="text-orange-600 flex items-center gap-1">
+                            <AlertTriangle className="h-4 w-4" />
+                            No keys configured
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant="primary"
+                        onClick={handleSave}
+                        disabled={saved || isSavingKeys || (!openaiKey && !perplexityKey)}
+                      >
+                        {isSavingKeys ? (
+                          'Saving...'
+                        ) : saved ? (
+                          <>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Saved!
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save API Keys
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           )}
