@@ -472,6 +472,7 @@ export const mockMeetingTranscripts: MeetingTranscript[] = [
 
 export const mockFinancialData: FinancialData[] = [
   {
+    id: 'fd1',
     clientId: '1',
     mrr: 15000,
     totalRevenue: 285000,

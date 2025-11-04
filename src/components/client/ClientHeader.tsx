@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { MapPin, Calendar, RefreshCw, ChevronDown, MoreVertical, Mail, Phone, Video, FileText, Database } from 'lucide-react';
+import { MapPin, Calendar, RefreshCw, ChevronDown, MoreVertical, Mail, Phone, Video, FileText } from 'lucide-react';
 import { Client } from '../../types';
 import { useNavigate } from 'react-router-dom';
 
@@ -66,15 +66,6 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshDat
           </div>
 
           <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/clients/${client.id}/data-sources`)}
-            >
-              <Database className="h-4 w-4 mr-2" />
-              Data Sources
-            </Button>
-
             <Button
               variant="ghost"
               size="sm"

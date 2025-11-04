@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ClientHeader } from '../components/client/ClientHeader';
 import { FinancialOverview } from '../components/client/FinancialOverview';
@@ -12,11 +12,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp } from 'lucide-react';
-import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery } from '../types';
+import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
-import { mockFinancialData, mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
+import { mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
 import { exportPersonaReportAsPDF } from '../utils/pdfExport';
 import { useToast } from '../components/ui/Toast';
+import { supabase } from '../lib/supabase';
 
 export const ClientDetailNew: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,42 +32,88 @@ export const ClientDetailNew: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [queries, setQueries] = useState<IntelligenceQuery[]>([]);
   const [isProcessingQuery, setIsProcessingQuery] = useState(false);
+  const [client, setClient] = useState<Client | null>(null);
+  const [financialData, setFinancialData] = useState<FinancialData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const client = {
-    id: '1',
-    name: 'Sarah Mitchell',
-    company: 'TechCorp Solutions',
-    email: 'sarah.mitchell@techcorp.com',
-    phone: '+1 (555) 123-4567',
-    role: 'VP of Engineering',
-    industry: 'Technology',
-    status: 'active' as const,
-    lastContact: '2025-10-28',
-    nextFollowUp: '2025-11-05',
-    personaScore: 92,
-    tags: ['decision-maker', 'technical', 'high-value'],
-    createdAt: '2025-06-15',
-    location: 'San Francisco, CA',
-    founded: '2018',
-    csm: 'John Williams',
-  };
-
-  const financialData = mockFinancialData.find(f => f.clientId === id) || mockFinancialData[0];
   const contacts = mockContacts.filter(c => c.clientId === id);
   const opportunities = mockOpportunities.filter(o => o.clientId === id);
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
 
-  const handleRefreshData = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      handleRunPersonaAnalysis();
-    }, 2000);
+  useEffect(() => {
+    if (id) {
+      loadClientData();
+    }
+  }, [id]);
+
+  const loadClientData = async () => {
+    setIsLoading(true);
+    try {
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (clientError) throw clientError;
+
+      if (clientData) {
+        setClient({
+          id: clientData.id,
+          name: clientData.name,
+          company: clientData.company,
+          email: clientData.email,
+          phone: clientData.phone || '',
+          role: clientData.role || '',
+          industry: clientData.industry || '',
+          status: clientData.status,
+          lastContact: clientData.last_contact || '',
+          nextFollowUp: clientData.next_follow_up || '',
+          personaScore: clientData.persona_score,
+          tags: clientData.tags || [],
+          createdAt: clientData.created_at,
+          location: clientData.location || '',
+          founded: clientData.founded || '',
+          csm: clientData.csm || '',
+          avatar: clientData.avatar || undefined,
+        });
+      }
+
+      const { data: financialDataResult, error: financialError } = await supabase
+        .from('financial_data')
+        .select('*')
+        .eq('client_id', id)
+        .maybeSingle();
+
+      if (!financialError && financialDataResult) {
+        setFinancialData({
+          id: financialDataResult.id,
+          clientId: financialDataResult.client_id || '',
+          mrr: financialDataResult.mrr,
+          totalRevenue: financialDataResult.total_revenue,
+          activeDeals: financialDataResult.active_deals,
+          latestDeal: financialDataResult.latest_deal_name ? {
+            name: financialDataResult.latest_deal_name,
+            value: financialDataResult.latest_deal_value || 0,
+            stage: financialDataResult.latest_deal_stage || '',
+            closeDate: financialDataResult.latest_deal_close_date || '',
+          } : undefined,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading client data:', error);
+      showToast('error', 'Failed to load client data');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  React.useEffect(() => {
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    await loadClientData();
+    setIsRefreshing(false);
     handleRunPersonaAnalysis();
-  }, []);
+  };
 
   const handleRunPersonaAnalysis = () => {
     setIsAnalyzing(true);
@@ -109,6 +156,28 @@ export const ClientDetailNew: React.FC = () => {
     { id: 'intelligence', label: 'Intelligence & Assets', icon: MessageSquare },
     { id: 'settings', label: 'Settings & Admin', icon: Settings },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading client data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!client) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">Client not found</p>
+          <Button onClick={() => navigate('/clients')}>Back to Clients</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -159,10 +228,11 @@ export const ClientDetailNew: React.FC = () => {
       <div className="p-6">
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <FinancialOverview data={financialData} />
-              </div>
+            {financialData ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <FinancialOverview data={financialData} />
+                </div>
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Quick Actions</CardTitle>
@@ -204,6 +274,13 @@ export const ClientDetailNew: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
+            ) : (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <p className="text-muted-foreground">No financial data available for this client.</p>
+                </CardContent>
+              </Card>
+            )}
 
             {personaMetrics && !isAnalyzing && (
               <div className="space-y-6">

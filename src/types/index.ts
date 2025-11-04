@@ -253,6 +253,7 @@ export interface IngestionEvent {
 }
 
 export interface FinancialData {
+  id: string;
   clientId: string;
   mrr: number;
   totalRevenue: number;
