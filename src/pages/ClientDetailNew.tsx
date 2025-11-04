@@ -13,6 +13,7 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
+import { DocumentUpload } from '../components/data-sources/DocumentUpload';
 import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
@@ -55,6 +56,8 @@ export const ClientDetailNew: React.FC = () => {
   const [meetingNotes, setMeetingNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState<any[]>([]);
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
 
   const opportunities = mockOpportunities.filter(o => o.clientId === id);
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
@@ -192,6 +195,89 @@ export const ClientDetailNew: React.FC = () => {
       showToast('error', 'Failed to save meeting notes');
     } finally {
       setSavingNotes(false);
+    }
+  };
+
+  const handleDocumentUpload = async (files: File[]) => {
+    if (!client || !user || files.length === 0) return;
+
+    setUploadingDoc(true);
+    setShowDocumentUpload(false);
+
+    try {
+      for (const file of files) {
+        const sanitizedFileName = file.name
+          .replace(/[^a-zA-Z0-9._-]/g, '_')
+          .replace(/_{2,}/g, '_');
+        const fileName = `${user.id}/${client.id}/${Date.now()}_${sanitizedFileName}`;
+
+        const { data, error } = await supabase.storage
+          .from('client-documents')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) {
+          console.error('Error uploading file:', error);
+          throw new Error(`Failed to upload ${file.name}: ${error.message}`);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('client-documents')
+          .getPublicUrl(fileName);
+
+        const documentType = file.type.includes('pdf') ? 'proposal' :
+                            file.type.includes('word') ? 'contract' :
+                            file.type.includes('image') ? 'other' : 'email';
+
+        const { data: docData, error: dbError } = await supabase
+          .from('documents')
+          .insert({
+            client_id: client.id,
+            user_id: user.id,
+            name: file.name,
+            type: documentType,
+            size: file.size,
+            url: publicUrl,
+            source: fileName,
+            status: 'completed',
+            uploaded_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+
+        if (dbError) {
+          console.error('Error saving document to database:', dbError);
+          throw new Error(`Failed to save ${file.name} to database: ${dbError.message}`);
+        }
+
+        if (docData) {
+          setUploadedDocuments(prev => [docData, ...prev]);
+        }
+
+        try {
+          const { processAndEmbedDocument } = await import('../utils/documentEmbeddings');
+          await processAndEmbedDocument(file, {
+            clientId: client.id,
+            metadata: {
+              documentType: documentType,
+              fileName: file.name,
+              clientId: client.id,
+            }
+          });
+          console.log(`Successfully generated embeddings for ${file.name}`);
+        } catch (embedError) {
+          console.error(`Failed to generate embeddings for ${file.name}:`, embedError);
+        }
+      }
+
+      showToast('success', `Successfully uploaded ${files.length} document(s)`);
+    } catch (error) {
+      console.error('Error uploading documents:', error);
+      showToast('error', error instanceof Error ? error.message : 'Failed to upload documents');
+    } finally {
+      setUploadingDoc(false);
     }
   };
 
@@ -859,21 +945,42 @@ Client Information:
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Upload className="h-5 w-5" />
-                      Documents & Assets
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <Upload className="h-5 w-5" />
+                        Documents & Assets
+                      </CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowDocumentUpload(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Upload
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
+                    {uploadingDoc && (
+                      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                        <span className="text-sm text-blue-900">Uploading and generating embeddings...</span>
+                      </div>
+                    )}
                     {uploadedDocuments.length === 0 ? (
                       <div className="text-center py-8">
                         <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                         <p className="text-sm text-muted-foreground mb-4">
                           No documents uploaded yet
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          Upload documents in the Settings & Admin tab
-                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowDocumentUpload(true)}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Upload First Document
+                        </Button>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -1419,6 +1526,12 @@ Client Information:
           </div>
         </div>
       </Modal>
+
+      <DocumentUpload
+        isOpen={showDocumentUpload}
+        onClose={() => setShowDocumentUpload(false)}
+        onUpload={handleDocumentUpload}
+      />
     </div>
   );
 };

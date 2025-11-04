@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { Sparkles, Loader2, ChevronDown, Send, User, Bot } from 'lucide-react';
+import { Sparkles, Loader2, ChevronDown, Send, User, Bot, History, Trash2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 interface Message {
   id: string;
@@ -27,6 +28,8 @@ export const IntelligenceAgent: React.FC<IntelligenceAgentProps> = ({
   const [mode, setMode] = useState<'quick' | 'deep'>('quick');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const suggestions = [
     'What are the key pain points for this client?',
@@ -35,6 +38,73 @@ export const IntelligenceAgent: React.FC<IntelligenceAgentProps> = ({
     'Analyze communication patterns',
     'Identify potential risks'
   ];
+
+  useEffect(() => {
+    loadChatHistory();
+  }, [clientId]);
+
+  const loadChatHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('chat_history')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (data) {
+        const loadedMessages: Message[] = data.map(msg => ({
+          id: msg.id,
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          timestamp: msg.created_at,
+          mode: msg.mode as 'quick' | 'deep' | undefined
+        }));
+        setMessages(loadedMessages);
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const saveChatMessage = async (message: Message) => {
+    try {
+      const { error } = await supabase
+        .from('chat_history')
+        .insert({
+          client_id: clientId,
+          role: message.role,
+          content: message.content,
+          mode: message.mode,
+          created_at: message.timestamp
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving chat message:', error);
+    }
+  };
+
+  const clearChatHistory = async () => {
+    if (!confirm('Are you sure you want to clear all chat history for this client?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('chat_history')
+        .delete()
+        .eq('client_id', clientId);
+
+      if (error) throw error;
+
+      setMessages([]);
+    } catch (error) {
+      console.error('Error clearing chat history:', error);
+    }
+  };
 
   const handleSubmit = async () => {
     if (query.trim() && !isProcessing) {
@@ -46,6 +116,8 @@ export const IntelligenceAgent: React.FC<IntelligenceAgentProps> = ({
       };
 
       setMessages(prev => [...prev, userMessage]);
+      await saveChatMessage(userMessage);
+
       const currentQuery = query;
       const currentMode = mode;
       setQuery('');
@@ -62,6 +134,7 @@ export const IntelligenceAgent: React.FC<IntelligenceAgentProps> = ({
         };
 
         setMessages(prev => [...prev, assistantMessage]);
+        await saveChatMessage(assistantMessage);
       } catch (error) {
         console.error('Error processing query:', error);
       }
@@ -84,6 +157,15 @@ export const IntelligenceAgent: React.FC<IntelligenceAgentProps> = ({
             Intelligence Agent
           </CardTitle>
           <div className="flex items-center gap-2">
+            {messages.length > 0 && (
+              <button
+                onClick={clearChatHistory}
+                className="p-2 hover:bg-accent rounded-md transition-colors"
+                title="Clear chat history"
+              >
+                <Trash2 className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
             <button
               onClick={() => setMode('quick')}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
