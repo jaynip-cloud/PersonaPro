@@ -141,12 +141,20 @@ async function crawlWebsite(startUrl: string): Promise<CrawlResult[]> {
     'blog',
     'news',
     'press',
+    'press-releases',
     'case-studies',
     'portfolio',
     'careers',
     'jobs',
     'technology',
-    'partners'
+    'partners',
+    'investors',
+    'investor-relations',
+    'strategy',
+    'roadmap',
+    'mission',
+    'vision',
+    'goals'
   ];
 
   const baseUrl = new URL(startUrl);
@@ -273,6 +281,8 @@ IMPORTANT: You have access to real-time web search. Use it extensively to:
 - Find leadership information (CEO, Founder, Owner) from LinkedIn, news, press releases
 - Extract blog articles from their blog/news pages
 - Identify technology stack, partners, and integrations from their website and web sources
+- **SEARCH FOR BUSINESS GOALS**: Find recent press releases, CEO interviews, blog posts about company strategy, goals, roadmap, and future plans
+- **EXTRACT CLIENT EXPECTATIONS**: Look for what they expect from partnerships, vendors, and service providers
 - Cross-reference information for accuracy
 
 ROOT DOMAIN: ${rootUrl}
@@ -367,9 +377,9 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
     "integrations": ["Integration 1", "Integration 2", "Platform 1"]
   },
   "businessInfo": {
-    "shortTermGoals": "Company's short-term goals/objectives if mentioned (next 6-12 months)",
-    "longTermGoals": "Company's long-term vision/goals if mentioned (2-5 years)",
-    "expectations": "What the company expects from partnerships/clients/services if mentioned"
+    "shortTermGoals": "Company's short-term goals, objectives, immediate priorities, current focus areas, quarterly/annual targets (next 6-12 months). Examples: 'Expand into 3 new markets', 'Increase revenue by 25%', 'Launch new product line', 'Scale team to 100 employees'",
+    "longTermGoals": "Company's long-term vision, strategic goals, future aspirations, 5-year plan, mission-driven objectives (2-5 years). Examples: 'Become market leader', 'IPO by 2027', 'Expand globally to 50 countries', 'Achieve $100M ARR'",
+    "expectations": "What the company expects from partnerships, client relationships, vendor services, collaboration outcomes. Examples: 'Expect 24/7 support', 'Need scalable solutions', 'Require data security compliance', 'Want strategic partnership growth'"
   },
   "socialProfiles": {
     "linkedin": "${linkedinCompanyUrls[0] || ''}",
@@ -424,16 +434,38 @@ DETAILED EXTRACTION GUIDELINES:
 - Phone: Include country code (+1, +44, etc.), look in contact page and header
 - Extract both primary and alternate contact details if multiple found
 
+**Business Goals & Expectations (IMPORTANT):**
+- **Short-term Goals** - Look in: about page, investor relations, press releases, blog posts, annual reports
+  - Search for: "goals for 2024", "this year we aim to", "current priorities", "our focus", "Q1/Q2/Q3/Q4 objectives"
+  - Extract specific, measurable goals like revenue targets, expansion plans, product launches, hiring goals
+  - Examples: "Launch mobile app in Q2 2024", "Grow customer base by 40%", "Expand to European market"
+
+- **Long-term Goals** - Look in: about page, mission/vision section, investor deck, CEO interviews, strategy pages
+  - Search for: "vision for", "by 2025/2026/2027", "our long-term strategy", "5-year plan", "roadmap"
+  - Extract strategic direction, market position goals, transformation objectives
+  - Examples: "Become the leading SaaS platform in healthcare", "Achieve unicorn status", "Revolutionize the industry"
+
+- **Client/Partnership Expectations** - Look in: partnerships page, client testimonials, case studies, service agreements
+  - Search for: "we expect", "looking for partners who", "ideal client", "what we value", "our requirements"
+  - Extract what they need from vendors/partners/clients (response time, quality standards, communication style)
+  - Examples: "24/7 support availability", "Transparent communication", "Scalability and flexibility", "Data security compliance"
+
+- **Use web search extensively** to find recent press releases, CEO interviews, blog posts about company goals
+- If explicit goals not found, infer from company description, recent news, product roadmap, hiring patterns
+
 SEARCH STRATEGY:
-1. Homepage - company overview, hero description, key services
-2. About/About-us - company history, founding year, mission, vision, team size
+1. Homepage - company overview, hero description, key services, current initiatives
+2. About/About-us - company history, founding year, mission, vision, team size, strategic goals
 3. Services/Products/Solutions - ALL services and products with descriptions
 4. Team/Leadership - CEO, founders, key team members with LinkedIn profiles
-5. Blog/News/Insights - Recent articles with titles, URLs, dates, summaries
+5. Blog/News/Insights - Recent articles with titles, URLs, dates, summaries, company updates, goal announcements
 6. Technology/Partners/Integrations - Tech stack, partner companies, integrations
 7. Contact - email addresses, phone numbers, physical address with zip code
 8. Footer - often contains location, social links, contact info
-9. Use web search to fill gaps in leadership, technology, and company information
+9. Investor Relations/Press - company goals, growth targets, strategic direction
+10. Careers/Jobs - hiring goals, team expansion plans (indicates growth ambitions)
+11. Use web search extensively to find: press releases, CEO interviews, recent news about company goals and strategy
+12. Search for: "[Company Name] goals", "[Company Name] strategy", "[Company Name] roadmap", "[Company Name] future plans"
 
 QUALITY REQUIREMENTS:
 - Minimum 3-5 services/products (if available on website)
@@ -460,7 +492,7 @@ Now extract the comprehensive company information including services, blogs, tec
         messages: [
           {
             role: "system",
-            content: "You are an expert business intelligence analyst who excels at extracting comprehensive, accurate company information from website content and online sources. You have access to web search and use it extensively to find missing information, verify details, and enrich data. You are meticulous, thorough, and never fabricate data. You always return properly formatted JSON with complete, factual data. When you find LinkedIn profiles, you search for details about those people. You extract all services, blog articles, and technology information available on the website.",
+            content: "You are an expert business intelligence analyst who excels at extracting comprehensive, accurate company information from website content and online sources. You have access to web search and use it extensively to find missing information, verify details, and enrich data. You are meticulous, thorough, and never fabricate data. You always return properly formatted JSON with complete, factual data. When you find LinkedIn profiles, you search for details about those people. You extract all services, blog articles, technology information, and CRITICALLY IMPORTANT: business goals, strategic objectives, and partnership expectations. You actively search for company goals in press releases, blog posts, about pages, and recent news. If explicit goals aren't stated, you intelligently infer them from company descriptions, growth indicators, and strategic direction.",
           },
           {
             role: "user",

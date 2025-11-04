@@ -207,9 +207,10 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
         if (data.data.contactInfo?.primaryPhone && !formData.primaryPhone) updates.primaryPhone = data.data.contactInfo.primaryPhone;
         if (data.data.contactInfo?.alternatePhone && !formData.alternatePhone) updates.alternatePhone = data.data.contactInfo.alternatePhone;
 
-        if (data.data.businessGoals?.shortTermGoals && !formData.shortTermGoals) updates.shortTermGoals = data.data.businessGoals.shortTermGoals;
-        if (data.data.businessGoals?.longTermGoals && !formData.longTermGoals) updates.longTermGoals = data.data.businessGoals.longTermGoals;
-        if (data.data.businessGoals?.expectations && !formData.expectations) updates.expectations = data.data.businessGoals.expectations;
+        if (data.data.businessInfo?.shortTermGoals && !formData.shortTermGoals) updates.shortTermGoals = data.data.businessInfo.shortTermGoals;
+        if (data.data.businessInfo?.longTermGoals && !formData.longTermGoals) updates.longTermGoals = data.data.businessInfo.longTermGoals;
+        if (data.data.businessInfo?.expectations && !formData.expectations) updates.expectations = data.data.businessInfo.expectations;
+        if (data.data.description && !formData.description) updates.description = data.data.description;
 
         if (data.data.socialProfiles?.linkedin && !formData.linkedinUrl) updates.linkedinUrl = data.data.socialProfiles.linkedin;
         if (data.data.socialProfiles?.twitter && !formData.twitterUrl) updates.twitterUrl = data.data.socialProfiles.twitter;
