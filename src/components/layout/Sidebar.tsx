@@ -15,10 +15,10 @@ import { ComingSoonModal } from '../ui/ComingSoonModal';
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, comingSoon: false },
   { name: 'Clients', href: '/clients', icon: Users, comingSoon: false },
-  { name: 'Projects', href: '/projects', icon: Briefcase, comingSoon: true },
   { name: 'Pitch History', href: '/pitch-history', icon: History, comingSoon: false },
-  { name: 'Growth Opportunities', href: '/growth-opportunities', icon: TrendingUp, comingSoon: true },
   { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen, comingSoon: false },
+  { name: 'Projects', href: '/projects', icon: Briefcase, comingSoon: true },
+  { name: 'Growth Opportunities', href: '/growth-opportunities', icon: TrendingUp, comingSoon: true },
   { name: 'Settings', href: '/settings', icon: Settings, comingSoon: false },
 ];
 
