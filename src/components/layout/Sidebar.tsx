@@ -14,9 +14,9 @@ import {
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users },
-  { name: 'Projects', href: '/projects', icon: Briefcase, comingSoon: true },
+  { name: 'Projects', href: '/projects', icon: Briefcase },
   { name: 'Pitch History', href: '/pitch-history', icon: History },
-  { name: 'Growth Opportunities', href: '/growth-opportunities', icon: TrendingUp, comingSoon: true },
+  { name: 'Growth Opportunities', href: '/growth-opportunities', icon: TrendingUp },
   { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
@@ -44,12 +44,7 @@ export const Sidebar: React.FC = () => {
               }
             >
               <item.icon className="h-5 w-5" />
-              <span className="flex-1">{item.name}</span>
-              {item.comingSoon && (
-                <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-blue-500/10 text-blue-600 border border-blue-500/20">
-                  Soon
-                </span>
-              )}
+              {item.name}
             </NavLink>
           ))}
         </nav>
