@@ -355,11 +355,10 @@ export const NewProject: React.FC = () => {
                   }`}
                 >
                   <option value="opportunity_identified">Opportunity Identified</option>
-                  <option value="planned">Planned</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="on_hold">On Hold</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="discussion">Discussion</option>
+                  <option value="quote">Quote</option>
+                  <option value="win">Win</option>
+                  <option value="loss">Loss</option>
                 </select>
                 {errors.status && (
                   <p className="text-sm text-red-500 mt-1">{errors.status}</p>

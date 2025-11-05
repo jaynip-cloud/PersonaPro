@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
-import { X, Edit2, Save, Sparkles, Calendar, DollarSign, Clock } from 'lucide-react';
+import { X, Save, Sparkles, Calendar, DollarSign, Clock, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Project {
   id: string;
   title: string;
   description: string;
-  status: 'opportunity_identified' | 'planned' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+  status: 'opportunity_identified' | 'discussion' | 'quote' | 'win' | 'loss';
   budget?: number;
   timeline?: string;
   dueDate?: string;
@@ -31,12 +31,14 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
   onUpdate,
 }) => {
   const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
   const [editedProject, setEditedProject] = useState<Project>(project);
+
+  useEffect(() => {
+    setEditedProject(project);
+  }, [project]);
 
   const handleSave = () => {
     onUpdate(editedProject);
-    setIsEditing(false);
   };
 
   const handleGeneratePitch = () => {
@@ -47,15 +49,13 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
     switch (status) {
       case 'opportunity_identified':
         return 'secondary';
-      case 'planned':
+      case 'discussion':
         return 'primary';
-      case 'in_progress':
+      case 'quote':
         return 'warning';
-      case 'on_hold':
-        return 'error';
-      case 'completed':
+      case 'win':
         return 'success';
-      case 'cancelled':
+      case 'loss':
         return 'error';
       default:
         return 'secondary';
@@ -66,22 +66,45 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
     switch (status) {
       case 'opportunity_identified':
         return 'Opportunity Identified';
-      case 'planned':
-        return 'Planned';
-      case 'in_progress':
-        return 'In Progress';
-      case 'on_hold':
-        return 'On Hold';
-      case 'completed':
-        return 'Completed';
-      case 'cancelled':
-        return 'Cancelled';
+      case 'discussion':
+        return 'Discussion';
+      case 'quote':
+        return 'Quote';
+      case 'win':
+        return 'Win';
+      case 'loss':
+        return 'Loss';
       default:
         return status;
     }
   };
 
+  const getProgressPercentage = (status: Project['status']) => {
+    switch (status) {
+      case 'opportunity_identified':
+        return 20;
+      case 'discussion':
+        return 40;
+      case 'quote':
+        return 60;
+      case 'win':
+        return 100;
+      case 'loss':
+        return 0;
+      default:
+        return 0;
+    }
+  };
+
+  const getProgressColor = (status: Project['status']) => {
+    if (status === 'loss') return 'bg-red-500';
+    if (status === 'win') return 'bg-green-500';
+    return 'bg-blue-500';
+  };
+
   if (!isOpen) return null;
+
+  const progress = getProgressPercentage(editedProject.status);
 
   return (
     <>
@@ -93,17 +116,6 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
         <div className="sticky top-0 bg-background border-b border-border p-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-foreground">Project Details</h2>
           <div className="flex items-center gap-2">
-            {!isEditing ? (
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-                <Edit2 className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-            ) : (
-              <Button variant="primary" size="sm" onClick={handleSave}>
-                <Save className="h-4 w-4 mr-2" />
-                Save
-              </Button>
-            )}
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -112,29 +124,36 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
 
         <div className="p-6 space-y-6">
           <div>
+            <label className="block text-sm font-medium mb-2">Progress</label>
+            <div className="space-y-2">
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className={`h-3 rounded-full transition-all duration-500 ${getProgressColor(editedProject.status)}`}
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {progress}% Complete
+              </p>
+            </div>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-2">Title</label>
-            {isEditing ? (
-              <Input
-                value={editedProject.title}
-                onChange={(e) => setEditedProject({ ...editedProject, title: e.target.value })}
-              />
-            ) : (
-              <p className="text-lg font-semibold">{project.title}</p>
-            )}
+            <Input
+              value={editedProject.title}
+              onChange={(e) => setEditedProject({ ...editedProject, title: e.target.value })}
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-2">Description</label>
-            {isEditing ? (
-              <textarea
-                value={editedProject.description}
-                onChange={(e) => setEditedProject({ ...editedProject, description: e.target.value })}
-                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                rows={4}
-              />
-            ) : (
-              <p className="text-muted-foreground">{project.description}</p>
-            )}
+            <textarea
+              value={editedProject.description}
+              onChange={(e) => setEditedProject({ ...editedProject, description: e.target.value })}
+              className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              rows={4}
+            />
           </div>
 
           <div>
@@ -144,24 +163,17 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
 
           <div>
             <label className="block text-sm font-medium mb-2">Status</label>
-            {isEditing ? (
-              <select
-                value={editedProject.status}
-                onChange={(e) => setEditedProject({ ...editedProject, status: e.target.value as Project['status'] })}
-                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="opportunity_identified">Opportunity Identified</option>
-                <option value="planned">Planned</option>
-                <option value="in_progress">In Progress</option>
-                <option value="on_hold">On Hold</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            ) : (
-              <Badge variant={getStatusColor(project.status)}>
-                {getStatusLabel(project.status)}
-              </Badge>
-            )}
+            <select
+              value={editedProject.status}
+              onChange={(e) => setEditedProject({ ...editedProject, status: e.target.value as Project['status'] })}
+              className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="opportunity_identified">Opportunity Identified</option>
+              <option value="discussion">Discussion</option>
+              <option value="quote">Quote</option>
+              <option value="win">Win</option>
+              <option value="loss">Loss</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -170,18 +182,12 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
                 <DollarSign className="h-4 w-4" />
                 Budget
               </label>
-              {isEditing ? (
-                <Input
-                  type="number"
-                  value={editedProject.budget || ''}
-                  onChange={(e) => setEditedProject({ ...editedProject, budget: parseFloat(e.target.value) || undefined })}
-                  placeholder="0.00"
-                />
-              ) : (
-                <p className="text-foreground">
-                  {project.budget ? `$${project.budget.toLocaleString()}` : 'Not set'}
-                </p>
-              )}
+              <Input
+                type="number"
+                value={editedProject.budget || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, budget: parseFloat(e.target.value) || undefined })}
+                placeholder="0.00"
+              />
             </div>
 
             <div>
@@ -189,15 +195,11 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
                 <Clock className="h-4 w-4" />
                 Timeline
               </label>
-              {isEditing ? (
-                <Input
-                  value={editedProject.timeline || ''}
-                  onChange={(e) => setEditedProject({ ...editedProject, timeline: e.target.value })}
-                  placeholder="e.g., 3 months"
-                />
-              ) : (
-                <p className="text-foreground">{project.timeline || 'Not set'}</p>
-              )}
+              <Input
+                value={editedProject.timeline || ''}
+                onChange={(e) => setEditedProject({ ...editedProject, timeline: e.target.value })}
+                placeholder="e.g., 3 months"
+              />
             </div>
           </div>
 
@@ -206,21 +208,19 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
               <Calendar className="h-4 w-4" />
               Due Date
             </label>
-            {isEditing ? (
-              <Input
-                type="date"
-                value={editedProject.dueDate || ''}
-                onChange={(e) => setEditedProject({ ...editedProject, dueDate: e.target.value })}
-              />
-            ) : (
-              <p className="text-foreground">
-                {project.dueDate ? new Date(project.dueDate).toLocaleDateString() : 'Not set'}
-              </p>
-            )}
+            <Input
+              type="date"
+              value={editedProject.dueDate || ''}
+              onChange={(e) => setEditedProject({ ...editedProject, dueDate: e.target.value })}
+            />
           </div>
 
-          <div className="pt-4 border-t border-border">
-            <Button variant="primary" className="w-full" onClick={handleGeneratePitch}>
+          <div className="flex gap-3 pt-4 border-t border-border">
+            <Button variant="primary" className="flex-1" onClick={handleSave}>
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={handleGeneratePitch}>
               <Sparkles className="h-4 w-4 mr-2" />
               Generate Pitch
             </Button>

@@ -15,7 +15,7 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { DocumentUpload } from '../components/data-sources/DocumentUpload';
 import { ProjectDetailPanel } from '../components/project/ProjectDetailPanel';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2 } from 'lucide-react';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
@@ -1329,30 +1329,10 @@ Client Information:
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Projects</CardTitle>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleGenerateProject}
-                        disabled={isGeneratingProject}
-                      >
-                        {isGeneratingProject ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Generating...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            AI Generate
-                          </>
-                        )}
-                      </Button>
-                      <Button variant="primary" size="sm">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Project
-                      </Button>
-                    </div>
+                    <Button variant="primary" size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Project
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -1373,8 +1353,6 @@ Client Information:
                           if (status === 'quote') return 'warning';
                           if (status === 'win') return 'success';
                           if (status === 'loss') return 'error';
-                          if (status === 'in_progress') return 'primary';
-                          if (status === 'completed') return 'success';
                           return 'secondary';
                         };
 
@@ -1384,8 +1362,6 @@ Client Information:
                           if (status === 'quote') return 'Quote';
                           if (status === 'win') return 'Win';
                           if (status === 'loss') return 'Loss';
-                          if (status === 'in_progress') return 'In Progress';
-                          if (status === 'completed') return 'Completed';
                           return status;
                         };
 
@@ -1406,9 +1382,10 @@ Client Information:
                                 </Badge>
                                 <button
                                   onClick={() => setSelectedProject(project)}
-                                  className="p-1 hover:bg-muted rounded"
+                                  className="p-1 hover:bg-muted rounded transition-colors"
+                                  title="View details"
                                 >
-                                  <Edit2 className="h-4 w-4 text-muted-foreground" />
+                                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
                                 </button>
                               </div>
                             </div>
