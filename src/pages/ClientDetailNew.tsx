@@ -69,9 +69,12 @@ export const ClientDetailNew: React.FC = () => {
   const [projects, setProjects] = useState<any[]>([]);
   const [isGeneratingOpportunity, setIsGeneratingOpportunity] = useState(false);
   const [showAddOpportunityModal, setShowAddOpportunityModal] = useState(false);
+  const [showEditOpportunityModal, setShowEditOpportunityModal] = useState(false);
   const [newOpportunityForm, setNewOpportunityForm] = useState({ title: '', description: '' });
+  const [editOpportunityForm, setEditOpportunityForm] = useState<{ id: string; title: string; description: string } | null>(null);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [isGeneratingProject, setIsGeneratingProject] = useState(false);
+  const [deletingOpportunityId, setDeletingOpportunityId] = useState<string | null>(null);
 
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
 
@@ -732,6 +735,73 @@ Client Information:
     }
   };
 
+  const handleEditOpportunity = (opportunity: any) => {
+    setEditOpportunityForm({
+      id: opportunity.id,
+      title: opportunity.title,
+      description: opportunity.description || '',
+    });
+    setShowEditOpportunityModal(true);
+  };
+
+  const handleUpdateOpportunity = async () => {
+    if (!editOpportunityForm || !editOpportunityForm.title || !editOpportunityForm.description) return;
+
+    try {
+      const { error } = await supabase
+        .from('opportunities')
+        .update({
+          title: editOpportunityForm.title,
+          description: editOpportunityForm.description,
+        })
+        .eq('id', editOpportunityForm.id);
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      setOpportunities(opportunities.map(o =>
+        o.id === editOpportunityForm.id
+          ? { ...o, title: editOpportunityForm.title, description: editOpportunityForm.description }
+          : o
+      ));
+      setEditOpportunityForm(null);
+      setShowEditOpportunityModal(false);
+      showToast('success', 'Opportunity updated successfully');
+    } catch (error: any) {
+      console.error('Error updating opportunity:', error);
+      showToast('error', `Failed to update opportunity: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleDeleteOpportunity = async (opportunityId: string) => {
+    if (!confirm('Are you sure you want to delete this opportunity? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingOpportunityId(opportunityId);
+    try {
+      const { error } = await supabase
+        .from('opportunities')
+        .delete()
+        .eq('id', opportunityId);
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      setOpportunities(opportunities.filter(o => o.id !== opportunityId));
+      showToast('success', 'Opportunity deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting opportunity:', error);
+      showToast('error', `Failed to delete opportunity: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setDeletingOpportunityId(null);
+    }
+  };
+
   const handleConvertToProject = async (opportunityId: string) => {
     if (!client || !user) return;
 
@@ -1184,15 +1254,38 @@ Client Information:
                             Created {new Date(opp.created_at).toLocaleDateString()}
                           </p>
                         </div>
-                        {!opp.converted_to_project_id && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleConvertToProject(opp.id)}
-                          >
-                            Add to Project
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {!opp.converted_to_project_id && (
+                            <>
+                              <button
+                                onClick={() => handleEditOpportunity(opp)}
+                                className="p-2 hover:bg-muted rounded transition-colors"
+                                title="Edit opportunity"
+                              >
+                                <Edit2 className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteOpportunity(opp.id)}
+                                disabled={deletingOpportunityId === opp.id}
+                                className="p-2 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                                title="Delete opportunity"
+                              >
+                                {deletingOpportunityId === opp.id ? (
+                                  <Loader2 className="h-4 w-4 text-red-600 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4 text-red-600 hover:text-red-700" />
+                                )}
+                              </button>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => handleConvertToProject(opp.id)}
+                              >
+                                Add to Project
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -2178,6 +2271,57 @@ Client Information:
             </Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={showEditOpportunityModal}
+        onClose={() => {
+          setShowEditOpportunityModal(false);
+          setEditOpportunityForm(null);
+        }}
+        title="Edit Growth Opportunity"
+      >
+        {editOpportunityForm && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Title</label>
+              <Input
+                value={editOpportunityForm.title}
+                onChange={(e) => setEditOpportunityForm({ ...editOpportunityForm, title: e.target.value })}
+                placeholder="e.g., Mobile App Development"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Description</label>
+              <textarea
+                value={editOpportunityForm.description}
+                onChange={(e) => setEditOpportunityForm({ ...editOpportunityForm, description: e.target.value })}
+                placeholder="Describe the opportunity..."
+                className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                rows={4}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowEditOpportunityModal(false);
+                  setEditOpportunityForm(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleUpdateOpportunity}
+                disabled={!editOpportunityForm.title || !editOpportunityForm.description}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Update Opportunity
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {selectedProject && (
