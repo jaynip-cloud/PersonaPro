@@ -75,6 +75,16 @@ export const ClientDetailNew: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [isGeneratingProject, setIsGeneratingProject] = useState(false);
   const [deletingOpportunityId, setDeletingOpportunityId] = useState<string | null>(null);
+  const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+  const [newProjectForm, setNewProjectForm] = useState({
+    name: '',
+    description: '',
+    status: 'opportunity_identified',
+    budget: '',
+    timeline: '',
+    dueDate: ''
+  });
+  const [savingProject, setSavingProject] = useState(false);
 
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
 
@@ -883,6 +893,54 @@ Client Information:
     }
   };
 
+  const handleAddProject = async () => {
+    if (!newProjectForm.name.trim()) {
+      showToast('error', 'Project name is required');
+      return;
+    }
+
+    setSavingProject(true);
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          client_id: id,
+          name: newProjectForm.name,
+          description: newProjectForm.description || null,
+          status: newProjectForm.status,
+          budget: newProjectForm.budget ? parseFloat(newProjectForm.budget) : null,
+          timeline: newProjectForm.timeline || null,
+          due_date: newProjectForm.dueDate || null,
+          project_type: 'Pre-Sales',
+          progress_percentage: 0,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Project creation error:', error);
+        throw error;
+      }
+
+      setProjects([data, ...projects]);
+      showToast('success', 'Project created successfully');
+      setShowAddProjectModal(false);
+      setNewProjectForm({
+        name: '',
+        description: '',
+        status: 'opportunity_identified',
+        budget: '',
+        timeline: '',
+        dueDate: ''
+      });
+    } catch (error: any) {
+      console.error('Error creating project:', error);
+      showToast('error', `Failed to create project: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setSavingProject(false);
+    }
+  };
+
   const handleUpdateProject = async (updatedProject: any) => {
     try {
       const updateData: any = {
@@ -1329,7 +1387,7 @@ Client Information:
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Projects</CardTitle>
-                    <Button variant="primary" size="sm">
+                    <Button variant="primary" size="sm" onClick={() => setShowAddProjectModal(true)}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Project
                     </Button>
@@ -2289,6 +2347,116 @@ Client Information:
           onUpdate={handleUpdateProject}
         />
       )}
+
+      <Modal
+        isOpen={showAddProjectModal}
+        onClose={() => setShowAddProjectModal(false)}
+        title="Add New Project"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Project Name <span className="text-red-600">*</span>
+            </label>
+            <Input
+              placeholder="Enter project name"
+              value={newProjectForm.name}
+              onChange={(e) => setNewProjectForm({ ...newProjectForm, name: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Description
+            </label>
+            <textarea
+              placeholder="Enter project description"
+              value={newProjectForm.description}
+              onChange={(e) => setNewProjectForm({ ...newProjectForm, description: e.target.value })}
+              className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              rows={4}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Status
+            </label>
+            <select
+              value={newProjectForm.status}
+              onChange={(e) => setNewProjectForm({ ...newProjectForm, status: e.target.value })}
+              className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="opportunity_identified">Opportunity Identified</option>
+              <option value="discussion">Discussion</option>
+              <option value="quote">Quote</option>
+              <option value="win">Win</option>
+              <option value="loss">Loss</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Budget
+              </label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={newProjectForm.budget}
+                onChange={(e) => setNewProjectForm({ ...newProjectForm, budget: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Timeline
+              </label>
+              <Input
+                placeholder="e.g., 3 months"
+                value={newProjectForm.timeline}
+                onChange={(e) => setNewProjectForm({ ...newProjectForm, timeline: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              Due Date
+            </label>
+            <Input
+              type="date"
+              value={newProjectForm.dueDate}
+              onChange={(e) => setNewProjectForm({ ...newProjectForm, dueDate: e.target.value })}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowAddProjectModal(false)}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleAddProject}
+              disabled={savingProject}
+              className="flex-1"
+            >
+              {savingProject ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Project'
+              )}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
