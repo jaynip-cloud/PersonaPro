@@ -1543,12 +1543,28 @@ Client Information:
                             <div className="mt-3 pt-3 border-t border-border">
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs text-muted-foreground">Progress</span>
-                                <span className="text-xs font-medium text-foreground">{project.progress_percentage || 0}%</span>
+                                <span className="text-xs font-medium text-foreground">
+                                  {project.progress_percentage ?? (
+                                    project.status === 'opportunity_identified' ? 10 :
+                                    project.status === 'in_progress' ? 50 :
+                                    project.status === 'quote' ? 75 :
+                                    project.status === 'win' ? 100 :
+                                    project.status === 'loss' ? 0 :
+                                    project.status === 'completed' ? 100 : 0
+                                  )}%
+                                </span>
                               </div>
                               <div className="h-2 bg-muted rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-primary rounded-full transition-all duration-300"
-                                  style={{ width: `${project.progress_percentage || 0}%` }}
+                                  style={{ width: `${project.progress_percentage ?? (
+                                    project.status === 'opportunity_identified' ? 10 :
+                                    project.status === 'in_progress' ? 50 :
+                                    project.status === 'quote' ? 75 :
+                                    project.status === 'win' ? 100 :
+                                    project.status === 'loss' ? 0 :
+                                    project.status === 'completed' ? 100 : 0
+                                  )}%` }}
                                 />
                               </div>
                             </div>
