@@ -2,8 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
+import { Modal } from '../ui/Modal';
 import { X, Save, Sparkles, Calendar, DollarSign, Clock, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PitchBuilderForm } from '../pitch/PitchBuilderForm';
+import { GeneratedPitchDisplay } from '../pitch/GeneratedPitchDisplay';
+import { mockClients } from '../../data/mockData';
+import { generatePitchVariants } from '../../utils/pitchGenerator';
+import { GeneratedPitch, PitchGeneratorInput } from '../../types';
 
 interface Project {
   id: string;
@@ -32,6 +38,9 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
 }) => {
   const navigate = useNavigate();
   const [editedProject, setEditedProject] = useState<Project>(project);
+  const [showPitchModal, setShowPitchModal] = useState(false);
+  const [generatedPitches, setGeneratedPitches] = useState<GeneratedPitch[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     setEditedProject(project);
@@ -42,7 +51,26 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
   };
 
   const handleGeneratePitch = () => {
-    navigate('/pitch-generator', { state: { project: editedProject } });
+    setShowPitchModal(true);
+  };
+
+  const handlePitchGenerate = (input: PitchGeneratorInput) => {
+    setIsGenerating(true);
+
+    const simulatedDelay = Math.random() * 2000 + 2000;
+
+    setTimeout(() => {
+      const client = mockClients.find(c => c.id === input.clientId);
+      if (!client) return;
+
+      const { variantA, variantB } = generatePitchVariants(input, client);
+      setGeneratedPitches([variantA, variantB]);
+      setIsGenerating(false);
+    }, simulatedDelay);
+  };
+
+  const handleSavePitch = (pitch: GeneratedPitch) => {
+    console.log('Pitch saved:', pitch);
   };
 
   const getStatusColor = (status: Project['status']) => {
@@ -231,6 +259,37 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={showPitchModal}
+        onClose={() => {
+          setShowPitchModal(false);
+          setGeneratedPitches([]);
+        }}
+        title="Generate Pitch"
+        size="xl"
+      >
+        <div className="space-y-6">
+          <PitchBuilderForm
+            clients={mockClients}
+            onGenerate={handlePitchGenerate}
+            isGenerating={isGenerating}
+          />
+
+          {generatedPitches.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground">Generated Pitches</h3>
+              {generatedPitches.map((pitch) => (
+                <GeneratedPitchDisplay
+                  key={pitch.id}
+                  pitch={pitch}
+                  onSave={handleSavePitch}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
     </>
   );
 };
