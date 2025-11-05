@@ -1881,121 +1881,91 @@ Client Information:
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-6">
-                  <p className="text-sm text-green-900 font-medium mb-2">
-                    3 High-Priority Opportunities Identified
-                  </p>
-                  <p className="text-sm text-green-800">
-                    Based on client intelligence, market trends, and persona analysis
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="p-5 border-2 border-green-200 bg-green-50/50 rounded-lg">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-semibold text-foreground">ML Platform Integration</h4>
-                          <Badge variant="success">High Priority</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          Client has expressed strong interest in ML capabilities during recent calls. Their recent platform migration sets the perfect foundation for ML integration.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Estimated Value</p>
-                        <p className="text-lg font-bold text-green-600">$125,000</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Win Probability</p>
-                        <p className="text-lg font-bold text-foreground">78%</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Timeline</p>
-                        <p className="text-lg font-bold text-foreground">Q1 2026</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex gap-2">
-                      <Button variant="primary" size="sm">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Generate Pitch
-                      </Button>
-                      <Button variant="outline" size="sm">View Details</Button>
-                    </div>
+                {opportunities.length === 0 ? (
+                  <div className="text-center py-12">
+                    <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold text-foreground mb-2">No opportunities identified yet</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Click "Refresh Analysis" to identify growth opportunities based on client data
+                    </p>
                   </div>
+                ) : (
+                  <>
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-6">
+                      <p className="text-sm text-green-900 font-medium mb-2">
+                        {opportunities.length} {opportunities.length === 1 ? 'Opportunity' : 'Opportunities'} Identified
+                      </p>
+                      <p className="text-sm text-green-800">
+                        Based on client intelligence, market trends, and persona analysis
+                      </p>
+                    </div>
 
-                  <div className="p-5 border border-border rounded-lg">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-semibold text-foreground">Enterprise Support Upgrade</h4>
-                          <Badge variant="warning">Medium Priority</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          Current support tier shows high utilization. Client team size has grown 40% this year. Upgrade would provide 24/7 coverage and dedicated support engineer.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Estimated Value</p>
-                        <p className="text-lg font-bold text-foreground">$48,000/yr</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Win Probability</p>
-                        <p className="text-lg font-bold text-foreground">65%</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Timeline</p>
-                        <p className="text-lg font-bold text-foreground">Q4 2025</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex gap-2">
-                      <Button variant="primary" size="sm">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Generate Pitch
-                      </Button>
-                      <Button variant="outline" size="sm">View Details</Button>
-                    </div>
-                  </div>
+                    <div className="space-y-4">
+                      {opportunities.map((opportunity) => {
+                        const getPriorityBadge = (priority: string) => {
+                          if (priority === 'high') return { variant: 'success' as const, label: 'High Priority' };
+                          if (priority === 'medium') return { variant: 'warning' as const, label: 'Medium Priority' };
+                          return { variant: 'secondary' as const, label: 'Low Priority' };
+                        };
 
-                  <div className="p-5 border border-border rounded-lg">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-semibold text-foreground">Training & Certification Program</h4>
-                          <Badge variant="secondary">Low Priority</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          With new team members joining, structured training program could accelerate onboarding and improve platform adoption. Includes certification for 10 users.
-                        </p>
-                      </div>
+                        const badge = getPriorityBadge(opportunity.priority);
+
+                        return (
+                          <div
+                            key={opportunity.id}
+                            className={`p-5 border rounded-lg ${opportunity.priority === 'high' ? 'border-2 border-green-200 bg-green-50/50' : 'border-border'}`}
+                          >
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h4 className="font-semibold text-foreground">{opportunity.title}</h4>
+                                  <Badge variant={badge.variant}>{badge.label}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-3">
+                                  {opportunity.description}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 mt-4">
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Estimated Value</p>
+                                <p className={`text-lg font-bold ${opportunity.priority === 'high' ? 'text-green-600' : 'text-foreground'}`}>
+                                  {opportunity.estimated_value ? `$${opportunity.estimated_value.toLocaleString()}` : 'N/A'}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Win Probability</p>
+                                <p className="text-lg font-bold text-foreground">
+                                  {opportunity.win_probability ? `${opportunity.win_probability}%` : 'N/A'}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Timeline</p>
+                                <p className="text-lg font-bold text-foreground">
+                                  {opportunity.timeline || 'TBD'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-4 flex gap-2">
+                              <Button variant="primary" size="sm">
+                                <FileText className="h-4 w-4 mr-2" />
+                                Generate Pitch
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleConvertToProject(opportunity.id)}
+                                disabled={!!opportunity.converted_to_project_id}
+                              >
+                                {opportunity.converted_to_project_id ? 'Converted to Project' : 'Add to Project'}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Estimated Value</p>
-                        <p className="text-lg font-bold text-foreground">$15,000</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Win Probability</p>
-                        <p className="text-lg font-bold text-foreground">45%</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Timeline</p>
-                        <p className="text-lg font-bold text-foreground">Q1 2026</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex gap-2">
-                      <Button variant="primary" size="sm">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Generate Pitch
-                      </Button>
-                      <Button variant="outline" size="sm">View Details</Button>
-                    </div>
-                  </div>
-                </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
