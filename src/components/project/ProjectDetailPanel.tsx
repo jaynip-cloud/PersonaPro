@@ -109,13 +109,19 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
   };
 
   const handlePitchGenerate = (input: PitchGeneratorInput) => {
+    console.log('handlePitchGenerate called with:', input);
     setIsGenerating(true);
 
     const simulatedDelay = Math.random() * 2000 + 2000;
 
     setTimeout(() => {
-      const client = mockClients.find(c => c.id === input.clientId);
-      if (!client) return;
+      const client = clients.find(c => c.id === input.clientId);
+      console.log('Found client:', client);
+      if (!client) {
+        console.error('Client not found with ID:', input.clientId);
+        setIsGenerating(false);
+        return;
+      }
 
       const { variantA, variantB } = generatePitchVariants(input, client);
       setGeneratedPitches([variantA, variantB]);
