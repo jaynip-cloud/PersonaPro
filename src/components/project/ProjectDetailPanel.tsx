@@ -3,7 +3,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
-import { X, Save, Sparkles, Calendar, DollarSign, Clock, ChevronRight } from 'lucide-react';
+import { X, Save, Sparkles, Calendar, DollarSign, Clock, ChevronRight, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PitchBuilderForm } from '../pitch/PitchBuilderForm';
 import { GeneratedPitchDisplay } from '../pitch/GeneratedPitchDisplay';
@@ -31,6 +31,7 @@ interface ProjectDetailPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (updatedProject: Project) => void;
+  onDelete?: (projectId: string) => void;
 }
 
 export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
@@ -38,6 +39,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
   isOpen,
   onClose,
   onUpdate,
+  onDelete,
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -89,6 +91,17 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
 
   const handleSave = () => {
     onUpdate(editedProject);
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+      return;
+    }
+
+    if (onDelete) {
+      onDelete(project.id);
+      onClose();
+    }
   };
 
   const handleGeneratePitch = () => {
@@ -310,15 +323,23 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
             />
           </div>
 
-          <div className="flex gap-3 pt-4 border-t border-border">
-            <Button variant="primary" className="flex-1" onClick={handleSave}>
-              <Save className="h-4 w-4 mr-2" />
-              Save Changes
-            </Button>
-            <Button variant="outline" className="flex-1" onClick={handleGeneratePitch}>
-              <Sparkles className="h-4 w-4 mr-2" />
-              Generate Pitch
-            </Button>
+          <div className="space-y-3 pt-4 border-t border-border">
+            <div className="flex gap-3">
+              <Button variant="primary" className="flex-1" onClick={handleSave}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={handleGeneratePitch}>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate Pitch
+              </Button>
+            </div>
+            {onDelete && (
+              <Button variant="ghost" className="w-full text-red-500 hover:bg-red-50 hover:text-red-600" onClick={handleDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Project
+              </Button>
+            )}
           </div>
 
           <div className="text-xs text-muted-foreground">

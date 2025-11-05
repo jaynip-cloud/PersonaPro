@@ -98,8 +98,9 @@ export const PitchBuilderForm: React.FC<PitchBuilderFormProps> = ({
                 setShowDropdown(true);
               }}
               onFocus={() => setShowDropdown(true)}
+              disabled={!!initialClientId}
             />
-            {showDropdown && filteredClients.length > 0 && (
+            {showDropdown && filteredClients.length > 0 && !initialClientId && (
               <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
                 {filteredClients.map(client => (
                   <button

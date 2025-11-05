@@ -989,6 +989,27 @@ Client Information:
     }
   };
 
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+
+      if (error) {
+        console.error('Project delete error:', error);
+        throw error;
+      }
+
+      setProjects(projects.filter(p => p.id !== projectId));
+      setSelectedProject(null);
+      showToast('success', 'Project deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting project:', error);
+      showToast('error', `Failed to delete project: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Sparkles },
     { id: 'relationships', label: 'Relationships', icon: Users },
@@ -1457,20 +1478,18 @@ Client Information:
                                 </button>
                               </div>
                             </div>
-                            {project.progress_percentage !== undefined && project.progress_percentage !== null && (
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-muted-foreground">Progress</span>
-                                  <span className="font-medium">{project.progress_percentage}%</span>
-                                </div>
-                                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-primary transition-all duration-300"
-                                    style={{ width: `${project.progress_percentage}%` }}
-                                  />
-                                </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Progress</span>
+                                <span className="font-medium">{project.progress_percentage ?? 0}%</span>
                               </div>
-                            )}
+                              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary transition-all duration-300"
+                                  style={{ width: `${project.progress_percentage ?? 0}%` }}
+                                />
+                              </div>
+                            </div>
                             <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3">
                               {project.due_date && (
                                 <span>Due: {new Date(project.due_date).toLocaleDateString()}</span>
@@ -2356,6 +2375,7 @@ Client Information:
           isOpen={!!selectedProject}
           onClose={() => setSelectedProject(null)}
           onUpdate={handleUpdateProject}
+          onDelete={handleDeleteProject}
         />
       )}
 
