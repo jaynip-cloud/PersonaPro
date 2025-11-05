@@ -14,6 +14,7 @@ import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { DocumentUpload } from '../components/data-sources/DocumentUpload';
+import { ProjectDetailPanel } from '../components/project/ProjectDetailPanel';
 import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2 } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
@@ -64,8 +65,14 @@ export const ClientDetailNew: React.FC = () => {
   const [meetingTranscripts, setMeetingTranscripts] = useState<any[]>([]);
   const [showTranscriptHistory, setShowTranscriptHistory] = useState(false);
   const [editingTranscriptId, setEditingTranscriptId] = useState<string | null>(null);
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [isGeneratingOpportunity, setIsGeneratingOpportunity] = useState(false);
+  const [showAddOpportunityModal, setShowAddOpportunityModal] = useState(false);
+  const [newOpportunityForm, setNewOpportunityForm] = useState({ title: '', description: '' });
+  const [selectedProject, setSelectedProject] = useState<any | null>(null);
+  const [isGeneratingProject, setIsGeneratingProject] = useState(false);
 
-  const opportunities = mockOpportunities.filter(o => o.clientId === id);
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
 
   useEffect(() => {
@@ -174,6 +181,27 @@ export const ClientDetailNew: React.FC = () => {
 
       if (!transcriptsError && transcriptsData) {
         setMeetingTranscripts(transcriptsData);
+      }
+
+      const { data: opportunitiesData, error: opportunitiesError } = await supabase
+        .from('opportunities')
+        .select('*')
+        .eq('client_id', id)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!opportunitiesError && opportunitiesData) {
+        setOpportunities(opportunitiesData);
+      }
+
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('client_id', id)
+        .order('created_at', { ascending: false });
+
+      if (!projectsError && projectsData) {
+        setProjects(projectsData);
       }
     } catch (error) {
       console.error('Error loading client data:', error);
@@ -639,6 +667,165 @@ Client Information:
     }
   };
 
+  const handleGenerateOpportunity = async () => {
+    if (!client || !user) return;
+
+    setIsGeneratingOpportunity(true);
+    try {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .insert({
+          client_id: id,
+          user_id: user.id,
+          title: `${client.company} - Growth Opportunity`,
+          description: `AI-identified opportunity for ${client.company} based on recent interactions and market analysis.`,
+          is_ai_generated: true,
+          stage: 'qualification',
+          probability: 75,
+          value: 50000,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setOpportunities([data, ...opportunities]);
+      showToast('success', 'Opportunity generated successfully');
+    } catch (error) {
+      console.error('Error generating opportunity:', error);
+      showToast('error', 'Failed to generate opportunity');
+    } finally {
+      setIsGeneratingOpportunity(false);
+    }
+  };
+
+  const handleAddManualOpportunity = async () => {
+    if (!client || !user || !newOpportunityForm.title || !newOpportunityForm.description) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .insert({
+          client_id: id,
+          user_id: user.id,
+          title: newOpportunityForm.title,
+          description: newOpportunityForm.description,
+          is_ai_generated: false,
+          stage: 'qualification',
+          probability: 50,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setOpportunities([data, ...opportunities]);
+      setNewOpportunityForm({ title: '', description: '' });
+      setShowAddOpportunityModal(false);
+      showToast('success', 'Opportunity added successfully');
+    } catch (error) {
+      console.error('Error adding opportunity:', error);
+      showToast('error', 'Failed to add opportunity');
+    }
+  };
+
+  const handleConvertToProject = async (opportunityId: string) => {
+    if (!client || !user) return;
+
+    try {
+      const opportunity = opportunities.find(o => o.id === opportunityId);
+      if (!opportunity) return;
+
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .insert({
+          client_id: id,
+          name: opportunity.title,
+          description: opportunity.description,
+          status: 'opportunity_identified',
+          project_type: 'Pre-Sales',
+          opportunity_id: opportunityId,
+          progress_percentage: 0,
+        })
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+
+      const { error: updateError } = await supabase
+        .from('opportunities')
+        .update({ converted_to_project_id: projectData.id })
+        .eq('id', opportunityId);
+
+      if (updateError) throw updateError;
+
+      setProjects([projectData, ...projects]);
+      setOpportunities(opportunities.map(o =>
+        o.id === opportunityId ? { ...o, converted_to_project_id: projectData.id } : o
+      ));
+      showToast('success', 'Converted to project successfully');
+      setActiveTab('projects');
+    } catch (error) {
+      console.error('Error converting to project:', error);
+      showToast('error', 'Failed to convert to project');
+    }
+  };
+
+  const handleGenerateProject = async () => {
+    if (!client || !user) return;
+
+    setIsGeneratingProject(true);
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          client_id: id,
+          name: `AI-Generated Project for ${client.company}`,
+          description: 'AI-identified project opportunity based on client needs and capabilities',
+          status: 'opportunity_identified',
+          project_type: 'Pre-Sales',
+          progress_percentage: 0,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setProjects([data, ...projects]);
+      showToast('success', 'Project generated successfully');
+    } catch (error) {
+      console.error('Error generating project:', error);
+      showToast('error', 'Failed to generate project');
+    } finally {
+      setIsGeneratingProject(false);
+    }
+  };
+
+  const handleUpdateProject = async (updatedProject: any) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          name: updatedProject.title || updatedProject.name,
+          description: updatedProject.description,
+          status: updatedProject.status,
+          budget: updatedProject.budget,
+          timeline: updatedProject.timeline,
+          due_date: updatedProject.dueDate,
+        })
+        .eq('id', updatedProject.id);
+
+      if (error) throw error;
+
+      setProjects(projects.map(p => p.id === updatedProject.id ? { ...p, ...updatedProject } : p));
+      setSelectedProject(null);
+      showToast('success', 'Project updated successfully');
+    } catch (error) {
+      console.error('Error updating project:', error);
+      showToast('error', 'Failed to update project');
+    }
+  };
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Sparkles },
     { id: 'relationships', label: 'Relationships', icon: Users },
@@ -897,30 +1084,102 @@ Client Information:
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Growth Opportunities</CardTitle>
-                <Button variant="primary" size="sm">Add Opportunity</Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateOpportunity}
+                    disabled={isGeneratingOpportunity}
+                  >
+                    {isGeneratingOpportunity ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Auto-Generate
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={() => setShowAddOpportunityModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Opportunity
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {opportunities.map(opp => (
-                  <div key={opp.id} className="p-4 border border-border rounded-lg">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h4 className="font-semibold text-foreground">{opp.title}</h4>
-                        <p className="text-sm text-muted-foreground mt-1">{opp.description}</p>
+              {opportunities.length === 0 ? (
+                <div className="text-center py-12">
+                  <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold text-foreground mb-2">No opportunities yet</h3>
+                  <p className="text-muted-foreground mb-6">
+                    Use AI to identify potential growth areas or add manually
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {opportunities.map(opp => (
+                    <div
+                      key={opp.id}
+                      className={`p-4 border rounded-lg ${
+                        opp.converted_to_project_id
+                          ? 'border-green-200 bg-green-50'
+                          : 'border-border'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="font-semibold text-foreground">{opp.title}</h4>
+                            {opp.is_ai_generated && (
+                              <Badge variant="outline" size="sm">
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                AI
+                              </Badge>
+                            )}
+                            {opp.converted_to_project_id && (
+                              <Badge variant="success" size="sm">
+                                Converted to Project
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{opp.description}</p>
+                        </div>
+                        {!opp.converted_to_project_id && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleConvertToProject(opp.id)}
+                          >
+                            Add to Project
+                          </Button>
+                        )}
                       </div>
-                      <Badge variant="secondary">{opp.stage}</Badge>
+                      {opp.value && (
+                        <div className="flex items-center gap-4 mt-3 text-sm">
+                          <span className="font-semibold text-foreground">
+                            ${opp.value.toLocaleString()}
+                          </span>
+                          {opp.probability && (
+                            <span className="text-muted-foreground">{opp.probability}% probability</span>
+                          )}
+                          {opp.expected_close_date && (
+                            <span className="text-muted-foreground">
+                              Close: {new Date(opp.expected_close_date).toLocaleDateString()}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">
+                            Created {new Date(opp.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-4 mt-3 text-sm">
-                      <span className="font-semibold text-foreground">
-                        ${opp.value.toLocaleString()}
-                      </span>
-                      <span className="text-muted-foreground">{opp.probability}% probability</span>
-                      <span className="text-muted-foreground">Close: {opp.expectedCloseDate}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -958,87 +1217,120 @@ Client Information:
               <Card className="lg:col-span-2">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Active Projects</CardTitle>
-                    <Button variant="primary" size="sm">New Project</Button>
+                    <CardTitle>Projects</CardTitle>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGenerateProject}
+                        disabled={isGeneratingProject}
+                      >
+                        {isGeneratingProject ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            AI Generate
+                          </>
+                        )}
+                      </Button>
+                      <Button variant="primary" size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Project
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-4 border border-border rounded-lg">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-semibold text-foreground">Platform Migration</h4>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Migrate legacy systems to cloud-native architecture
-                          </p>
-                        </div>
-                        <Badge variant="warning">In Progress</Badge>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Progress</span>
-                          <span className="font-medium">67%</span>
-                        </div>
-                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-primary" style={{ width: '67%' }} />
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-3">
-                          <span>Due: Dec 30, 2025</span>
-                          <span>Budget: $185,000</span>
-                        </div>
-                      </div>
+                  {projects.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold text-foreground mb-2">No projects yet</h3>
+                      <p className="text-muted-foreground mb-6">
+                        Convert opportunities to projects or create new ones
+                      </p>
                     </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {projects.map((project) => {
+                        const getStatusColor = (status: string) => {
+                          if (status === 'opportunity_identified') return 'secondary';
+                          if (status === 'discussion') return 'primary';
+                          if (status === 'quote') return 'warning';
+                          if (status === 'win') return 'success';
+                          if (status === 'loss') return 'error';
+                          if (status === 'in_progress') return 'primary';
+                          if (status === 'completed') return 'success';
+                          return 'secondary';
+                        };
 
-                    <div className="p-4 border border-border rounded-lg">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-semibold text-foreground">API Development</h4>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Build RESTful APIs for third-party integrations
-                          </p>
-                        </div>
-                        <Badge variant="success">On Track</Badge>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Progress</span>
-                          <span className="font-medium">45%</span>
-                        </div>
-                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-green-600" style={{ width: '45%' }} />
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-3">
-                          <span>Due: Jan 20, 2026</span>
-                          <span>Budget: $75,000</span>
-                        </div>
-                      </div>
-                    </div>
+                        const getStatusLabel = (status: string) => {
+                          if (status === 'opportunity_identified') return 'Opportunity';
+                          if (status === 'discussion') return 'Discussion';
+                          if (status === 'quote') return 'Quote';
+                          if (status === 'win') return 'Win';
+                          if (status === 'loss') return 'Loss';
+                          if (status === 'in_progress') return 'In Progress';
+                          if (status === 'completed') return 'Completed';
+                          return status;
+                        };
 
-                    <div className="p-4 border border-border rounded-lg">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-semibold text-foreground">Security Audit</h4>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Comprehensive security review and penetration testing
-                          </p>
-                        </div>
-                        <Badge variant="secondary">Completed</Badge>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Progress</span>
-                          <span className="font-medium">100%</span>
-                        </div>
-                        <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full bg-green-600" style={{ width: '100%' }} />
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground mt-3">
-                          <span>Completed: Oct 15, 2025</span>
-                          <span>Budget: $42,000</span>
-                        </div>
-                      </div>
+                        return (
+                          <div key={project.id} className="p-4 border border-border rounded-lg">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-foreground">{project.name}</h4>
+                                {project.description && (
+                                  <p className="text-sm text-muted-foreground mt-1">
+                                    {project.description}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={getStatusColor(project.status)}>
+                                  {getStatusLabel(project.status)}
+                                </Badge>
+                                <button
+                                  onClick={() => setSelectedProject(project)}
+                                  className="p-1 hover:bg-muted rounded"
+                                >
+                                  <Edit2 className="h-4 w-4 text-muted-foreground" />
+                                </button>
+                              </div>
+                            </div>
+                            {project.progress_percentage !== null && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                  <span className="text-muted-foreground">Progress</span>
+                                  <span className="font-medium">{project.progress_percentage}%</span>
+                                </div>
+                                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-primary"
+                                    style={{ width: `${project.progress_percentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3">
+                              {project.due_date && (
+                                <span>Due: {new Date(project.due_date).toLocaleDateString()}</span>
+                              )}
+                              {project.budget && (
+                                <span>Budget: ${project.budget.toLocaleString()}</span>
+                              )}
+                              {project.timeline && (
+                                <span>Timeline: {project.timeline}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1830,6 +2122,64 @@ Client Information:
         onClose={() => setShowDocumentUpload(false)}
         onUpload={handleDocumentUpload}
       />
+
+      <Modal
+        isOpen={showAddOpportunityModal}
+        onClose={() => setShowAddOpportunityModal(false)}
+        title="Add Growth Opportunity"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Title</label>
+            <Input
+              value={newOpportunityForm.title}
+              onChange={(e) => setNewOpportunityForm({ ...newOpportunityForm, title: e.target.value })}
+              placeholder="e.g., Mobile App Development"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2">Description</label>
+            <textarea
+              value={newOpportunityForm.description}
+              onChange={(e) => setNewOpportunityForm({ ...newOpportunityForm, description: e.target.value })}
+              placeholder="Describe the opportunity..."
+              className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              rows={4}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowAddOpportunityModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleAddManualOpportunity}
+              disabled={!newOpportunityForm.title || !newOpportunityForm.description}
+            >
+              Create Opportunity
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {selectedProject && (
+        <ProjectDetailPanel
+          project={{
+            id: selectedProject.id,
+            title: selectedProject.name,
+            description: selectedProject.description || '',
+            status: selectedProject.status,
+            budget: selectedProject.budget,
+            timeline: selectedProject.timeline,
+            dueDate: selectedProject.due_date,
+            clientName: client?.company || '',
+            createdAt: selectedProject.created_at,
+          }}
+          isOpen={!!selectedProject}
+          onClose={() => setSelectedProject(null)}
+          onUpdate={handleUpdateProject}
+        />
+      )}
     </div>
   );
 };
