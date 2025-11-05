@@ -9,7 +9,7 @@ interface Project {
   id: string;
   title: string;
   description: string;
-  status: 'opportunity_identified' | 'discussion' | 'quote' | 'win' | 'loss';
+  status: 'opportunity_identified' | 'planned' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
   budget?: number;
   timeline?: string;
   dueDate?: string;
@@ -47,13 +47,15 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
     switch (status) {
       case 'opportunity_identified':
         return 'secondary';
-      case 'discussion':
+      case 'planned':
         return 'primary';
-      case 'quote':
+      case 'in_progress':
         return 'warning';
-      case 'win':
+      case 'on_hold':
+        return 'error';
+      case 'completed':
         return 'success';
-      case 'loss':
+      case 'cancelled':
         return 'error';
       default:
         return 'secondary';
@@ -64,14 +66,16 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
     switch (status) {
       case 'opportunity_identified':
         return 'Opportunity Identified';
-      case 'discussion':
-        return 'Discussion';
-      case 'quote':
-        return 'Quote';
-      case 'win':
-        return 'Win';
-      case 'loss':
-        return 'Loss';
+      case 'planned':
+        return 'Planned';
+      case 'in_progress':
+        return 'In Progress';
+      case 'on_hold':
+        return 'On Hold';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
       default:
         return status;
     }
@@ -147,10 +151,11 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
                 className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="opportunity_identified">Opportunity Identified</option>
-                <option value="discussion">Discussion</option>
-                <option value="quote">Quote</option>
-                <option value="win">Win</option>
-                <option value="loss">Loss</option>
+                <option value="planned">Planned</option>
+                <option value="in_progress">In Progress</option>
+                <option value="on_hold">On Hold</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             ) : (
               <Badge variant={getStatusColor(project.status)}>

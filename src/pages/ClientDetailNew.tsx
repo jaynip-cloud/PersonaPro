@@ -815,7 +815,7 @@ Client Information:
           client_id: id,
           name: opportunity.title,
           summary: opportunity.description,
-          status: 'planned',
+          status: 'opportunity_identified',
           project_type: 'Pre-Sales',
           opportunity_id: opportunityId,
           progress_percentage: 0,

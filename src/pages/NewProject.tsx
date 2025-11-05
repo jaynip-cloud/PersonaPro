@@ -77,7 +77,7 @@ export const NewProject: React.FC = () => {
     projectType: '',
     summary: '',
     tags: [],
-    status: 'planned',
+    status: 'opportunity_identified',
     startDate: '',
     endDatePlanned: '',
     projectManager: '',
@@ -354,6 +354,7 @@ export const NewProject: React.FC = () => {
                     errors.status ? 'border-red-500' : 'border-border'
                   }`}
                 >
+                  <option value="opportunity_identified">Opportunity Identified</option>
                   <option value="planned">Planned</option>
                   <option value="in_progress">In Progress</option>
                   <option value="on_hold">On Hold</option>
