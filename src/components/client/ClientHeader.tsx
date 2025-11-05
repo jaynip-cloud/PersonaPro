@@ -29,7 +29,6 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshDat
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-3xl font-bold text-foreground">{client.company}</h1>
-                <Badge variant="outline" className="border-2">Agency</Badge>
               </div>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 {client.phone && (
