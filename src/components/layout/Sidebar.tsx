@@ -7,7 +7,7 @@ import {
   Settings,
   Sparkles,
   BookOpen,
-  FileText,
+  History,
   TrendingUp,
 } from 'lucide-react';
 
@@ -15,7 +15,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Projects', href: '/projects', icon: Briefcase },
-  { name: 'Pitch Generator', href: '/pitch-generator', icon: FileText },
+  { name: 'Pitch History', href: '/pitch-history', icon: History },
   { name: 'Growth Opportunities', href: '/growth-opportunities', icon: TrendingUp },
   { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
   { name: 'Settings', href: '/settings', icon: Settings },

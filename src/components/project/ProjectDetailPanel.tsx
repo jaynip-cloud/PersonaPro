@@ -47,6 +47,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [savedPitches, setSavedPitches] = useState<any[]>([]);
   const [prefilledClientId, setPrefilledClientId] = useState<string>('');
+  const [clients, setClients] = useState<any[]>([]);
 
   useEffect(() => {
     setEditedProject(project);
@@ -54,7 +55,22 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
       setPrefilledClientId(project.client_id);
       loadSavedPitches(project.id);
     }
+    loadClients();
   }, [project]);
+
+  const loadClients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .order('company', { ascending: true });
+
+      if (error) throw error;
+      setClients(data || []);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+    }
+  };
 
   const loadSavedPitches = async (projectId: string) => {
     try {
@@ -357,7 +373,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
       >
         <div className="space-y-6">
           <PitchBuilderForm
-            clients={mockClients}
+            clients={clients}
             onGenerate={handlePitchGenerate}
             isGenerating={isGenerating}
             initialClientId={prefilledClientId}

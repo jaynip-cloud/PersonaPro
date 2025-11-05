@@ -16,6 +16,7 @@ import { ProjectDetail } from './pages/ProjectDetail';
 import { NewProject } from './pages/NewProject';
 import { KnowledgeBase } from './pages/KnowledgeBase';
 import { PitchGenerator } from './pages/PitchGenerator';
+import { PitchHistory } from './pages/PitchHistory';
 import { GrowthOpportunities } from './pages/GrowthOpportunities';
 import { Settings } from './pages/Settings';
 import { ToastProvider } from './components/ui/Toast';
@@ -50,6 +51,7 @@ function App() {
                 <Route path="projects/:id" element={<ProjectDetail />} />
 
                 <Route path="pitch-generator" element={<PitchGenerator />} />
+                <Route path="pitch-history" element={<PitchHistory />} />
                 <Route path="growth-opportunities" element={<GrowthOpportunities />} />
 
                 <Route path="knowledge-base" element={<KnowledgeBase />} />
