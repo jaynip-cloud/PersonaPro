@@ -64,8 +64,16 @@ export const ClientDetailNew: React.FC = () => {
   const [meetingTranscripts, setMeetingTranscripts] = useState<any[]>([]);
   const [showTranscriptHistory, setShowTranscriptHistory] = useState(false);
   const [editingTranscriptId, setEditingTranscriptId] = useState<string | null>(null);
-
-  const opportunities = mockOpportunities.filter(o => o.clientId === id);
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [isGeneratingOpportunity, setIsGeneratingOpportunity] = useState(false);
+  const [showAddOpportunityModal, setShowAddOpportunityModal] = useState(false);
+  const [newOpportunityForm, setNewOpportunityForm] = useState({
+    title: '',
+    description: '',
+    value: '',
+    probability: '50',
+    expectedCloseDate: ''
+  });
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
 
   useEffect(() => {
@@ -174,6 +182,17 @@ export const ClientDetailNew: React.FC = () => {
 
       if (!transcriptsError && transcriptsData) {
         setMeetingTranscripts(transcriptsData);
+      }
+
+      const { data: opportunitiesData, error: opportunitiesError } = await supabase
+        .from('opportunities')
+        .select('*')
+        .eq('client_id', id)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!opportunitiesError && opportunitiesData) {
+        setOpportunities(opportunitiesData);
       }
     } catch (error) {
       console.error('Error loading client data:', error);
@@ -408,6 +427,136 @@ export const ClientDetailNew: React.FC = () => {
     } catch (error) {
       console.error('Error deleting client:', error);
       showToast('error', 'Failed to delete client');
+    }
+  };
+
+  const handleGenerateOpportunity = async () => {
+    if (!client || !user) return;
+
+    setIsGeneratingOpportunity(true);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-growth-opportunity`;
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ clientId: client.id }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate opportunity');
+      }
+
+      setOpportunities(prev => [result.opportunity, ...prev]);
+      showToast('success', 'Growth opportunity generated successfully!');
+    } catch (error) {
+      console.error('Error generating opportunity:', error);
+      showToast('error', error instanceof Error ? error.message : 'Failed to generate opportunity');
+    } finally {
+      setIsGeneratingOpportunity(false);
+    }
+  };
+
+  const handleAddOpportunity = async () => {
+    if (!client || !user) return;
+    if (!newOpportunityForm.title.trim() || !newOpportunityForm.description.trim()) {
+      showToast('error', 'Please provide title and description');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .insert({
+          client_id: client.id,
+          user_id: user.id,
+          title: newOpportunityForm.title,
+          description: newOpportunityForm.description,
+          value: newOpportunityForm.value ? parseFloat(newOpportunityForm.value) : null,
+          probability: parseInt(newOpportunityForm.probability),
+          expected_close_date: newOpportunityForm.expectedCloseDate || null,
+          stage: 'lead',
+          is_ai_generated: false,
+          source: 'Manual Entry',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setOpportunities(prev => [data, ...prev]);
+      setShowAddOpportunityModal(false);
+      setNewOpportunityForm({
+        title: '',
+        description: '',
+        value: '',
+        probability: '50',
+        expectedCloseDate: ''
+      });
+      showToast('success', 'Opportunity added successfully');
+    } catch (error) {
+      console.error('Error adding opportunity:', error);
+      showToast('error', 'Failed to add opportunity');
+    }
+  };
+
+  const handleConvertToProject = async (opportunityId: string) => {
+    if (!user) return;
+
+    const opportunity = opportunities.find(o => o.id === opportunityId);
+    if (!opportunity) return;
+
+    const confirmConvert = window.confirm(
+      `Convert "${opportunity.title}" to a project?\n\nThis will create a new project and mark the opportunity as converted.`
+    );
+    if (!confirmConvert) return;
+
+    try {
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .insert({
+          client_id: opportunity.client_id,
+          user_id: user.id,
+          name: opportunity.title,
+          description: opportunity.description,
+          status: 'planning',
+          budget: opportunity.value,
+          start_date: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+
+      const { error: updateError } = await supabase
+        .from('opportunities')
+        .update({
+          converted_to_project_id: project.id,
+          stage: 'closed-won',
+        })
+        .eq('id', opportunityId)
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      setOpportunities(prev =>
+        prev.map(o =>
+          o.id === opportunityId
+            ? { ...o, converted_to_project_id: project.id, stage: 'closed-won' }
+            : o
+        )
+      );
+
+      showToast('success', 'Opportunity converted to project successfully!');
+    } catch (error) {
+      console.error('Error converting to project:', error);
+      showToast('error', 'Failed to convert to project');
     }
   };
 
@@ -893,37 +1042,238 @@ Client Information:
         )}
 
         {activeTab === 'growth' && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Growth Opportunities</CardTitle>
-                <Button variant="primary" size="sm">Add Opportunity</Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {opportunities.map(opp => (
-                  <div key={opp.id} className="p-4 border border-border rounded-lg">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h4 className="font-semibold text-foreground">{opp.title}</h4>
-                        <p className="text-sm text-muted-foreground mt-1">{opp.description}</p>
-                      </div>
-                      <Badge variant="secondary">{opp.stage}</Badge>
-                    </div>
-                    <div className="flex items-center gap-4 mt-3 text-sm">
-                      <span className="font-semibold text-foreground">
-                        ${opp.value.toLocaleString()}
-                      </span>
-                      <span className="text-muted-foreground">{opp.probability}% probability</span>
-                      <span className="text-muted-foreground">Close: {opp.expectedCloseDate}</span>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Growth Opportunities</CardTitle>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateOpportunity}
+                      disabled={isGeneratingOpportunity}
+                    >
+                      {isGeneratingOpportunity ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Auto-Generate with AI
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setShowAddOpportunityModal(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Opportunity
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {opportunities.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-foreground mb-2">No Growth Opportunities Yet</h3>
+                    <p className="text-sm text-muted-foreground mb-6">
+                      Use AI to automatically identify opportunities or add them manually
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={handleGenerateOpportunity}
+                        disabled={isGeneratingOpportunity}
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Auto-Generate with AI
+                      </Button>
+                      <Button variant="primary" onClick={() => setShowAddOpportunityModal(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Manually
+                      </Button>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {opportunities.map(opp => (
+                      <div
+                        key={opp.id}
+                        className={`p-5 border rounded-lg ${
+                          opp.is_ai_generated
+                            ? 'border-blue-200 bg-blue-50/30'
+                            : 'border-border bg-background'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold text-foreground">{opp.title}</h4>
+                              {opp.is_ai_generated && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  AI Generated
+                                </Badge>
+                              )}
+                              {opp.converted_to_project_id && (
+                                <Badge variant="success" className="text-xs">
+                                  Converted to Project
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-2">{opp.description}</p>
+                          </div>
+                          <Badge variant="secondary">{opp.stage}</Badge>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-border">
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Estimated Value</p>
+                            <p className="text-base font-bold text-foreground">
+                              {opp.value ? `$${opp.value.toLocaleString()}` : 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Probability</p>
+                            <p className="text-base font-bold text-foreground">{opp.probability}%</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Expected Close</p>
+                            <p className="text-base font-bold text-foreground">
+                              {opp.expected_close_date
+                                ? new Date(opp.expected_close_date).toLocaleDateString()
+                                : 'N/A'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {!opp.converted_to_project_id && (
+                          <div className="mt-4 flex gap-2">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleConvertToProject(opp.id)}
+                            >
+                              <Briefcase className="h-4 w-4 mr-2" />
+                              Add to Project
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              View Details
+                            </Button>
+                          </div>
+                        )}
+
+                        {opp.is_ai_generated && opp.ai_analysis?.reasoning && (
+                          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                            <p className="text-xs font-medium text-blue-900 mb-1">AI Analysis</p>
+                            <p className="text-xs text-blue-800">{opp.ai_analysis.reasoning}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
+
+        <Modal
+          isOpen={showAddOpportunityModal}
+          onClose={() => setShowAddOpportunityModal(false)}
+          title="Add Growth Opportunity"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Opportunity Title *
+              </label>
+              <Input
+                value={newOpportunityForm.title}
+                onChange={(e) =>
+                  setNewOpportunityForm({ ...newOpportunityForm, title: e.target.value })
+                }
+                placeholder="e.g., Enterprise Support Upgrade"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Description *
+              </label>
+              <textarea
+                value={newOpportunityForm.description}
+                onChange={(e) =>
+                  setNewOpportunityForm({ ...newOpportunityForm, description: e.target.value })
+                }
+                placeholder="Describe the opportunity and its potential value..."
+                className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Estimated Value ($)
+                </label>
+                <Input
+                  type="number"
+                  value={newOpportunityForm.value}
+                  onChange={(e) =>
+                    setNewOpportunityForm({ ...newOpportunityForm, value: e.target.value })
+                  }
+                  placeholder="50000"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Win Probability (%)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={newOpportunityForm.probability}
+                  onChange={(e) =>
+                    setNewOpportunityForm({ ...newOpportunityForm, probability: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Expected Close Date
+              </label>
+              <Input
+                type="date"
+                value={newOpportunityForm.expectedCloseDate}
+                onChange={(e) =>
+                  setNewOpportunityForm({
+                    ...newOpportunityForm,
+                    expectedCloseDate: e.target.value,
+                  })
+                }
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button variant="outline" onClick={() => setShowAddOpportunityModal(false)} className="flex-1">
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleAddOpportunity} className="flex-1">
+                Add Opportunity
+              </Button>
+            </div>
+          </div>
+        </Modal>
 
         {activeTab === 'projects' && (
           <div className="space-y-6">
