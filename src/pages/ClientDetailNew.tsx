@@ -1510,12 +1510,6 @@ Client Information:
                             </div>
                             <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-border">
                               <div className="space-y-2">
-                                {project.project_type && (
-                                  <div className="flex items-center gap-2 text-xs">
-                                    <Target className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-muted-foreground">{project.project_type}</span>
-                                  </div>
-                                )}
                                 {project.project_manager && (
                                   <div className="flex items-center gap-2 text-xs">
                                     <User className="h-3 w-3 text-muted-foreground" />
@@ -1546,31 +1540,18 @@ Client Information:
                                 )}
                               </div>
                             </div>
-                            {(project.progress_percentage !== undefined && project.progress_percentage !== null) && (
-                              <div className="mt-3 pt-3 border-t border-border">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs text-muted-foreground">Progress</span>
-                                  <span className="text-xs font-medium text-foreground">{project.progress_percentage}%</span>
-                                </div>
-                                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-primary rounded-full transition-all duration-300"
-                                    style={{ width: `${project.progress_percentage}%` }}
-                                  />
-                                </div>
+                            <div className="mt-3 pt-3 border-t border-border">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs text-muted-foreground">Progress</span>
+                                <span className="text-xs font-medium text-foreground">{project.progress_percentage || 0}%</span>
                               </div>
-                            )}
-                            {project.health_score !== undefined && project.health_score !== null && (
-                              <div className="flex items-center gap-2 mt-2">
-                                <span className="text-xs text-muted-foreground">Health:</span>
-                                <div className={`w-2 h-2 rounded-full ${
-                                  project.health_score >= 80 ? 'bg-green-500' :
-                                  project.health_score >= 60 ? 'bg-blue-500' :
-                                  project.health_score >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-                                }`} title={`Health Score: ${project.health_score}%`} />
-                                <span className="text-xs text-muted-foreground">{project.health_score}%</span>
+                              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-primary rounded-full transition-all duration-300"
+                                  style={{ width: `${project.progress_percentage || 0}%` }}
+                                />
                               </div>
-                            )}
+                            </div>
                           </div>
                         );
                       })}
