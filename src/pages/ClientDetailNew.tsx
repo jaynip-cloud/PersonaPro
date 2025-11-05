@@ -88,6 +88,14 @@ export const ClientDetailNew: React.FC = () => {
 
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
 
+  const dealsProjects = projects.filter(p =>
+    p.status === 'quote' || p.status === 'win' || p.status === 'loss'
+  );
+
+  const totalPipelineValue = dealsProjects.reduce((sum, deal) =>
+    sum + (deal.budget || 0), 0
+  );
+
   useEffect(() => {
     if (id && user) {
       loadClientData();
@@ -1478,18 +1486,6 @@ Client Information:
                                 </button>
                               </div>
                             </div>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Progress</span>
-                                <span className="font-medium">{project.progress_percentage ?? 0}%</span>
-                              </div>
-                              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-primary transition-all duration-300"
-                                  style={{ width: `${project.progress_percentage ?? 0}%` }}
-                                />
-                              </div>
-                            </div>
                             <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3">
                               {project.due_date && (
                                 <span>Due: {new Date(project.due_date).toLocaleDateString()}</span>
@@ -1515,40 +1511,47 @@ Client Information:
                     <CardTitle>Deals Pipeline</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-foreground">
-                            Enterprise Platform Upgrade
-                          </span>
-                          <Badge variant="warning">Negotiation</Badge>
-                        </div>
-                        <p className="text-lg font-bold text-foreground">$95,000</p>
-                        <p className="text-xs text-muted-foreground mt-1">Close: Dec 15, 2025</p>
+                    {dealsProjects.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        No active deals in pipeline
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {dealsProjects.map((deal, index) => (
+                          <div key={deal.id} className={index > 0 ? 'pt-4 border-t border-border' : ''}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-foreground">
+                                {deal.name}
+                              </span>
+                              <Badge variant={
+                                deal.status === 'quote' ? 'warning' :
+                                deal.status === 'win' ? 'success' :
+                                deal.status === 'loss' ? 'error' : 'secondary'
+                              }>
+                                {deal.status === 'quote' ? 'Quote' :
+                                 deal.status === 'win' ? 'Win' :
+                                 deal.status === 'loss' ? 'Loss' :
+                                 deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
+                              </Badge>
+                            </div>
+                            {deal.budget && (
+                              <p className="text-lg font-bold text-foreground">
+                                ${deal.budget.toLocaleString()}
+                              </p>
+                            )}
+                            {deal.due_date && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Close: {new Date(deal.due_date).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            )}
+                          </div>
+                        ))}
                       </div>
-
-                      <div className="pt-4 border-t border-border">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-foreground">
-                            Annual Support Renewal
-                          </span>
-                          <Badge variant="success">Proposal</Badge>
-                        </div>
-                        <p className="text-lg font-bold text-foreground">$48,000</p>
-                        <p className="text-xs text-muted-foreground mt-1">Close: Nov 30, 2025</p>
-                      </div>
-
-                      <div className="pt-4 border-t border-border">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-foreground">
-                            ML Services Add-on
-                          </span>
-                          <Badge variant="secondary">Qualified</Badge>
-                        </div>
-                        <p className="text-lg font-bold text-foreground">$125,000</p>
-                        <p className="text-xs text-muted-foreground mt-1">Close: Jan 15, 2026</p>
-                      </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -1557,17 +1560,23 @@ Client Information:
                     <CardTitle>Total Value</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-3xl font-bold text-foreground mb-2">$268,000</p>
+                    <p className="text-3xl font-bold text-foreground mb-2">
+                      ${totalPipelineValue.toLocaleString()}
+                    </p>
                     <p className="text-sm text-muted-foreground">Weighted pipeline value</p>
                     <div className="mt-4 pt-4 border-t border-border">
                       <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Win Rate</span>
-                        <span className="font-semibold text-foreground">78%</span>
+                        <span className="text-muted-foreground">Total Deals</span>
+                        <span className="font-semibold text-foreground">{dealsProjects.length}</span>
                       </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Avg Deal Size</span>
-                        <span className="font-semibold text-foreground">$89,333</span>
-                      </div>
+                      {dealsProjects.length > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Avg Deal Size</span>
+                          <span className="font-semibold text-foreground">
+                            ${Math.round(totalPipelineValue / dealsProjects.length).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
