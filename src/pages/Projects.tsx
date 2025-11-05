@@ -40,6 +40,7 @@ interface Project {
   timeline?: string;
   dueDate?: string;
   createdAt?: string;
+  is_ai_generated?: boolean;
 }
 
 const mockProjects: Project[] = [
@@ -587,8 +588,17 @@ export const Projects: React.FC = () => {
                           />
                         </td>
                         <td className="py-4 px-4">
-                          <div className="font-medium text-foreground">{project.name}</div>
-                          <div className="text-xs text-muted-foreground">{project.projectCode}</div>
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <div className="font-medium text-foreground">{project.name}</div>
+                              <div className="text-xs text-muted-foreground">{project.projectCode}</div>
+                            </div>
+                            {project.is_ai_generated && (
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                                <Sparkles className="h-3 w-3" />
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="py-4 px-4">
                           <div className="text-sm text-muted-foreground">{project.clientName}</div>

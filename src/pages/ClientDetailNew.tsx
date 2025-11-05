@@ -829,6 +829,7 @@ Client Information:
           project_type: 'Pre-Sales',
           opportunity_id: opportunityId,
           progress_percentage: 0,
+          is_ai_generated: opportunity.is_ai_generated || false,
         })
         .select()
         .single();
@@ -874,6 +875,7 @@ Client Information:
           status: 'opportunity_identified',
           project_type: 'Pre-Sales',
           progress_percentage: 0,
+          is_ai_generated: true,
         })
         .select()
         .single();
@@ -1427,7 +1429,15 @@ Client Information:
                           <div key={project.id} className="p-4 border border-border rounded-lg">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex-1">
-                                <h4 className="font-semibold text-foreground">{project.name}</h4>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-semibold text-foreground">{project.name}</h4>
+                                  {project.is_ai_generated && (
+                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                                      <Sparkles className="h-3 w-3" />
+                                      <span>AI</span>
+                                    </div>
+                                  )}
+                                </div>
                                 {project.description && (
                                   <p className="text-sm text-muted-foreground mt-1">
                                     {project.description}
@@ -1447,7 +1457,7 @@ Client Information:
                                 </button>
                               </div>
                             </div>
-                            {project.progress_percentage !== null && (
+                            {project.progress_percentage !== undefined && project.progress_percentage !== null && (
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between text-sm">
                                   <span className="text-muted-foreground">Progress</span>
@@ -1455,7 +1465,7 @@ Client Information:
                                 </div>
                                 <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                                   <div
-                                    className="h-full bg-primary"
+                                    className="h-full bg-primary transition-all duration-300"
                                     style={{ width: `${project.progress_percentage}%` }}
                                   />
                                 </div>
