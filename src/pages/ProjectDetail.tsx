@@ -214,21 +214,6 @@ export const ProjectDetail: React.FC = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Progress</p>
-              <p className="text-2xl font-bold text-foreground">{project.progress}%</p>
-              <div className="h-2 bg-muted rounded-full overflow-hidden mt-2">
-                <div
-                  className="h-full bg-primary rounded-full"
-                  style={{ width: `${project.progress}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Health Score</p>
               <p className={`text-2xl font-bold ${getHealthColor(project.healthScore)}`}>
                 {project.healthScore}%
