@@ -204,10 +204,20 @@ export const ProjectDetail: React.FC = () => {
             <span>ID: #{project.id}</span>
           </div>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Edit className="h-4 w-4" />
-          Edit Project
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => navigate(`/pitch-generator?clientId=${project.clientId}`)}
+          >
+            <Sparkles className="h-4 w-4" />
+            Generate Pitch
+          </Button>
+          <Button variant="outline" className="gap-2">
+            <Edit className="h-4 w-4" />
+            Edit Project
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

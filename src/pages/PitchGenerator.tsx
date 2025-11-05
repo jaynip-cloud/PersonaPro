@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PitchBuilderForm } from '../components/pitch/PitchBuilderForm';
 import { GeneratedPitchDisplay } from '../components/pitch/GeneratedPitchDisplay';
 import { PitchHistory } from '../components/pitch/PitchHistory';
@@ -13,6 +14,7 @@ import { useToast } from '../components/ui/Toast';
 export const PitchGenerator: React.FC = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const [searchParams] = useSearchParams();
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(true);
   const [generatedPitches, setGeneratedPitches] = useState<GeneratedPitch[]>([]);
@@ -258,6 +260,7 @@ export const PitchGenerator: React.FC = () => {
                   clients={clients}
                   onGenerate={handleGenerate}
                   isGenerating={isGenerating}
+                  initialClientId={searchParams.get('clientId') || undefined}
                 />
               </div>
 
