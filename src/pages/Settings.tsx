@@ -362,30 +362,6 @@ export const Settings: React.FC = () => {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        Theme Preference
-                      </label>
-                      <div className="flex gap-2">
-                        {(['light', 'dark', 'system'] as const).map((t) => (
-                          <button
-                            key={t}
-                            onClick={() => setTheme(t)}
-                            className={`flex-1 py-2 px-4 rounded-md border transition-colors capitalize ${
-                              theme === t
-                                ? 'border-primary bg-primary text-white'
-                                : 'border-border bg-background text-foreground hover:bg-accent'
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Theme preference coming soon
-                      </p>
-                    </div>
-
                     <Button variant="primary" onClick={handleSave} disabled={saved || isSavingProfile}>
                       {isSavingProfile ? (
                         <>
