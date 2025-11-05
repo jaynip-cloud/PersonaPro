@@ -50,17 +50,19 @@ export const PitchGenerator: React.FC = () => {
           email: c.email,
           phone: c.phone || '',
           role: c.job_title || c.role || '',
-          industry: c.industry || '',
-          status: c.status,
+          industry: c.industry || 'Technology',
+          status: c.status || 'active',
           lastContact: c.last_contact || '',
           nextFollowUp: c.next_follow_up || '',
-          personaScore: c.persona_score,
+          personaScore: c.persona_score || 0,
           tags: c.tags || [],
           createdAt: c.created_at,
           location: c.location || '',
           founded: c.founded || '',
           csm: c.csm || '',
           avatar: c.avatar || undefined,
+          tier: c.tier || undefined,
+          healthScore: c.health_score || undefined,
         }));
         setClients(mappedClients);
       }
@@ -88,23 +90,38 @@ export const PitchGenerator: React.FC = () => {
   };
 
   const handleGenerate = (input: PitchGeneratorInput) => {
+    console.log('handleGenerate called with input:', input);
+    console.log('Available clients:', clients.length);
+
     setIsGenerating(true);
     setViewingPitch(null);
 
     const simulatedDelay = Math.random() * 2000 + 2000;
 
     setTimeout(() => {
-      const client = clients.find(c => c.id === input.clientId);
-      if (!client) {
-        showToast('error', 'Client not found');
-        setIsGenerating(false);
-        return;
-      }
+      try {
+        const client = clients.find(c => c.id === input.clientId);
+        console.log('Found client:', client);
 
-      const { variantA, variantB } = generatePitchVariants(input, client);
-      setGeneratedPitches([variantA, variantB]);
-      setIsGenerating(false);
-      showToast('success', 'Pitch variants generated successfully');
+        if (!client) {
+          console.error('Client not found for ID:', input.clientId);
+          showToast('error', 'Client not found');
+          setIsGenerating(false);
+          return;
+        }
+
+        console.log('Generating pitch variants...');
+        const { variantA, variantB } = generatePitchVariants(input, client);
+        console.log('Generated variants:', variantA, variantB);
+
+        setGeneratedPitches([variantA, variantB]);
+        setIsGenerating(false);
+        showToast('success', 'Pitch variants generated successfully');
+      } catch (error) {
+        console.error('Error generating pitch:', error);
+        showToast('error', 'Failed to generate pitch');
+        setIsGenerating(false);
+      }
     }, simulatedDelay);
   };
 

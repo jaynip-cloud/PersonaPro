@@ -65,7 +65,23 @@ export const PitchBuilderForm: React.FC<PitchBuilderFormProps> = ({
   };
 
   const handleGenerate = () => {
-    if (!selectedClientId || services.length === 0) return;
+    console.log('handleGenerate in form called');
+    console.log('selectedClientId:', selectedClientId);
+    console.log('services:', services);
+    console.log('canGenerate:', canGenerate);
+
+    if (!selectedClientId || services.length === 0) {
+      console.log('Validation failed - missing client or services');
+      return;
+    }
+
+    console.log('Calling onGenerate with:', {
+      clientId: selectedClientId,
+      services,
+      companyDescription,
+      tone,
+      length
+    });
 
     onGenerate({
       clientId: selectedClientId,
