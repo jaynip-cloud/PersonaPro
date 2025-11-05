@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { ProjectDetailPanel } from '../components/project/ProjectDetailPanel';
 import {
   Plus,
   Search,
@@ -14,16 +15,20 @@ import {
   Calendar,
   TrendingUp,
   Briefcase,
+  Sparkles,
+  ChevronRight,
 } from 'lucide-react';
 
 interface Project {
   id: string;
   name: string;
+  title?: string;
+  description?: string;
   projectCode: string;
   clientId: string;
   clientName: string;
   projectType: string;
-  status: 'planned' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+  status: 'opportunity_identified' | 'discussion' | 'quote' | 'win' | 'loss' | 'planned' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
   startDate: string;
   endDatePlanned: string;
   actualEndDate?: string;
@@ -31,9 +36,34 @@ interface Project {
   healthScore: number;
   projectManager: string;
   lastUpdated: string;
+  budget?: number;
+  timeline?: string;
+  dueDate?: string;
+  createdAt?: string;
 }
 
 const mockProjects: Project[] = [
+  {
+    id: 'presales-1',
+    name: 'Enterprise Support Package',
+    title: 'Enterprise Support Package',
+    description: 'Upgrade to enterprise support tier with dedicated support engineer',
+    projectCode: 'OPP-001',
+    clientId: '1',
+    clientName: 'TechCorp Solutions',
+    projectType: 'Support Services',
+    status: 'discussion',
+    startDate: '2025-11-01',
+    endDatePlanned: '2025-12-15',
+    progress: 0,
+    healthScore: 85,
+    projectManager: 'Sarah Chen',
+    lastUpdated: '2025-11-05',
+    budget: 15000,
+    timeline: '2 months',
+    dueDate: '2025-11-20',
+    createdAt: '2025-11-05',
+  },
   {
     id: '1',
     name: 'Website Revamp',
@@ -114,7 +144,7 @@ const mockProjects: Project[] = [
 
 export const Projects: React.FC = () => {
   const navigate = useNavigate();
-  const [projects] = useState<Project[]>(mockProjects);
+  const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterClient, setFilterClient] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -124,6 +154,8 @@ export const Projects: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const uniqueClients = Array.from(new Set(projects.map((p) => p.clientName)));
   const uniqueTypes = Array.from(new Set(projects.map((p) => p.projectType)));
@@ -179,6 +211,11 @@ export const Projects: React.FC = () => {
 
   const getStatusBadge = (status: Project['status']) => {
     const statusConfig = {
+      opportunity_identified: { label: 'Opportunity', variant: 'secondary' as const },
+      discussion: { label: 'Discussion', variant: 'primary' as const },
+      quote: { label: 'Quote', variant: 'warning' as const },
+      win: { label: 'Win', variant: 'success' as const },
+      loss: { label: 'Loss', variant: 'error' as const },
       planned: { label: 'Planned', variant: 'secondary' as const },
       in_progress: { label: 'In Progress', variant: 'primary' as const },
       on_hold: { label: 'On Hold', variant: 'warning' as const },
@@ -186,6 +223,40 @@ export const Projects: React.FC = () => {
       cancelled: { label: 'Cancelled', variant: 'error' as const },
     };
     return statusConfig[status];
+  };
+
+  const handleGenerateProject = () => {
+    setIsGenerating(true);
+    setTimeout(() => {
+      const newProject: Project = {
+        id: `ai-${Date.now()}`,
+        name: 'AI-Generated Project Opportunity',
+        title: 'Cloud Migration Initiative',
+        description: 'Migrate legacy infrastructure to cloud-based solution for improved scalability',
+        projectCode: `AI-${String(projects.length + 1).padStart(3, '0')}`,
+        clientId: '2',
+        clientName: 'Global Finance Partners',
+        projectType: 'Cloud Services',
+        status: 'opportunity_identified',
+        startDate: new Date().toISOString().split('T')[0],
+        endDatePlanned: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        progress: 0,
+        healthScore: 75,
+        projectManager: 'Sarah Chen',
+        lastUpdated: new Date().toISOString().split('T')[0],
+        budget: 50000,
+        timeline: '3 months',
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        createdAt: new Date().toISOString(),
+      };
+      setProjects([newProject, ...projects]);
+      setIsGenerating(false);
+    }, 2000);
+  };
+
+  const handleUpdateProject = (updatedProject: Project) => {
+    setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
+    setSelectedProject(null);
   };
 
   const getHealthColor = (score: number) => {
@@ -251,9 +322,13 @@ export const Projects: React.FC = () => {
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
+          <Button variant="outline" className="gap-2" onClick={handleGenerateProject} disabled={isGenerating}>
+            <Sparkles className="h-4 w-4" />
+            {isGenerating ? 'Generating...' : 'AI Generate'}
+          </Button>
           <Button variant="primary" className="gap-2" onClick={() => navigate('/projects/new')}>
             <Plus className="h-4 w-4" />
-            New Project
+            Add Project
           </Button>
         </div>
       </div>
@@ -491,6 +566,7 @@ export const Projects: React.FC = () => {
                     <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">
                       Last Updated
                     </th>
+                    <th className="w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -511,13 +587,8 @@ export const Projects: React.FC = () => {
                           />
                         </td>
                         <td className="py-4 px-4">
-                          <div
-                            className="cursor-pointer hover:text-primary"
-                            onClick={() => navigate(`/projects/${project.id}`)}
-                          >
-                            <div className="font-medium text-foreground">{project.name}</div>
-                            <div className="text-xs text-muted-foreground">{project.projectCode}</div>
-                          </div>
+                          <div className="font-medium text-foreground">{project.name}</div>
+                          <div className="text-xs text-muted-foreground">{project.projectCode}</div>
                         </td>
                         <td className="py-4 px-4">
                           <div className="text-sm text-muted-foreground">{project.clientName}</div>
@@ -590,6 +661,15 @@ export const Projects: React.FC = () => {
                             })}
                           </div>
                         </td>
+                        <td className="py-4 px-4">
+                          <button
+                            onClick={() => setSelectedProject(project)}
+                            className="p-1 hover:bg-muted rounded transition-colors"
+                            title="View details"
+                          >
+                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -599,6 +679,25 @@ export const Projects: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {selectedProject && (
+        <ProjectDetailPanel
+          project={{
+            id: selectedProject.id,
+            title: selectedProject.title || selectedProject.name,
+            description: selectedProject.description || '',
+            status: selectedProject.status as any,
+            budget: selectedProject.budget,
+            timeline: selectedProject.timeline,
+            dueDate: selectedProject.dueDate,
+            clientName: selectedProject.clientName,
+            createdAt: selectedProject.createdAt || selectedProject.lastUpdated,
+          }}
+          isOpen={!!selectedProject}
+          onClose={() => setSelectedProject(null)}
+          onUpdate={handleUpdateProject}
+        />
+      )}
     </div>
   );
 };

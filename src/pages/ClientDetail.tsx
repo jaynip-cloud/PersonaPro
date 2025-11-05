@@ -11,6 +11,7 @@ import { PersonaSummary } from '../components/persona/PersonaSummary';
 import { PersonaMetricsCards } from '../components/persona/PersonaMetricsCards';
 import { ExplainabilityPanel } from '../components/persona/ExplainabilityPanel';
 import { PersonaEditor } from '../components/persona/PersonaEditor';
+import { GrowthOpportunities } from '../components/client/GrowthOpportunities';
 import { PersonaMetrics, EvidenceSnippet } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 
@@ -317,6 +318,8 @@ export const ClientDetail: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+
+          <GrowthOpportunities clientId={id || ''} clientName={client.name} />
         </div>
       </div>
 
