@@ -30,7 +30,8 @@ export const ClientDetailNew: React.FC = () => {
   const { showToast } = useToast();
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'opportunities' | 'projects' | 'intelligence' | 'pitch' | 'growth' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'growth' | 'projects' | 'pitch' | 'intelligence' | 'settings'>('overview');
+  const [projectsSubTab, setProjectsSubTab] = useState<'projects' | 'pitch'>('projects');
   const [personaMetrics, setPersonaMetrics] = useState<PersonaMetrics | null>(null);
   const [evidence, setEvidence] = useState<EvidenceSnippet[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -641,12 +642,10 @@ Client Information:
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Sparkles },
     { id: 'relationships', label: 'Relationships', icon: Users },
-    { id: 'opportunities', label: 'Opportunities', icon: Target },
-    { id: 'pitch', label: 'Pitch Generator', icon: FileText },
     { id: 'growth', label: 'Growth Opportunities', icon: TrendingUp },
-    { id: 'projects', label: 'Projects & Deals', icon: Briefcase },
+    { id: 'projects', label: 'Projects & Deals', icon: Briefcase, hasSubnav: true },
     { id: 'intelligence', label: 'Intelligence & Assets', icon: MessageSquare },
-    { id: 'settings', label: 'Settings & Admin', icon: Settings },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   if (isLoading) {
@@ -893,7 +892,7 @@ Client Information:
           </div>
         )}
 
-        {activeTab === 'opportunities' && (
+        {activeTab === 'growth' && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -928,6 +927,33 @@ Client Information:
 
         {activeTab === 'projects' && (
           <div className="space-y-6">
+            <div className="border-b border-border mb-6">
+              <div className="flex gap-6">
+                <button
+                  onClick={() => setProjectsSubTab('projects')}
+                  className={`pb-3 border-b-2 transition-colors text-sm font-medium ${
+                    projectsSubTab === 'projects'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Projects & Deals
+                </button>
+                <button
+                  onClick={() => setProjectsSubTab('pitch')}
+                  className={`pb-3 border-b-2 transition-colors text-sm font-medium flex items-center gap-2 ${
+                    projectsSubTab === 'pitch'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Pitch Generator
+                </button>
+              </div>
+            </div>
+
+            {projectsSubTab === 'projects' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-2">
                 <CardHeader>
@@ -1080,6 +1106,133 @@ Client Information:
                 </Card>
               </div>
             </div>
+            )}
+
+            {projectsSubTab === 'pitch' && (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>AI Pitch Generator</CardTitle>
+                      <Badge variant="secondary" className="gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        AI-Powered
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-900">
+                          Generate personalized pitches based on client intelligence, persona insights, and company knowledge base.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Pitch Type
+                        </label>
+                        <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
+                          <option>Service Upsell</option>
+                          <option>New Product Introduction</option>
+                          <option>Renewal Proposal</option>
+                          <option>Partnership Opportunity</option>
+                          <option>Custom Pitch</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Target Services
+                        </label>
+                        <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" multiple>
+                          <option>AI Consulting</option>
+                          <option>Custom Development</option>
+                          <option>Data Analytics</option>
+                          <option>ML Integration</option>
+                          <option>Cloud Migration</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-2">
+                          Tone & Style
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Button variant="outline" size="sm">Professional</Button>
+                          <Button variant="outline" size="sm">Casual</Button>
+                          <Button variant="outline" size="sm">Technical</Button>
+                        </div>
+                      </div>
+
+                      <Button variant="primary" className="w-full">
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate Pitch
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Generated Pitches</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="p-4 border border-border rounded-lg">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="font-semibold text-foreground">ML Services Upsell Pitch</h4>
+                            <p className="text-xs text-muted-foreground mt-1">Generated on Oct 28, 2025</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Based on TechCorp's recent platform migration success and Sarah's interest in ML capabilities, we've identified an opportunity to introduce our ML Integration services...
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="secondary">Professional Tone</Badge>
+                          <Badge variant="secondary">ML Integration</Badge>
+                          <Badge variant="secondary">92% Fit Score</Badge>
+                        </div>
+                      </div>
+
+                      <div className="p-4 border border-border rounded-lg">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="font-semibold text-foreground">Annual Support Renewal</h4>
+                            <p className="text-xs text-muted-foreground mt-1">Generated on Oct 25, 2025</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Sarah, as your support contract approaches renewal, I wanted to highlight the value we've delivered over the past year...
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="secondary">Casual Tone</Badge>
+                          <Badge variant="secondary">Support Services</Badge>
+                          <Badge variant="secondary">88% Fit Score</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </div>
         )}
 
@@ -1332,132 +1485,6 @@ Client Information:
                 </Card>
               </div>
             </div>
-          </div>
-        )}
-
-        {activeTab === 'pitch' && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>AI Pitch Generator</CardTitle>
-                  <Badge variant="secondary" className="gap-1">
-                    <Sparkles className="h-3 w-3" />
-                    AI-Powered
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-900">
-                      Generate personalized pitches based on client intelligence, persona insights, and company knowledge base.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Pitch Type
-                    </label>
-                    <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary">
-                      <option>Service Upsell</option>
-                      <option>New Product Introduction</option>
-                      <option>Renewal Proposal</option>
-                      <option>Partnership Opportunity</option>
-                      <option>Custom Pitch</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Target Services
-                    </label>
-                    <select className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" multiple>
-                      <option>AI Consulting</option>
-                      <option>Custom Development</option>
-                      <option>Data Analytics</option>
-                      <option>ML Integration</option>
-                      <option>Cloud Migration</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Tone & Style
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button variant="outline" size="sm">Professional</Button>
-                      <Button variant="outline" size="sm">Casual</Button>
-                      <Button variant="outline" size="sm">Technical</Button>
-                    </div>
-                  </div>
-
-                  <Button variant="primary" className="w-full">
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generate Pitch
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Generated Pitches</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="p-4 border border-border rounded-lg">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="font-semibold text-foreground">ML Services Upsell Pitch</h4>
-                        <p className="text-xs text-muted-foreground mt-1">Generated on Oct 28, 2025</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Based on TechCorp's recent platform migration success and Sarah's interest in ML capabilities, we've identified an opportunity to introduce our ML Integration services...
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary">Professional Tone</Badge>
-                      <Badge variant="secondary">ML Integration</Badge>
-                      <Badge variant="secondary">92% Fit Score</Badge>
-                    </div>
-                  </div>
-
-                  <div className="p-4 border border-border rounded-lg">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h4 className="font-semibold text-foreground">Annual Support Renewal</h4>
-                        <p className="text-xs text-muted-foreground mt-1">Generated on Oct 25, 2025</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Sarah, as your support contract approaches renewal, I wanted to highlight the value we've delivered over the past year...
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary">Casual Tone</Badge>
-                      <Badge variant="secondary">Support Services</Badge>
-                      <Badge variant="secondary">88% Fit Score</Badge>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
 
