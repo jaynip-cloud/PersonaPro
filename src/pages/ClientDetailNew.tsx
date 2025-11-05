@@ -1458,18 +1458,6 @@ Client Information:
                                 </button>
                               </div>
                             </div>
-                            <div className="mt-3 space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">Progress</span>
-                                <span className="font-medium">{project.progress_percentage ?? 0}%</span>
-                              </div>
-                              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-primary transition-all duration-300"
-                                  style={{ width: `${project.progress_percentage ?? 0}%` }}
-                                />
-                              </div>
-                            </div>
                             <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3">
                               {project.due_date && (
                                 <span>Due: {new Date(project.due_date).toLocaleDateString()}</span>
