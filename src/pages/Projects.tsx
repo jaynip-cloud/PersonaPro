@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/ui/Toast';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -145,7 +148,10 @@ const mockProjects: Project[] = [
 
 export const Projects: React.FC = () => {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterClient, setFilterClient] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -157,6 +163,89 @@ export const Projects: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      fetchProjects();
+    }
+  }, [user]);
+
+  const fetchProjects = async () => {
+    try {
+      setIsLoading(true);
+      const { data: membership } = await supabase
+        .from('organization_memberships')
+        .select('organization_id')
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      if (!membership?.organization_id) {
+        setProjects([]);
+        return;
+      }
+
+      const { data: projectsData, error } = await supabase
+        .from('projects')
+        .select(`
+          id,
+          name,
+          project_code,
+          client_id,
+          project_type,
+          status,
+          start_date,
+          end_date_planned,
+          actual_end_date,
+          progress_percentage,
+          health_score,
+          project_manager,
+          updated_at,
+          budget,
+          timeline,
+          due_date,
+          created_at,
+          is_ai_generated,
+          clients!inner(
+            id,
+            company_name
+          )
+        `)
+        .eq('clients.organization_id', membership.organization_id)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedProjects: Project[] = (projectsData || []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        projectCode: p.project_code || `PRJ-${p.id.substring(0, 8)}`,
+        clientId: p.client_id,
+        clientName: p.clients?.company_name || 'Unknown Client',
+        projectType: p.project_type || 'General',
+        status: p.status || 'planned',
+        startDate: p.start_date || new Date().toISOString().split('T')[0],
+        endDatePlanned: p.end_date_planned || new Date().toISOString().split('T')[0],
+        actualEndDate: p.actual_end_date,
+        progress: p.progress_percentage || 0,
+        healthScore: p.health_score || 50,
+        projectManager: p.project_manager || 'Unassigned',
+        lastUpdated: p.updated_at || p.created_at,
+        budget: p.budget,
+        timeline: p.timeline,
+        dueDate: p.due_date,
+        createdAt: p.created_at,
+        is_ai_generated: p.is_ai_generated,
+      }));
+
+      setProjects(formattedProjects);
+    } catch (error: any) {
+      console.error('Error fetching projects:', error);
+      showToast('Failed to load projects', 'error');
+      setProjects([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const uniqueClients = Array.from(new Set(projects.map((p) => p.clientName)));
   const uniqueTypes = Array.from(new Set(projects.map((p) => p.projectType)));
@@ -226,38 +315,43 @@ export const Projects: React.FC = () => {
     return statusConfig[status];
   };
 
-  const handleGenerateProject = () => {
-    setIsGenerating(true);
-    setTimeout(() => {
-      const newProject: Project = {
-        id: `ai-${Date.now()}`,
-        name: 'AI-Generated Project Opportunity',
-        title: 'Cloud Migration Initiative',
-        description: 'Migrate legacy infrastructure to cloud-based solution for improved scalability',
-        projectCode: `AI-${String(projects.length + 1).padStart(3, '0')}`,
-        clientId: '2',
-        clientName: 'Global Finance Partners',
-        projectType: 'Cloud Services',
-        status: 'opportunity_identified',
-        startDate: new Date().toISOString().split('T')[0],
-        endDatePlanned: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        progress: 0,
-        healthScore: 75,
-        projectManager: 'Sarah Chen',
-        lastUpdated: new Date().toISOString().split('T')[0],
-        budget: 50000,
-        timeline: '3 months',
-        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        createdAt: new Date().toISOString(),
-      };
-      setProjects([newProject, ...projects]);
+  const handleGenerateProject = async () => {
+    try {
+      setIsGenerating(true);
+      showToast('AI project generation is under development', 'info');
+    } catch (error: any) {
+      console.error('Error generating project:', error);
+      showToast('Failed to generate project', 'error');
+    } finally {
       setIsGenerating(false);
-    }, 2000);
+    }
   };
 
-  const handleUpdateProject = (updatedProject: Project) => {
-    setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
-    setSelectedProject(null);
+  const handleUpdateProject = async (updatedProject: Project) => {
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          name: updatedProject.name,
+          status: updatedProject.status,
+          project_manager: updatedProject.projectManager,
+          progress_percentage: updatedProject.progress,
+          budget: updatedProject.budget,
+          timeline: updatedProject.timeline,
+          due_date: updatedProject.dueDate,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', updatedProject.id);
+
+      if (error) throw error;
+
+      setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
+      setSelectedProject(null);
+      showToast('Project updated successfully', 'success');
+    } catch (error: any) {
+      console.error('Error updating project:', error);
+      showToast('Failed to update project', 'error');
+    }
   };
 
   const getHealthColor = (score: number) => {
@@ -514,7 +608,12 @@ export const Projects: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredProjects.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading projects...</p>
+            </div>
+          ) : filteredProjects.length === 0 ? (
             <div className="text-center py-16">
               <Briefcase className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">No projects yet</h3>

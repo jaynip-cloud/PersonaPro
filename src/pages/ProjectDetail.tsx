@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/ui/Toast';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -131,8 +134,71 @@ type TabType = 'overview' | 'scope' | 'communications' | 'risks' | 'opportunitie
 export const ProjectDetail: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const project = mockProject;
+  const [project, setProject] = useState<typeof mockProject | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (id && user) {
+      fetchProjectDetails();
+    }
+  }, [id, user]);
+
+  const fetchProjectDetails = async () => {
+    try {
+      setIsLoading(true);
+      const { data: projectData, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          clients!inner(
+            id,
+            company_name
+          )
+        `)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!projectData) {
+        showToast('Project not found', 'error');
+        navigate('/projects');
+        return;
+      }
+
+      setProject({
+        id: projectData.id,
+        name: projectData.name,
+        clientId: projectData.client_id,
+        clientName: projectData.clients?.company_name || 'Unknown',
+        projectType: projectData.project_type || 'General',
+        status: projectData.status || 'planned',
+        summary: projectData.summary || 'No summary available',
+        scopeSummary: projectData.scope_summary || 'No scope defined',
+        startDate: projectData.start_date || new Date().toISOString().split('T')[0],
+        estimatedEndDate: projectData.end_date_planned || new Date().toISOString().split('T')[0],
+        actualEndDate: projectData.actual_end_date,
+        progress: projectData.progress_percentage || 0,
+        healthScore: projectData.health_score || 50,
+        sentimentTrend: projectData.sentiment_trend || 'stable',
+        revenue: projectData.revenue || 0,
+        projectManager: projectData.project_manager || 'Unassigned',
+        teamMembers: projectData.team_members || [],
+        deliverables: [],
+        risks: [],
+        opportunities: [],
+        communications: [],
+        documents: [],
+      });
+    } catch (error: any) {
+      console.error('Error fetching project:', error);
+      showToast('Failed to load project details', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const tabs = [
     { id: 'overview' as TabType, label: 'Overview', icon: FileText },
@@ -173,6 +239,28 @@ export const ProjectDetail: React.FC = () => {
     if (severity === 'medium') return <Badge variant="warning">Medium</Badge>;
     return <Badge variant="secondary">Low</Badge>;
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading project details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-foreground mb-2">Project not found</h3>
+          <Button onClick={() => navigate('/projects')}>Back to Projects</Button>
+        </div>
+      </div>
+    );
+  }
 
   const statusBadge = getStatusBadge(project.status);
 
