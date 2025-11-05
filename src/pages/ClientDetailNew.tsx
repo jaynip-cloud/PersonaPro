@@ -680,20 +680,23 @@ Client Information:
           title: `${client.company} - Growth Opportunity`,
           description: `AI-identified opportunity for ${client.company} based on recent interactions and market analysis.`,
           is_ai_generated: true,
-          stage: 'qualification',
+          stage: 'qualified',
           probability: 75,
           value: 50000,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       setOpportunities([data, ...opportunities]);
       showToast('success', 'Opportunity generated successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating opportunity:', error);
-      showToast('error', 'Failed to generate opportunity');
+      showToast('error', `Failed to generate opportunity: ${error?.message || 'Unknown error'}`);
     } finally {
       setIsGeneratingOpportunity(false);
     }
@@ -711,21 +714,24 @@ Client Information:
           title: newOpportunityForm.title,
           description: newOpportunityForm.description,
           is_ai_generated: false,
-          stage: 'qualification',
+          stage: 'lead',
           probability: 50,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       setOpportunities([data, ...opportunities]);
       setNewOpportunityForm({ title: '', description: '' });
       setShowAddOpportunityModal(false);
       showToast('success', 'Opportunity added successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding opportunity:', error);
-      showToast('error', 'Failed to add opportunity');
+      showToast('error', `Failed to add opportunity: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -750,14 +756,20 @@ Client Information:
         .select()
         .single();
 
-      if (projectError) throw projectError;
+      if (projectError) {
+        console.error('Project insert error:', projectError);
+        throw projectError;
+      }
 
       const { error: updateError } = await supabase
         .from('opportunities')
         .update({ converted_to_project_id: projectData.id })
         .eq('id', opportunityId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Opportunity update error:', updateError);
+        throw updateError;
+      }
 
       setProjects([projectData, ...projects]);
       setOpportunities(opportunities.map(o =>
@@ -765,9 +777,9 @@ Client Information:
       ));
       showToast('success', 'Converted to project successfully');
       setActiveTab('projects');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error converting to project:', error);
-      showToast('error', 'Failed to convert to project');
+      showToast('error', `Failed to convert to project: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -789,13 +801,16 @@ Client Information:
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Project generation error:', error);
+        throw error;
+      }
 
       setProjects([data, ...projects]);
       showToast('success', 'Project generated successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating project:', error);
-      showToast('error', 'Failed to generate project');
+      showToast('error', `Failed to generate project: ${error?.message || 'Unknown error'}`);
     } finally {
       setIsGeneratingProject(false);
     }
@@ -803,26 +818,47 @@ Client Information:
 
   const handleUpdateProject = async (updatedProject: any) => {
     try {
+      const updateData: any = {
+        name: updatedProject.title || updatedProject.name,
+        description: updatedProject.description,
+        status: updatedProject.status,
+      };
+
+      if (updatedProject.budget !== undefined) {
+        updateData.budget = updatedProject.budget;
+      }
+      if (updatedProject.timeline) {
+        updateData.timeline = updatedProject.timeline;
+      }
+      if (updatedProject.dueDate) {
+        updateData.due_date = updatedProject.dueDate;
+      }
+
       const { error } = await supabase
         .from('projects')
-        .update({
-          name: updatedProject.title || updatedProject.name,
-          description: updatedProject.description,
-          status: updatedProject.status,
-          budget: updatedProject.budget,
-          timeline: updatedProject.timeline,
-          due_date: updatedProject.dueDate,
-        })
+        .update(updateData)
         .eq('id', updatedProject.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Project update error:', error);
+        throw error;
+      }
 
-      setProjects(projects.map(p => p.id === updatedProject.id ? { ...p, ...updatedProject } : p));
+      const { data: refreshedProject, error: fetchError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', updatedProject.id)
+        .single();
+
+      if (!fetchError && refreshedProject) {
+        setProjects(projects.map(p => p.id === updatedProject.id ? refreshedProject : p));
+      }
+
       setSelectedProject(null);
       showToast('success', 'Project updated successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating project:', error);
-      showToast('error', 'Failed to update project');
+      showToast('error', `Failed to update project: ${error?.message || 'Unknown error'}`);
     }
   };
 
