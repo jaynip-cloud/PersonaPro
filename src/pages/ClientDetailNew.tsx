@@ -15,7 +15,7 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { DocumentUpload } from '../components/data-sources/DocumentUpload';
 import { ProjectDetailPanel } from '../components/project/ProjectDetailPanel';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight } from 'lucide-react';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight, Eye } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
@@ -32,7 +32,10 @@ export const ClientDetailNew: React.FC = () => {
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'growth' | 'projects' | 'pitch' | 'intelligence' | 'settings'>('overview');
-  const [projectsSubTab, setProjectsSubTab] = useState<'projects' | 'pitch'>('projects');
+  const [projectsSubTab, setProjectsSubTab] = useState<'projects' | 'pitch-history'>('projects');
+  const [savedPitches, setSavedPitches] = useState<any[]>([]);
+  const [selectedPitch, setSelectedPitch] = useState<any | null>(null);
+  const [showPitchModal, setShowPitchModal] = useState(false);
   const [personaMetrics, setPersonaMetrics] = useState<PersonaMetrics | null>(null);
   const [evidence, setEvidence] = useState<EvidenceSnippet[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -223,6 +226,16 @@ export const ClientDetailNew: React.FC = () => {
 
       if (!projectsError && projectsData) {
         setProjects(projectsData);
+      }
+
+      const { data: pitchesData, error: pitchesError } = await supabase
+        .from('saved_pitches')
+        .select('*')
+        .eq('client_id', id)
+        .order('created_at', { ascending: false });
+
+      if (!pitchesError && pitchesData) {
+        setSavedPitches(pitchesData);
       }
     } catch (error) {
       console.error('Error loading client data:', error);
@@ -1385,6 +1398,38 @@ Client Information:
         )}
 
         {activeTab === 'projects' && (
+          <div className="space-y-6">
+            <div className="border-b border-border">
+              <div className="flex gap-6">
+                <button
+                  onClick={() => setProjectsSubTab('projects')}
+                  className={`pb-3 px-1 border-b-2 transition-colors ${
+                    projectsSubTab === 'projects'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span className="text-sm font-medium">Projects</span>
+                </button>
+                <button
+                  onClick={() => setProjectsSubTab('pitch-history')}
+                  className={`pb-3 px-1 border-b-2 transition-colors ${
+                    projectsSubTab === 'pitch-history'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span className="text-sm font-medium">Pitch History</span>
+                  {savedPitches.length > 0 && (
+                    <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-semibold">
+                      {savedPitches.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {projectsSubTab === 'projects' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <Card className="lg:col-span-2">
                 <CardHeader>
@@ -1554,6 +1599,91 @@ Client Information:
                 </Card>
               </div>
             </div>
+            )}
+
+            {projectsSubTab === 'pitch-history' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Saved Pitches for {client?.company}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {savedPitches.length === 0 ? (
+                    <div className="text-center py-12">
+                      <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <h3 className="text-lg font-semibold text-foreground mb-2">No saved pitches yet</h3>
+                      <p className="text-muted-foreground mb-6">
+                        Generate and save pitches from the Pitch Generator to see them here
+                      </p>
+                      <Button variant="primary" onClick={() => navigate('/pitch-generator')}>
+                        Go to Pitch Generator
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {savedPitches.map((pitch) => (
+                        <div
+                          key={pitch.id}
+                          className="p-4 border border-border rounded-lg hover:bg-accent transition-colors"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-foreground">{pitch.title}</h4>
+                                <Badge variant="outline" size="sm">
+                                  Variant {pitch.variant}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                <span>{new Date(pitch.created_at).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedPitch(pitch);
+                                  setShowPitchModal(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const blob = new Blob([pitch.content], { type: 'text/plain' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = `pitch-${pitch.variant}-${new Date(pitch.created_at).toLocaleDateString()}.txt`;
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  document.body.removeChild(a);
+                                  URL.revokeObjectURL(url);
+                                }}
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="secondary" size="sm">{pitch.tone}</Badge>
+                            <Badge variant="secondary" size="sm">{pitch.length}</Badge>
+                          </div>
+
+                          <div className="text-sm text-muted-foreground">
+                            Services: {pitch.services?.join(', ') || 'None'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
 
         {activeTab === 'intelligence' && (
@@ -2237,6 +2367,94 @@ Client Information:
             </Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={showPitchModal}
+        onClose={() => {
+          setShowPitchModal(false);
+          setSelectedPitch(null);
+        }}
+        title={selectedPitch?.title || 'Pitch Details'}
+        size="xl"
+      >
+        {selectedPitch && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">Client:</span>
+                <span className="ml-2 font-medium">{client?.company}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Variant:</span>
+                <span className="ml-2 font-medium">{selectedPitch.variant}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Date:</span>
+                <span className="ml-2 font-medium">
+                  {new Date(selectedPitch.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Tone:</span>
+                <span className="ml-2 font-medium">{selectedPitch.tone}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Badge variant="secondary">{selectedPitch.tone}</Badge>
+              <Badge variant="secondary">{selectedPitch.length}</Badge>
+            </div>
+
+            <div>
+              <span className="text-sm text-muted-foreground">Services:</span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {selectedPitch.services?.map((service: string, idx: number) => (
+                  <Badge key={idx} variant="outline" size="sm">
+                    {service}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-4">
+              <h4 className="font-semibold mb-3">Pitch Content</h4>
+              <div className="p-4 bg-muted rounded-lg whitespace-pre-wrap text-sm max-h-96 overflow-y-auto">
+                {selectedPitch.content}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  const blob = new Blob([selectedPitch.content], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `pitch-${selectedPitch.variant}-${new Date(selectedPitch.created_at).toLocaleDateString()}.txt`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowPitchModal(false);
+                  setSelectedPitch(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
