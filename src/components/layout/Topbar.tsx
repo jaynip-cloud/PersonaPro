@@ -1,26 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Bell, Moon, Sun, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Badge } from '../ui/Badge';
 import { Avatar } from '../ui/Avatar';
+import { supabase } from '../../lib/supabase';
 
 export const Topbar: React.FC = () => {
   const { theme, toggleTheme, recommendations } = useApp();
   const { user, signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [userName, setUserName] = useState('User');
+  const [userEmail, setUserEmail] = useState('');
   const navigate = useNavigate();
 
   const unreadNotifications = recommendations.filter(r => r.status === 'new').length;
+
+  useEffect(() => {
+    if (user) {
+      loadUserProfile();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('user-profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${user.id}`
+        },
+        (payload) => {
+          if (payload.new) {
+            setUserName((payload.new as any).full_name || 'User');
+            setUserEmail((payload.new as any).email || user.email || '');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  const loadUserProfile = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('email, full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setUserName(data.full_name || 'User');
+        setUserEmail(data.email || user.email || '');
+      } else {
+        setUserName(user.user_metadata?.full_name || 'User');
+        setUserEmail(user.email || '');
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      setUserName(user.user_metadata?.full_name || 'User');
+      setUserEmail(user.email || '');
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/login');
   };
-
-  const userName = user?.user_metadata?.full_name || 'User';
-  const userEmail = user?.email || '';
 
   return (
     <header className="fixed left-60 right-0 top-0 z-30 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
