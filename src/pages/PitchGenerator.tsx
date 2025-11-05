@@ -2,16 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { PitchBuilderForm } from '../components/pitch/PitchBuilderForm';
 import { GeneratedPitchDisplay } from '../components/pitch/GeneratedPitchDisplay';
 import { PitchHistory } from '../components/pitch/PitchHistory';
-import { GeneratedPitch, PitchGeneratorInput } from '../types';
-import { mockClients } from '../data/mockData';
+import { GeneratedPitch, PitchGeneratorInput, Client } from '../types';
 import { generatePitchVariants } from '../utils/pitchGenerator';
-import { FileText, History, Sparkles } from 'lucide-react';
+import { FileText, History, Sparkles, Loader2 } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/ui/Toast';
 
 export const PitchGenerator: React.FC = () => {
   const { user } = useAuth();
+  const { showToast } = useToast();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(true);
   const [generatedPitches, setGeneratedPitches] = useState<GeneratedPitch[]>([]);
   const [savedPitchesCount, setSavedPitchesCount] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -20,8 +23,54 @@ export const PitchGenerator: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    loadSavedPitchesCount();
+    if (user) {
+      loadClients();
+      loadSavedPitchesCount();
+    }
   }, [user]);
+
+  const loadClients = async () => {
+    if (!user) return;
+
+    setIsLoadingClients(true);
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('company', { ascending: true });
+
+      if (error) throw error;
+
+      if (data) {
+        const mappedClients: Client[] = data.map(c => ({
+          id: c.id,
+          name: c.name || c.company,
+          company: c.company,
+          email: c.email,
+          phone: c.phone || '',
+          role: c.job_title || c.role || '',
+          industry: c.industry || '',
+          status: c.status,
+          lastContact: c.last_contact || '',
+          nextFollowUp: c.next_follow_up || '',
+          personaScore: c.persona_score,
+          tags: c.tags || [],
+          createdAt: c.created_at,
+          location: c.location || '',
+          founded: c.founded || '',
+          csm: c.csm || '',
+          avatar: c.avatar || undefined,
+        }));
+        setClients(mappedClients);
+      }
+    } catch (error) {
+      console.error('Error loading clients:', error);
+      showToast('error', 'Failed to load clients');
+    } finally {
+      setIsLoadingClients(false);
+    }
+  };
 
   const loadSavedPitchesCount = async () => {
     if (!user) return;
@@ -45,12 +94,17 @@ export const PitchGenerator: React.FC = () => {
     const simulatedDelay = Math.random() * 2000 + 2000;
 
     setTimeout(() => {
-      const client = mockClients.find(c => c.id === input.clientId);
-      if (!client) return;
+      const client = clients.find(c => c.id === input.clientId);
+      if (!client) {
+        showToast('error', 'Client not found');
+        setIsGenerating(false);
+        return;
+      }
 
       const { variantA, variantB } = generatePitchVariants(input, client);
       setGeneratedPitches([variantA, variantB]);
       setIsGenerating(false);
+      showToast('success', 'Pitch variants generated successfully');
     }, simulatedDelay);
   };
 
@@ -78,10 +132,10 @@ export const PitchGenerator: React.FC = () => {
       if (error) throw error;
 
       setSavedPitchesCount(prev => prev + 1);
-      alert('Pitch saved successfully!');
+      showToast('success', 'Pitch saved successfully!');
     } catch (error) {
       console.error('Error saving pitch:', error);
-      alert('Failed to save pitch');
+      showToast('error', 'Failed to save pitch');
     } finally {
       setIsSaving(false);
     }
@@ -164,14 +218,31 @@ export const PitchGenerator: React.FC = () => {
       </div>
 
       {activeTab === 'builder' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <PitchBuilderForm
-              clients={mockClients}
-              onGenerate={handleGenerate}
-              isGenerating={isGenerating}
-            />
-          </div>
+        <>
+          {isLoadingClients ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+                <p className="text-muted-foreground">Loading clients...</p>
+              </div>
+            </div>
+          ) : clients.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-border rounded-lg">
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">No Clients Found</h3>
+              <p className="text-muted-foreground mb-4">
+                You need to add clients before generating pitches
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <PitchBuilderForm
+                  clients={clients}
+                  onGenerate={handleGenerate}
+                  isGenerating={isGenerating}
+                />
+              </div>
 
           <div className="space-y-6">
             {isGenerating && (
@@ -214,7 +285,9 @@ export const PitchGenerator: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
+            </div>
+          )}
+        </>
       )}
 
       {activeTab === 'history' && (
