@@ -10,6 +10,8 @@ import { GeneratedPitchDisplay } from '../pitch/GeneratedPitchDisplay';
 import { mockClients } from '../../data/mockData';
 import { generatePitchVariants } from '../../utils/pitchGenerator';
 import { GeneratedPitch, PitchGeneratorInput } from '../../types';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 interface Project {
   id: string;
@@ -21,6 +23,7 @@ interface Project {
   dueDate?: string;
   clientName: string;
   createdAt: string;
+  client_id?: string;
 }
 
 interface ProjectDetailPanelProps {
@@ -37,14 +40,36 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
   onUpdate,
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [editedProject, setEditedProject] = useState<Project>(project);
   const [showPitchModal, setShowPitchModal] = useState(false);
   const [generatedPitches, setGeneratedPitches] = useState<GeneratedPitch[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [savedPitches, setSavedPitches] = useState<any[]>([]);
+  const [prefilledClientId, setPrefilledClientId] = useState<string>('');
 
   useEffect(() => {
     setEditedProject(project);
+    if (project.client_id) {
+      setPrefilledClientId(project.client_id);
+      loadSavedPitches(project.id);
+    }
   }, [project]);
+
+  const loadSavedPitches = async (projectId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('saved_pitches')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSavedPitches(data || []);
+    } catch (error) {
+      console.error('Error loading saved pitches:', error);
+    }
+  };
 
   const handleSave = () => {
     onUpdate(editedProject);
@@ -69,8 +94,34 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
     }, simulatedDelay);
   };
 
-  const handleSavePitch = (pitch: GeneratedPitch) => {
-    console.log('Pitch saved:', pitch);
+  const handleSavePitch = async (pitch: GeneratedPitch) => {
+    if (!user || !project.client_id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('saved_pitches')
+        .insert({
+          project_id: project.id,
+          client_id: project.client_id,
+          title: `Pitch ${pitch.variant} - ${new Date().toLocaleDateString()}`,
+          content: pitch.content,
+          variant: pitch.variant,
+          services: pitch.metadata.services,
+          tone: pitch.metadata.tone,
+          length: pitch.metadata.length,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setSavedPitches([data, ...savedPitches]);
+      alert('Pitch saved successfully!');
+    } catch (error: any) {
+      console.error('Error saving pitch:', error);
+      alert(`Failed to save pitch: ${error?.message || 'Unknown error'}`);
+    }
   };
 
   const getStatusColor = (status: Project['status']) => {
@@ -257,6 +308,41 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
           <div className="text-xs text-muted-foreground">
             Created {new Date(project.createdAt).toLocaleString()}
           </div>
+
+          {savedPitches.length > 0 && (
+            <div className="pt-6 border-t border-border">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Saved Pitches</h3>
+              <div className="space-y-3">
+                {savedPitches.map((pitch) => (
+                  <div key={pitch.id} className="p-4 border border-border rounded-lg bg-muted/30">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h4 className="font-medium text-foreground">{pitch.title}</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(pitch.created_at).toLocaleString()} • Variant {pitch.variant}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge variant="outline" size="sm">{pitch.tone}</Badge>
+                        <Badge variant="outline" size="sm">{pitch.length}</Badge>
+                      </div>
+                    </div>
+                    <div className="text-sm text-muted-foreground mb-2">
+                      Services: {pitch.services?.join(', ') || 'None'}
+                    </div>
+                    <details className="text-sm">
+                      <summary className="cursor-pointer text-primary hover:underline">
+                        View full pitch
+                      </summary>
+                      <div className="mt-2 p-3 bg-background rounded border border-border whitespace-pre-wrap">
+                        {pitch.content}
+                      </div>
+                    </details>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -274,6 +360,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
             clients={mockClients}
             onGenerate={handlePitchGenerate}
             isGenerating={isGenerating}
+            initialClientId={prefilledClientId}
           />
 
           {generatedPitches.length > 0 && (

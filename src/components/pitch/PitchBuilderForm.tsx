@@ -9,14 +9,16 @@ interface PitchBuilderFormProps {
   clients: Client[];
   onGenerate: (input: PitchGeneratorInput) => void;
   isGenerating: boolean;
+  initialClientId?: string;
 }
 
 export const PitchBuilderForm: React.FC<PitchBuilderFormProps> = ({
   clients,
   onGenerate,
-  isGenerating
+  isGenerating,
+  initialClientId
 }) => {
-  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState(initialClientId || '');
   const [services, setServices] = useState<string[]>([]);
   const [serviceInput, setServiceInput] = useState('');
   const [companyDescription, setCompanyDescription] = useState(
@@ -26,6 +28,16 @@ export const PitchBuilderForm: React.FC<PitchBuilderFormProps> = ({
   const [length, setLength] = useState<'short' | 'long'>('short');
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+
+  React.useEffect(() => {
+    if (initialClientId) {
+      const client = clients.find(c => c.id === initialClientId);
+      if (client) {
+        setSelectedClientId(initialClientId);
+        setSearchTerm(`${client.name} - ${client.company}`);
+      }
+    }
+  }, [initialClientId, clients]);
 
   const filteredClients = clients.filter(
     client =>

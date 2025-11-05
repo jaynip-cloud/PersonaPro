@@ -2351,6 +2351,7 @@ Client Information:
             dueDate: selectedProject.due_date,
             clientName: client?.company || '',
             createdAt: selectedProject.created_at,
+            client_id: selectedProject.client_id || id,
           }}
           isOpen={!!selectedProject}
           onClose={() => setSelectedProject(null)}
