@@ -681,8 +681,6 @@ Client Information:
           description: `AI-identified opportunity for ${client.company} based on recent interactions and market analysis.`,
           is_ai_generated: true,
           stage: 'qualified',
-          probability: 75,
-          value: 50000,
         })
         .select()
         .single();
@@ -715,7 +713,6 @@ Client Information:
           description: newOpportunityForm.description,
           is_ai_generated: false,
           stage: 'lead',
-          probability: 50,
         })
         .select()
         .single();
@@ -1183,6 +1180,9 @@ Client Information:
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">{opp.description}</p>
+                          <p className="text-xs text-muted-foreground mt-3">
+                            Created {new Date(opp.created_at).toLocaleDateString()}
+                          </p>
                         </div>
                         {!opp.converted_to_project_id && (
                           <Button
@@ -1194,24 +1194,6 @@ Client Information:
                           </Button>
                         )}
                       </div>
-                      {opp.value && (
-                        <div className="flex items-center gap-4 mt-3 text-sm">
-                          <span className="font-semibold text-foreground">
-                            ${opp.value.toLocaleString()}
-                          </span>
-                          {opp.probability && (
-                            <span className="text-muted-foreground">{opp.probability}% probability</span>
-                          )}
-                          {opp.expected_close_date && (
-                            <span className="text-muted-foreground">
-                              Close: {new Date(opp.expected_close_date).toLocaleDateString()}
-                            </span>
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            Created {new Date(opp.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
