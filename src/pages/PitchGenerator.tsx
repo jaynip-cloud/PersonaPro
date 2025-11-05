@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PitchBuilderForm } from '../components/pitch/PitchBuilderForm';
 import { GeneratedPitchDisplay } from '../components/pitch/GeneratedPitchDisplay';
 import { PitchHistory } from '../components/pitch/PitchHistory';
@@ -7,13 +7,36 @@ import { mockClients } from '../data/mockData';
 import { generatePitchVariants } from '../utils/pitchGenerator';
 import { FileText, History, Sparkles } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
 export const PitchGenerator: React.FC = () => {
+  const { user } = useAuth();
   const [generatedPitches, setGeneratedPitches] = useState<GeneratedPitch[]>([]);
-  const [savedPitches, setSavedPitches] = useState<GeneratedPitch[]>([]);
+  const [savedPitchesCount, setSavedPitchesCount] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'builder' | 'history'>('builder');
   const [viewingPitch, setViewingPitch] = useState<GeneratedPitch | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    loadSavedPitchesCount();
+  }, [user]);
+
+  const loadSavedPitchesCount = async () => {
+    if (!user) return;
+
+    try {
+      const { count, error } = await supabase
+        .from('saved_pitches')
+        .select('*', { count: 'exact', head: true });
+
+      if (error) throw error;
+      setSavedPitchesCount(count || 0);
+    } catch (error) {
+      console.error('Error loading saved pitches count:', error);
+    }
+  };
 
   const handleGenerate = (input: PitchGeneratorInput) => {
     setIsGenerating(true);
@@ -31,9 +54,36 @@ export const PitchGenerator: React.FC = () => {
     }, simulatedDelay);
   };
 
-  const handleSavePitch = (pitch: GeneratedPitch) => {
-    if (!savedPitches.some(p => p.id === pitch.id)) {
-      setSavedPitches([pitch, ...savedPitches]);
+  const handleSavePitch = async (pitch: GeneratedPitch) => {
+    if (!user || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('saved_pitches')
+        .insert({
+          project_id: null,
+          client_id: pitch.clientId,
+          title: `Pitch for ${pitch.clientCompany}`,
+          content: `${pitch.elevatorPitch}\n\nValue Points:\n${pitch.valuePoints.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n\nNext Actions:\n${pitch.nextActions.map((a, i) => `${i + 1}. ${a}`).join('\n')}`,
+          variant: pitch.variant,
+          services: pitch.services,
+          tone: pitch.tone,
+          length: pitch.length,
+          created_by: user.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setSavedPitchesCount(prev => prev + 1);
+      alert('Pitch saved successfully!');
+    } catch (error) {
+      console.error('Error saving pitch:', error);
+      alert('Failed to save pitch');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -42,10 +92,23 @@ export const PitchGenerator: React.FC = () => {
     setActiveTab('builder');
   };
 
-  const handleDeletePitch = (pitchId: string) => {
-    setSavedPitches(savedPitches.filter(p => p.id !== pitchId));
-    if (viewingPitch?.id === pitchId) {
-      setViewingPitch(null);
+  const handleDeletePitch = async (pitchId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('saved_pitches')
+        .delete()
+        .eq('id', pitchId);
+
+      if (error) throw error;
+
+      setSavedPitchesCount(prev => Math.max(0, prev - 1));
+      if (viewingPitch?.id === pitchId) {
+        setViewingPitch(null);
+      }
+    } catch (error) {
+      console.error('Error deleting pitch:', error);
     }
   };
 
@@ -55,7 +118,7 @@ export const PitchGenerator: React.FC = () => {
       id: 'history',
       label: 'History',
       icon: History,
-      badge: savedPitches.length > 0 ? savedPitches.length : undefined
+      badge: savedPitchesCount > 0 ? savedPitchesCount : undefined
     }
   ];
 
@@ -156,9 +219,9 @@ export const PitchGenerator: React.FC = () => {
 
       {activeTab === 'history' && (
         <PitchHistory
-          pitches={savedPitches}
           onView={handleViewPitch}
           onDelete={handleDeletePitch}
+          onPitchesLoad={(count) => setSavedPitchesCount(count)}
         />
       )}
     </div>

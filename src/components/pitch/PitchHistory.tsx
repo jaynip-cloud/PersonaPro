@@ -1,22 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { GeneratedPitch } from '../../types';
 import { Clock, Eye, Trash2, Copy, Download } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
+import { Modal } from '../ui/Modal';
 
 interface PitchHistoryProps {
-  pitches: GeneratedPitch[];
   onView: (pitch: GeneratedPitch) => void;
   onDelete: (pitchId: string) => void;
+  onPitchesLoad?: (count: number) => void;
 }
 
 export const PitchHistory: React.FC<PitchHistoryProps> = ({
-  pitches,
   onView,
-  onDelete
+  onDelete,
+  onPitchesLoad
 }) => {
+  const { user } = useAuth();
+  const [pitches, setPitches] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'formal' | 'casual'>('all');
+  const [selectedPitch, setSelectedPitch] = useState<any | null>(null);
+
+  useEffect(() => {
+    loadPitches();
+  }, [user]);
+
+  const loadPitches = async () => {
+    if (!user) return;
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('saved_pitches')
+        .select(`
+          *,
+          client:clients(id, name, company)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const transformedPitches = (data || []).map(pitch => ({
+        id: pitch.id,
+        clientId: pitch.client_id,
+        clientName: pitch.client?.name || 'Unknown',
+        clientCompany: pitch.client?.company || 'Unknown',
+        services: pitch.services || [],
+        tone: pitch.tone,
+        length: pitch.length,
+        elevatorPitch: pitch.content.split('\n\n')[0] || pitch.content,
+        valuePoints: [],
+        nextActions: [],
+        confidence: 85,
+        evidenceTags: [],
+        variant: pitch.variant,
+        createdAt: pitch.created_at,
+        fullContent: pitch.content,
+        title: pitch.title
+      }));
+
+      setPitches(transformedPitches);
+      if (onPitchesLoad) {
+        onPitchesLoad(transformedPitches.length);
+      }
+    } catch (error) {
+      console.error('Error loading pitches:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredPitches = pitches.filter(pitch => {
     if (filter === 'all') return true;
@@ -79,12 +135,24 @@ VARIANT: ${pitch.variant}
     URL.revokeObjectURL(url);
   };
 
-  const handleDelete = (pitchId: string, e: React.MouseEvent) => {
+  const handleDelete = async (pitchId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('Are you sure you want to delete this pitch?')) {
-      onDelete(pitchId);
+      await onDelete(pitchId);
+      await loadPitches();
     }
   };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-12 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading pitches...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (pitches.length === 0) {
     return (
@@ -146,8 +214,7 @@ VARIANT: ${pitch.variant}
           {sortedPitches.map(pitch => (
             <div
               key={pitch.id}
-              className="p-4 border border-border rounded-lg hover:bg-accent transition-colors cursor-pointer"
-              onClick={() => onView(pitch)}
+              className="p-4 border border-border rounded-lg hover:bg-accent transition-colors"
             >
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -204,8 +271,9 @@ VARIANT: ${pitch.variant}
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onView(pitch);
+                      setSelectedPitch(pitch);
                     }}
+                    title="View pitch details"
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -227,6 +295,88 @@ VARIANT: ${pitch.variant}
           ))}
         </div>
       </CardContent>
+
+      <Modal
+        isOpen={!!selectedPitch}
+        onClose={() => setSelectedPitch(null)}
+        title={selectedPitch?.title || 'Pitch Details'}
+        size="xl"
+      >
+        {selectedPitch && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">Client:</span>
+                <span className="ml-2 font-medium">{selectedPitch.clientCompany}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Contact:</span>
+                <span className="ml-2 font-medium">{selectedPitch.clientName}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Variant:</span>
+                <span className="ml-2 font-medium">{selectedPitch.variant}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Date:</span>
+                <span className="ml-2 font-medium">
+                  {new Date(selectedPitch.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Badge variant="secondary">{selectedPitch.tone}</Badge>
+              <Badge variant="secondary">{selectedPitch.length}</Badge>
+            </div>
+
+            <div>
+              <span className="text-sm text-muted-foreground">Services:</span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {selectedPitch.services?.map((service: string, idx: number) => (
+                  <Badge key={idx} variant="outline" size="sm">
+                    {service}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-4">
+              <h4 className="font-semibold mb-3">Pitch Content</h4>
+              <div className="p-4 bg-muted rounded-lg whitespace-pre-wrap text-sm">
+                {selectedPitch.fullContent}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => handleExport(selectedPitch, {} as React.MouseEvent)}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  handleCopy(selectedPitch, {} as React.MouseEvent);
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setSelectedPitch(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </Card>
   );
 };
