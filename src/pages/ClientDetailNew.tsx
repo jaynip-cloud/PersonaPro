@@ -814,8 +814,8 @@ Client Information:
         .insert({
           client_id: id,
           name: opportunity.title,
-          description: opportunity.description,
-          status: 'opportunity_identified',
+          summary: opportunity.description,
+          status: 'planned',
           project_type: 'Pre-Sales',
           opportunity_id: opportunityId,
           progress_percentage: 0,
