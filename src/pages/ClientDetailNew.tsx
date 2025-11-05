@@ -1472,10 +1472,10 @@ Client Information:
                         };
 
                         return (
-                          <div key={project.id} className="p-4 border border-border rounded-lg">
+                          <div key={project.id} className="p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 mb-1">
                                   <h4 className="font-semibold text-foreground">{project.name}</h4>
                                   {project.is_ai_generated && (
                                     <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
@@ -1484,9 +1484,14 @@ Client Information:
                                     </div>
                                   )}
                                 </div>
-                                {project.description && (
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    {project.description}
+                                {project.project_code && (
+                                  <p className="text-xs text-muted-foreground mb-1">
+                                    {project.project_code}
+                                  </p>
+                                )}
+                                {(project.summary || project.description) && (
+                                  <p className="text-sm text-muted-foreground mt-2">
+                                    {project.summary || project.description}
                                   </p>
                                 )}
                               </div>
@@ -1503,17 +1508,69 @@ Client Information:
                                 </button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground mt-3">
-                              {project.due_date && (
-                                <span>Due: {new Date(project.due_date).toLocaleDateString()}</span>
-                              )}
-                              {project.budget && (
-                                <span>Budget: ${project.budget.toLocaleString()}</span>
-                              )}
-                              {project.timeline && (
-                                <span>Timeline: {project.timeline}</span>
-                              )}
+                            <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-border">
+                              <div className="space-y-2">
+                                {project.project_type && (
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <Target className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-muted-foreground">{project.project_type}</span>
+                                  </div>
+                                )}
+                                {project.project_manager && (
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <User className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-muted-foreground">{project.project_manager}</span>
+                                  </div>
+                                )}
+                                {project.start_date && (
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-muted-foreground">Started: {new Date(project.start_date).toLocaleDateString()}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="space-y-2">
+                                {project.due_date && (
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-muted-foreground">Due: {new Date(project.due_date).toLocaleDateString()}</span>
+                                  </div>
+                                )}
+                                {project.budget && (
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-muted-foreground">Budget: ${project.budget.toLocaleString()}</span>
+                                  </div>
+                                )}
+                                {project.timeline && (
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-muted-foreground">Timeline: {project.timeline}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
+                            {(project.progress_percentage !== undefined && project.progress_percentage !== null) && (
+                              <div className="mt-3 pt-3 border-t border-border">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs text-muted-foreground">Progress</span>
+                                  <span className="text-xs font-medium text-foreground">{project.progress_percentage}%</span>
+                                </div>
+                                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-primary rounded-full transition-all duration-300"
+                                    style={{ width: `${project.progress_percentage}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            {project.health_score !== undefined && project.health_score !== null && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className="text-xs text-muted-foreground">Health:</span>
+                                <div className={`w-2 h-2 rounded-full ${
+                                  project.health_score >= 80 ? 'bg-green-500' :
+                                  project.health_score >= 60 ? 'bg-blue-500' :
+                                  project.health_score >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                                }`} title={`Health Score: ${project.health_score}%`} />
+                                <span className="text-xs text-muted-foreground">{project.health_score}%</span>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
