@@ -1547,6 +1547,7 @@ Client Information:
                                   {(() => {
                                     const calculatedProgress =
                                       project.status === 'opportunity_identified' ? 10 :
+                                      project.status === 'discussion' ? 40 :
                                       project.status === 'in_progress' ? 50 :
                                       project.status === 'quote' ? 75 :
                                       project.status === 'win' ? 100 :
@@ -1564,6 +1565,7 @@ Client Information:
                                   style={{ width: `${(() => {
                                     const calculatedProgress =
                                       project.status === 'opportunity_identified' ? 10 :
+                                      project.status === 'discussion' ? 40 :
                                       project.status === 'in_progress' ? 50 :
                                       project.status === 'quote' ? 75 :
                                       project.status === 'win' ? 100 :
