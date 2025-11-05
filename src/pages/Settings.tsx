@@ -43,6 +43,9 @@ export const Settings: React.FC = () => {
     if (user && activeTab === 'api') {
       loadApiKeys();
     }
+    if (user && activeTab === 'profile') {
+      loadProfile();
+    }
   }, [user, activeTab]);
 
   useEffect(() => {
@@ -125,12 +128,79 @@ export const Settings: React.FC = () => {
     }
   };
 
+  const loadProfile = async () => {
+    if (!user) return;
+
+    setIsLoadingProfile(true);
+    try {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('email, full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (userError) throw userError;
+
+      const { data: companyData, error: companyError } = await supabase
+        .from('company_profiles')
+        .select('company_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (companyError) throw companyError;
+
+      setProfile({
+        name: userData?.full_name || '',
+        email: userData?.email || '',
+        company: companyData?.company_name || ''
+      });
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!user) return;
+
+    setIsSavingProfile(true);
+    try {
+      const { error: userError } = await supabase
+        .from('users')
+        .update({
+          full_name: profile.name || null,
+        })
+        .eq('id', user.id);
+
+      if (userError) throw userError;
+
+      const { error: companyError } = await supabase
+        .from('company_profiles')
+        .update({
+          company_name: profile.company || null,
+        })
+        .eq('user_id', user.id);
+
+      if (companyError) throw companyError;
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert('Failed to save profile. Please try again.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   const [profile, setProfile] = useState({
-    name: 'John Williams',
-    email: 'john.williams@example.com',
-    role: 'CSM Lead',
-    company: 'TechSolutions Inc.'
+    name: '',
+    email: '',
+    company: ''
   });
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const [notifications, setNotifications] = useState({
     emailDigest: true,
@@ -153,6 +223,8 @@ export const Settings: React.FC = () => {
   const handleSave = () => {
     if (activeTab === 'api') {
       saveApiKeys();
+    } else if (activeTab === 'profile') {
+      saveProfile();
     } else {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -245,101 +317,110 @@ export const Settings: React.FC = () => {
                 <CardTitle>Profile Information</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Full Name
-                    </label>
-                    <Input
-                      type="text"
-                      value={profile.name}
-                      onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    />
+                {isLoadingProfile ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-muted-foreground">Loading profile...</div>
                   </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Full Name
+                      </label>
+                      <Input
+                        type="text"
+                        value={profile.name}
+                        onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                        placeholder="Enter your full name"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Email Address
-                    </label>
-                    <Input
-                      type="email"
-                      value={profile.email}
-                      onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Email Address
+                      </label>
+                      <Input
+                        type="email"
+                        value={profile.email}
+                        disabled
+                        className="bg-gray-50 cursor-not-allowed"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Email cannot be changed from this page
+                      </p>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Role
-                    </label>
-                    <Input
-                      type="text"
-                      value={profile.role}
-                      onChange={(e) => setProfile({ ...profile, role: e.target.value })}
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Company
+                      </label>
+                      <Input
+                        type="text"
+                        value={profile.company}
+                        onChange={(e) => setProfile({ ...profile, company: e.target.value })}
+                        placeholder="Enter your company name"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Company
-                    </label>
-                    <Input
-                      type="text"
-                      value={profile.company}
-                      onChange={(e) => setProfile({ ...profile, company: e.target.value })}
-                    />
-                  </div>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Theme Preference
+                      </label>
+                      <div className="flex gap-2">
+                        {(['light', 'dark', 'system'] as const).map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => setTheme(t)}
+                            className={`flex-1 py-2 px-4 rounded-md border transition-colors capitalize ${
+                              theme === t
+                                ? 'border-primary bg-primary text-white'
+                                : 'border-border bg-background text-foreground hover:bg-accent'
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Theme preference coming soon
+                      </p>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Theme Preference
-                    </label>
-                    <div className="flex gap-2">
-                      {(['light', 'dark', 'system'] as const).map((t) => (
-                        <button
-                          key={t}
-                          onClick={() => setTheme(t)}
-                          className={`flex-1 py-2 px-4 rounded-md border transition-colors capitalize ${
-                            theme === t
-                              ? 'border-primary bg-primary text-white'
-                              : 'border-border bg-background text-foreground hover:bg-accent'
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
+                    <Button variant="primary" onClick={handleSave} disabled={saved || isSavingProfile}>
+                      {isSavingProfile ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Saving...
+                        </>
+                      ) : saved ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Saved!
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
+
+                    <div className="mt-8 pt-6 border-t border-red-200">
+                      <h3 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h3>
+                      <p className="text-sm text-slate-600 mb-4">
+                        Permanently delete your account and all associated data. This action cannot be undone.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowDeleteModal(true)}
+                        className="border-red-300 text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Account
+                      </Button>
                     </div>
                   </div>
-
-                  <Button variant="primary" onClick={handleSave} disabled={saved}>
-                    {saved ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Saved!
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="mt-8 pt-6 border-t border-red-200">
-                    <h3 className="text-lg font-semibold text-red-600 mb-2">Danger Zone</h3>
-                    <p className="text-sm text-slate-600 mb-4">
-                      Permanently delete your account and all associated data. This action cannot be undone.
-                    </p>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowDeleteModal(true)}
-                      className="border-red-300 text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Account
-                    </Button>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -350,39 +431,14 @@ export const Settings: React.FC = () => {
                 <CardTitle>Notification Preferences</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {Object.entries(notifications).map(([key, value]) => (
-                    <label key={key} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                      <div>
-                        <p className="font-medium text-foreground capitalize">
-                          {key.replace(/([A-Z])/g, ' $1').trim()}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {getNotificationDescription(key)}
-                        </p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={value}
-                        onChange={(e) => setNotifications({ ...notifications, [key]: e.target.checked })}
-                        className="w-5 h-5 text-primary rounded focus:ring-2 focus:ring-primary"
-                      />
-                    </label>
-                  ))}
-
-                  <Button variant="primary" onClick={handleSave} disabled={saved}>
-                    {saved ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Saved!
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Preferences
-                      </>
-                    )}
-                  </Button>
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mb-4">
+                    <Bell className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Coming Soon</h3>
+                  <p className="text-gray-600 text-center max-w-md">
+                    Notification preferences will be available soon. You'll be able to customize email alerts, in-app notifications, and more.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -394,108 +450,14 @@ export const Settings: React.FC = () => {
                 <CardTitle>Data Privacy & Security</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Data Retention Policy
-                    </label>
-                    <select
-                      value={privacy.retentionPolicy}
-                      onChange={(e) => setPrivacy({ ...privacy, retentionPolicy: e.target.value })}
-                      className="w-full border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    >
-                      <option value="90days">90 Days</option>
-                      <option value="1year">1 Year</option>
-                      <option value="never">Keep Forever</option>
-                    </select>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      How long should we retain your client interaction data?
-                    </p>
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mb-4">
+                    <Shield className="h-8 w-8 text-white" />
                   </div>
-
-                  <div className="space-y-4">
-                    <label className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                      <div>
-                        <p className="font-medium text-foreground">
-                          Mask Sensitive Information
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Hide email addresses and phone numbers in reports
-                        </p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={privacy.maskSensitiveInfo}
-                        onChange={(e) => setPrivacy({ ...privacy, maskSensitiveInfo: e.target.checked })}
-                        className="w-5 h-5 text-primary rounded focus:ring-2 focus:ring-primary"
-                      />
-                    </label>
-
-                    <label className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                      <div>
-                        <p className="font-medium text-foreground">
-                          Consent Tracking
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Track client consent for data collection and processing
-                        </p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={privacy.consentTracking}
-                        onChange={(e) => setPrivacy({ ...privacy, consentTracking: e.target.checked })}
-                        className="w-5 h-5 text-primary rounded focus:ring-2 focus:ring-primary"
-                      />
-                    </label>
-
-                    <label className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                      <div>
-                        <p className="font-medium text-foreground">
-                          Enable Data Export
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Allow downloading of all collected data
-                        </p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={privacy.dataExport}
-                        onChange={(e) => setPrivacy({ ...privacy, dataExport: e.target.checked })}
-                        className="w-5 h-5 text-primary rounded focus:ring-2 focus:ring-primary"
-                      />
-                    </label>
-
-                    <label className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent transition-colors cursor-pointer">
-                      <div>
-                        <p className="font-medium text-foreground">
-                          Anonymize Reports
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Remove personally identifiable information from exported reports
-                        </p>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={privacy.anonymizeReports}
-                        onChange={(e) => setPrivacy({ ...privacy, anonymizeReports: e.target.checked })}
-                        className="w-5 h-5 text-primary rounded focus:ring-2 focus:ring-primary"
-                      />
-                    </label>
-                  </div>
-
-                  <Button variant="primary" onClick={handleSave} disabled={saved}>
-                    {saved ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Saved!
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Privacy Settings
-                      </>
-                    )}
-                  </Button>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Coming Soon</h3>
+                  <p className="text-gray-600 text-center max-w-md">
+                    Data privacy and security settings will be available soon. You'll be able to manage data retention, consent tracking, and more.
+                  </p>
                 </div>
               </CardContent>
             </Card>
