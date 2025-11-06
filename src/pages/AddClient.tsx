@@ -209,6 +209,40 @@ export const AddClient: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateAdditionalInfo = () => {
+    const newErrors: Partial<Record<keyof ClientFormData, string>> = {};
+
+    if (!formData.budgetRange.trim()) {
+      newErrors.budgetRange = 'Budget range is required';
+    }
+
+    if (!formData.companyOverview.trim()) {
+      newErrors.companyOverview = 'Company overview is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateGoalsInfo = () => {
+    const newErrors: Partial<Record<keyof ClientFormData, string>> = {};
+
+    if (!formData.shortTermGoals.trim()) {
+      newErrors.shortTermGoals = 'Short-term goals are required';
+    }
+
+    if (!formData.longTermGoals.trim()) {
+      newErrors.longTermGoals = 'Long-term goals are required';
+    }
+
+    if (!formData.expectations.trim()) {
+      newErrors.expectations = 'Client expectations are required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const validateContactInfo = () => {
     const newErrors: Partial<Record<keyof ClientFormData, string>> = {};
 
@@ -376,6 +410,16 @@ export const AddClient: React.FC = () => {
       return;
     }
 
+    if (activeTab === 'additional' && !validateAdditionalInfo()) {
+      showToast('error', 'Please fill in all required additional information');
+      return;
+    }
+
+    if (activeTab === 'goals' && !validateGoalsInfo()) {
+      showToast('error', 'Please fill in all required goals information');
+      return;
+    }
+
     setCompletedTabs(prev => new Set(prev).add(activeTab));
 
     const tabOrder = ['basic', 'contact', 'social', 'additional', 'goals'];
@@ -464,8 +508,8 @@ export const AddClient: React.FC = () => {
       return;
     }
 
-    if (!validateBasicInfo() || !validateContactInfo()) {
-      showToast('error', 'Please fix errors in required fields');
+    if (!validateBasicInfo() || !validateContactInfo() || !validateAdditionalInfo() || !validateGoalsInfo()) {
+      showToast('error', 'Please fill in all required fields across all tabs');
       return;
     }
 
@@ -615,7 +659,7 @@ export const AddClient: React.FC = () => {
   };
 
   const canSave = () => {
-    return completedTabs.size >= 2;
+    return completedTabs.size >= 4;
   };
 
   const tabs = [
@@ -1118,6 +1162,43 @@ export const AddClient: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
+                  <DollarSign className="h-4 w-4 inline mr-2" />
+                  Budget Range <span className="text-red-600">*</span>
+                </label>
+                <Input
+                  placeholder="e.g., $10K-$50K, $100K+, Contact for pricing"
+                  value={formData.budgetRange}
+                  onChange={(e) => handleInputChange('budgetRange', e.target.value)}
+                  className={errors.budgetRange ? 'border-red-500' : ''}
+                />
+                {errors.budgetRange && (
+                  <p className="text-xs text-red-600 mt-1">{errors.budgetRange}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Understanding the client's budget helps tailor solutions and expectations
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Company Overview <span className="text-red-600">*</span>
+                </label>
+                <textarea
+                  placeholder="Provide a comprehensive overview of the company: what they do, their mission, market position, key products/services, and unique value proposition..."
+                  value={formData.companyOverview}
+                  onChange={(e) => handleInputChange('companyOverview', e.target.value)}
+                  className={`w-full min-h-[120px] border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none ${errors.companyOverview ? 'border-red-500' : 'border-border'}`}
+                />
+                {errors.companyOverview && (
+                  <p className="text-xs text-red-600 mt-1">{errors.companyOverview}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  This helps build context for better client insights and recommendations
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Notes / Description
                 </label>
                 <textarea
@@ -1195,40 +1276,65 @@ export const AddClient: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg mb-4">
+                <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
+                  <Target className="h-4 w-4 inline mr-2" />
+                  These fields are crucial for generating accurate AI insights and recommendations
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Short-Term Goals
+                  Short-Term Goals <span className="text-red-600">*</span>
                 </label>
                 <textarea
-                  placeholder="What are the client's immediate goals? (next 3-6 months)"
+                  placeholder="What are the client's immediate goals and priorities? (next 3-6 months)&#10;Examples: Launch new product line, expand to 3 new markets, increase revenue by 25%, scale team to 100 employees"
                   value={formData.shortTermGoals}
                   onChange={(e) => handleInputChange('shortTermGoals', e.target.value)}
-                  className="w-full min-h-[100px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  className={`w-full min-h-[100px] border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none ${errors.shortTermGoals ? 'border-red-500' : 'border-border'}`}
                 />
+                {errors.shortTermGoals && (
+                  <p className="text-xs text-red-600 mt-1">{errors.shortTermGoals}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Understanding short-term goals helps identify immediate opportunities
+                </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Long-Term Goals
+                  Long-Term Goals <span className="text-red-600">*</span>
                 </label>
                 <textarea
-                  placeholder="What are the client's long-term objectives? (1+ years)"
+                  placeholder="What are the client's long-term vision and strategic objectives? (1-5 years)&#10;Examples: Become market leader in industry, IPO by 2027, expand globally to 50 countries, achieve $100M ARR"
                   value={formData.longTermGoals}
                   onChange={(e) => handleInputChange('longTermGoals', e.target.value)}
-                  className="w-full min-h-[100px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  className={`w-full min-h-[100px] border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none ${errors.longTermGoals ? 'border-red-500' : 'border-border'}`}
                 />
+                {errors.longTermGoals && (
+                  <p className="text-xs text-red-600 mt-1">{errors.longTermGoals}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Long-term goals help align your solutions with their strategic vision
+                </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Client Expectations
+                  Client Expectations <span className="text-red-600">*</span>
                 </label>
                 <textarea
-                  placeholder="What specific outcomes or results is the client seeking from your services?"
+                  placeholder="What specific outcomes, service levels, or results is the client seeking?&#10;Examples: 24/7 support availability, scalable solutions, data security compliance, strategic partnership growth, transparent communication"
                   value={formData.expectations}
                   onChange={(e) => handleInputChange('expectations', e.target.value)}
-                  className="w-full min-h-[100px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  className={`w-full min-h-[100px] border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none ${errors.expectations ? 'border-red-500' : 'border-border'}`}
                 />
+                {errors.expectations && (
+                  <p className="text-xs text-red-600 mt-1">{errors.expectations}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Clear expectations ensure you can meet and exceed client needs
+                </p>
               </div>
 
               <div>

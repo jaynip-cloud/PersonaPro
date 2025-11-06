@@ -283,6 +283,13 @@ async function extractCompanyInfo(crawlResults: CrawlResult[], perplexityKey: st
 
 CRITICAL: ACCURACY IS PARAMOUNT - NEVER GUESS OR INFER DATA THAT IS NOT EXPLICITLY STATED OR FOUND.
 
+⚠️ MANDATORY FIELDS - THESE MUST BE EXTRACTED (use web search extensively if needed):
+1. companyOverview/description - REQUIRED (minimum 2-3 sentences about what the company does)
+2. shortTermGoals - REQUIRED (search press releases, blog, investor pages, CEO interviews)
+3. longTermGoals - REQUIRED (search about page, vision/mission, strategic direction, investor deck)
+4. expectations - REQUIRED (infer from testimonials, service pages, partnership requirements)
+5. budgetRange - OPTIONAL but highly valuable (look for pricing pages, case studies)
+
 DATA SOURCE PRIORITY (USE IN THIS EXACT ORDER):
 1. **PRIMARY SOURCE - LinkedIn Company Page**: ${linkedinCompanyUrls[0] || 'Not found - search for it'}
    - Search and extract from the company's official LinkedIn page FIRST
