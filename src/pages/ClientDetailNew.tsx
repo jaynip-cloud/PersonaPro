@@ -474,6 +474,47 @@ export const ClientDetailNew: React.FC = () => {
     }
   };
 
+  const handleGenerateInsights = async () => {
+    if (!client || !user) return;
+
+    setIsGeneratingInsights(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-client-insights`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId: client.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate insights');
+      }
+
+      const { insights, dataGathered } = await response.json();
+
+      setClient({
+        ...client,
+        aiInsights: insights,
+        aiInsightsGeneratedAt: new Date().toISOString(),
+      });
+
+      showToast('success', `Insights generated! Analyzed ${dataGathered.contacts} contacts, ${dataGathered.meetings} meetings, ${dataGathered.projects} projects`);
+    } catch (error: any) {
+      console.error('Error generating insights:', error);
+      showToast('error', error.message || 'Failed to generate insights');
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
+
   const handleDocumentUpload = async (files: File[]) => {
     if (!client || !user || files.length === 0) return;
 
