@@ -1,18 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
-import { Plus, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
+import { Plus, Sparkles, ArrowRight, Loader2, TrendingUp, AlertCircle } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 interface Opportunity {
   id: string;
   title: string;
   description: string;
-  isAiGenerated: boolean;
-  createdAt: string;
-  convertedToProjectId?: string;
+  is_ai_generated: boolean;
+  created_at: string;
+  converted_to_project_id?: string;
+  ai_analysis?: {
+    reasoning?: {
+      clientNeed?: string;
+      marketContext?: string;
+      capabilityMatch?: string;
+      timing?: string;
+      valueProposition?: string;
+    };
+    estimatedValue?: string;
+    urgency?: string;
+    confidence?: string;
+    recommendedApproach?: string;
+    expectedBudgetRange?: string;
+    successFactors?: string[];
+  };
 }
 
 interface GrowthOpportunitiesProps {
@@ -21,50 +38,108 @@ interface GrowthOpportunitiesProps {
 }
 
 export const GrowthOpportunities: React.FC<GrowthOpportunitiesProps> = ({ clientId, clientName }) => {
+  const { user } = useAuth();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newOpportunity, setNewOpportunity] = useState({ title: '', description: '' });
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user && clientId) {
+      loadOpportunities();
+    }
+  }, [user, clientId]);
+
+  const loadOpportunities = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOpportunities(data || []);
+    } catch (err: any) {
+      console.error('Error loading opportunities:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAutoGenerate = async () => {
+    if (!user) return;
+
     setIsGenerating(true);
+    setError(null);
 
-    setTimeout(() => {
-      const aiOpportunity: Opportunity = {
-        id: `opp-${Date.now()}`,
-        title: 'Enterprise Support Package Upgrade',
-        description: `Based on ${clientName}'s recent scaling needs and increased user load, recommend upgrading to enterprise support tier with dedicated support engineer.`,
-        isAiGenerated: true,
-        createdAt: new Date().toISOString(),
-      };
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
 
-      setOpportunities([aiOpportunity, ...opportunities]);
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-growth-opportunities`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ clientId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate opportunities');
+      }
+
+      const { opportunities: newOpportunities, analysisMetadata } = await response.json();
+
+      setOpportunities([...newOpportunities, ...opportunities]);
+
+      const message = `Generated ${newOpportunities.length} opportunities (Data Quality: ${analysisMetadata?.dataQuality || 'Unknown'})`;
+      alert(message);
+    } catch (err: any) {
+      console.error('Error generating opportunities:', err);
+      setError(err.message || 'Failed to generate opportunities');
+      alert(err.message || 'Failed to generate opportunities');
+    } finally {
       setIsGenerating(false);
-    }, 2000);
+    }
   };
 
-  const handleManualCreate = () => {
-    if (!newOpportunity.title || !newOpportunity.description) return;
+  const handleManualCreate = async () => {
+    if (!newOpportunity.title || !newOpportunity.description || !user) return;
 
-    const manualOpportunity: Opportunity = {
-      id: `opp-${Date.now()}`,
-      title: newOpportunity.title,
-      description: newOpportunity.description,
-      isAiGenerated: false,
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      const { data, error } = await supabase
+        .from('opportunities')
+        .insert({
+          client_id: clientId,
+          user_id: user.id,
+          title: newOpportunity.title,
+          description: newOpportunity.description,
+          is_ai_generated: false,
+        })
+        .select()
+        .single();
 
-    setOpportunities([manualOpportunity, ...opportunities]);
-    setNewOpportunity({ title: '', description: '' });
-    setIsModalOpen(false);
+      if (error) throw error;
+
+      setOpportunities([data, ...opportunities]);
+      setNewOpportunity({ title: '', description: '' });
+      setIsModalOpen(false);
+    } catch (err: any) {
+      console.error('Error creating opportunity:', err);
+      alert(err.message || 'Failed to create opportunity');
+    }
   };
 
-  const handleAddToProject = (opportunityId: string) => {
-    setOpportunities(opportunities.map(opp =>
-      opp.id === opportunityId
-        ? { ...opp, convertedToProjectId: `project-${Date.now()}` }
-        : opp
-    ));
+  const handleAddToProject = async (opportunityId: string) => {
+    alert('Converting to project - this will be implemented in the project creation flow');
   };
 
   return (
@@ -100,8 +175,24 @@ export const GrowthOpportunities: React.FC<GrowthOpportunitiesProps> = ({ client
           </div>
         </CardHeader>
         <CardContent>
-          {opportunities.length === 0 ? (
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-800">Error</p>
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {isLoading ? (
             <div className="text-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground mt-2">Loading opportunities...</p>
+            </div>
+          ) : opportunities.length === 0 ? (
+            <div className="text-center py-8">
+              <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
               <p className="text-sm text-muted-foreground mb-4">
                 No opportunities yet. Use AI to identify potential growth areas or add manually.
               </p>
@@ -112,7 +203,7 @@ export const GrowthOpportunities: React.FC<GrowthOpportunitiesProps> = ({ client
                 <div
                   key={opp.id}
                   className={`p-4 border rounded-lg ${
-                    opp.convertedToProjectId
+                    opp.converted_to_project_id
                       ? 'border-green-200 bg-green-50'
                       : 'border-border bg-background'
                   }`}
@@ -121,24 +212,64 @@ export const GrowthOpportunities: React.FC<GrowthOpportunitiesProps> = ({ client
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h4 className="font-semibold text-foreground">{opp.title}</h4>
-                        {opp.isAiGenerated && (
+                        {opp.is_ai_generated && (
                           <Badge variant="outline" size="sm" className="flex items-center gap-1">
                             <Sparkles className="h-3 w-3" />
                             AI
                           </Badge>
                         )}
-                        {opp.convertedToProjectId && (
+                        {opp.ai_analysis?.estimatedValue && (
+                          <Badge variant="outline" size="sm">
+                            Value: {opp.ai_analysis.estimatedValue}
+                          </Badge>
+                        )}
+                        {opp.ai_analysis?.urgency === 'High' && (
+                          <Badge variant="warning" size="sm">
+                            High Urgency
+                          </Badge>
+                        )}
+                        {opp.converted_to_project_id && (
                           <Badge variant="success" size="sm">
                             Converted to Project
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{opp.description}</p>
+                      <p className="text-sm text-muted-foreground mb-2">{opp.description}</p>
+
+                      {opp.ai_analysis?.reasoning && (
+                        <div className="mt-3 pt-3 border-t border-border space-y-2">
+                          {opp.ai_analysis.reasoning.clientNeed && (
+                            <div>
+                              <span className="text-xs font-medium text-foreground">Client Need: </span>
+                              <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.clientNeed}</span>
+                            </div>
+                          )}
+                          {opp.ai_analysis.reasoning.capabilityMatch && (
+                            <div>
+                              <span className="text-xs font-medium text-foreground">Solution: </span>
+                              <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.capabilityMatch}</span>
+                            </div>
+                          )}
+                          {opp.ai_analysis.reasoning.valueProposition && (
+                            <div>
+                              <span className="text-xs font-medium text-foreground">Value: </span>
+                              <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.valueProposition}</span>
+                            </div>
+                          )}
+                          {opp.ai_analysis.expectedBudgetRange && (
+                            <div>
+                              <span className="text-xs font-medium text-foreground">Budget: </span>
+                              <span className="text-xs text-muted-foreground">{opp.ai_analysis.expectedBudgetRange}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <p className="text-xs text-muted-foreground mt-2">
-                        Created {new Date(opp.createdAt).toLocaleDateString()}
+                        Created {new Date(opp.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    {!opp.convertedToProjectId && (
+                    {!opp.converted_to_project_id && (
                       <Button
                         variant="primary"
                         size="sm"
