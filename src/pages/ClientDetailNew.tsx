@@ -4,6 +4,7 @@ import { ClientHeader } from '../components/client/ClientHeader';
 import { FinancialOverview } from '../components/client/FinancialOverview';
 import { IntelligenceAgent } from '../components/client/IntelligenceAgent';
 import { QueryResult } from '../components/client/QueryResult';
+import { AIInsightsOverview } from '../components/client/AIInsightsOverview';
 import { PersonaSummary } from '../components/persona/PersonaSummary';
 import { PersonaMetricsCards } from '../components/persona/PersonaMetricsCards';
 import { ExplainabilityPanel } from '../components/persona/ExplainabilityPanel';
