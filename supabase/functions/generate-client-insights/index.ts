@@ -244,106 +244,106 @@ ${clientContext}
 Provide a comprehensive analysis in JSON format with the following structure:
 
 {
-  "executiveSummary": "2-3 sentence high-level overview of this client relationship and status",
+  \"executiveSummary\": \"2-3 sentence high-level overview of this client relationship and status\",
 
-  "clientProfile": {
-    "maturityLevel": "early-stage | growing | established | enterprise",
-    "sophisticationScore": number (0-100, based on goals clarity, processes, expectations),
-    "readinessToEngage": "high | medium | low",
-    "strategicValue": number (0-100, their long-term potential value)
+  \"clientProfile\": {
+    \"maturityLevel\": \"early-stage | growing | established | enterprise\",
+    \"sophisticationScore\": number (0-100, based on goals clarity, processes, expectations),
+    \"readinessToEngage\": \"high | medium | low\",
+    \"strategicValue\": number (0-100, their long-term potential value)
   },
 
-  "behavioralAnalysis": {
-    "communicationStyle": "formal | professional | casual | mixed",
-    "decisionMakingPattern": "data-driven | relationship-driven | consensus-based | hierarchical | fast-moving | cautious",
-    "engagementLevel": "highly engaged | moderately engaged | passive | disengaged",
-    "responsePattern": "quick responder | thoughtful responder | slow responder | inconsistent",
-    "meetingBehavior": "Analysis of meeting frequency, topics, tone, and outcomes based on transcripts",
-    "projectEngagement": "Analysis of how they engage with projects - active, hands-off, demanding, collaborative, etc.",
-    "reliabilityScore": number (0-100, based on meeting consistency, communication patterns)
+  \"behavioralAnalysis\": {
+    \"communicationStyle\": \"formal | professional | casual | mixed\",
+    \"decisionMakingPattern\": \"data-driven | relationship-driven | consensus-based | hierarchical | fast-moving | cautious\",
+    \"engagementLevel\": \"highly engaged | moderately engaged | passive | disengaged\",
+    \"responsePattern\": \"quick responder | thoughtful responder | slow responder | inconsistent\",
+    \"meetingBehavior\": \"Analysis of meeting frequency, topics, tone, and outcomes based on transcripts\",
+    \"projectEngagement\": \"Analysis of how they engage with projects - active, hands-off, demanding, collaborative, etc.\",
+    \"reliabilityScore\": number (0-100, based on meeting consistency, communication patterns)
   },
 
-  "sentimentAnalysis": {
-    "overallSentiment": "very positive | positive | neutral | concerned | negative",
-    "sentimentScore": number (0-100, overall satisfaction and relationship health),
-    "satisfactionDrivers": ["key factors driving positive sentiment"],
-    "concernAreas": ["areas of concern or dissatisfaction if any"],
-    "relationshipTrend": "improving | stable | declining",
-    "trustLevel": "high | medium | low",
-    "enthusiasmLevel": number (0-100, their excitement about working together),
-    "sentimentEvolution": "How sentiment has evolved over time based on meeting history"
+  \"sentimentAnalysis\": {
+    \"overallSentiment\": \"very positive | positive | neutral | concerned | negative\",
+    \"sentimentScore\": number (0-100, overall satisfaction and relationship health),
+    \"satisfactionDrivers\": [\"key factors driving positive sentiment\"],
+    \"concernAreas\": [\"areas of concern or dissatisfaction if any\"],
+    \"relationshipTrend\": \"improving | stable | declining\",
+    \"trustLevel\": \"high | medium | low\",
+    \"enthusiasmLevel\": number (0-100, their excitement about working together),
+    \"sentimentEvolution\": \"How sentiment has evolved over time based on meeting history\"
   },
 
-  "psychographicProfile": {
-    "priorities": ["ranked list of what matters most to this client"],
-    "painPoints": ["their biggest challenges and frustrations"],
-    "motivations": ["what drives their decision-making"],
-    "riskTolerance": "risk-averse | balanced | risk-taking",
-    "innovationAppetite": "bleeding-edge | early-adopter | pragmatic | conservative",
-    "valueOrientation": "cost-focused | quality-focused | speed-focused | relationship-focused | innovation-focused"
+  \"psychographicProfile\": {
+    \"priorities\": [\"ranked list of what matters most to this client\"],
+    \"painPoints\": [\"their biggest challenges and frustrations\"],
+    \"motivations\": [\"what drives their decision-making\"],
+    \"riskTolerance\": \"risk-averse | balanced | risk-taking\",
+    \"innovationAppetite\": \"bleeding-edge | early-adopter | pragmatic | conservative\",
+    \"valueOrientation\": \"cost-focused | quality-focused | speed-focused | relationship-focused | innovation-focused\"
   },
 
-  "relationshipHealth": {
-    "healthScore": number (0-100, overall relationship health),
-    "strengthAreas": ["what's working well in the relationship"],
-    "riskAreas": ["potential problems or red flags"],
-    "churnRisk": "low | medium | high",
-    "expansionPotential": "low | medium | high",
-    "loyaltyScore": number (0-100, likelihood they'll stay long-term)
+  \"relationshipHealth\": {
+    \"healthScore\": number (0-100, overall relationship health),
+    \"strengthAreas\": [\"what's working well in the relationship\"],
+    \"riskAreas\": [\"potential problems or red flags\"],
+    \"churnRisk\": \"low | medium | high\",
+    \"expansionPotential\": \"low | medium | high\",
+    \"loyaltyScore\": number (0-100, likelihood they'll stay long-term)
   },
 
-  "marketContext": {
-    "industryPosition": "Analysis of their position in their industry based on web search",
-    "competitivePressure": "low | moderate | high",
-    "growthTrajectory": "declining | stable | growing | rapid growth",
-    "marketChallenges": ["key challenges they face in their market"],
-    "marketOpportunities": ["opportunities visible in their market"],
-    "industryTrends": ["relevant trends affecting them"],
-    "reputationInsights": "What the market/public perception is of this company"
+  \"marketContext\": {
+    \"industryPosition\": \"Analysis of their position in their industry based on web search\",
+    \"competitivePressure\": \"low | moderate | high\",
+    \"growthTrajectory\": \"declining | stable | growing | rapid growth\",
+    \"marketChallenges\": [\"key challenges they face in their market\"],
+    \"marketOpportunities\": [\"opportunities visible in their market\"],
+    \"industryTrends\": [\"relevant trends affecting them\"],
+    \"reputationInsights\": \"What the market/public perception is of this company\"
   },
 
-  "opportunityAnalysis": {
-    "upsellOpportunities": ["specific areas where you could expand services"],
-    "crossSellOpportunities": ["other services they might need"],
-    "valueGaps": ["unmet needs or problems you could solve"],
-    "timingIndicators": ["signals that now is a good time to propose something"],
-    "budgetIndicators": "Analysis of their budget capacity and spending patterns",
-    "decisionTimeframe": "Estimated decision-making timeline - fast | medium | slow"
+  \"opportunityAnalysis\": {
+    \"upsellOpportunities\": [\"specific areas where you could expand services\"],
+    \"crossSellOpportunities\": [\"other services they might need\"],
+    \"valueGaps\": [\"unmet needs or problems you could solve\"],
+    \"timingIndicators\": [\"signals that now is a good time to propose something\"],
+    \"budgetIndicators\": \"Analysis of their budget capacity and spending patterns\",
+    \"decisionTimeframe\": \"Estimated decision-making timeline - fast | medium | slow\"
   },
 
-  "actionableInsights": {
-    "immediatePriorities": ["top 3-5 things to do in next 30 days"],
-    "strategicRecommendations": ["long-term relationship strategies"],
-    "communicationStrategy": "How to best communicate with this client based on their patterns",
-    "engagementTactics": ["specific tactics to deepen the relationship"],
-    "riskMitigation": ["actions to address any risk areas"],
-    "nextBestActions": ["prioritized list of next steps to maximize value"]
+  \"actionableInsights\": {
+    \"immediatePriorities\": [\"top 3-5 things to do in next 30 days\"],
+    \"strategicRecommendations\": [\"long-term relationship strategies\"],
+    \"communicationStrategy\": \"How to best communicate with this client based on their patterns\",
+    \"engagementTactics\": [\"specific tactics to deepen the relationship\"],
+    \"riskMitigation\": [\"actions to address any risk areas\"],
+    \"nextBestActions\": [\"prioritized list of next steps to maximize value\"]
   },
 
-  "kpis": {
-    "engagementScore": number (0-100, how actively engaged they are),
-    "collaborationScore": number (0-100, how well you work together),
-    "communicationScore": number (0-100, quality of communication),
-    "alignmentScore": number (0-100, alignment of goals and expectations),
-    "momentumScore": number (0-100, forward momentum in relationship),
-    "valueRealizationScore": number (0-100, are they getting value from you)
+  \"kpis\": {
+    \"engagementScore\": number (0-100, how actively engaged they are),
+    \"collaborationScore\": number (0-100, how well you work together),
+    \"communicationScore\": number (0-100, quality of communication),
+    \"alignmentScore\": number (0-100, alignment of goals and expectations),
+    \"momentumScore\": number (0-100, forward momentum in relationship),
+    \"valueRealizationScore\": number (0-100, are they getting value from you)
   },
 
-  "redFlags": ["Any concerning signals that require attention"],
-  "greenFlags": ["Positive signals indicating strong relationship"],
+  \"redFlags\": [\"Any concerning signals that require attention\"],
+  \"greenFlags\": [\"Positive signals indicating strong relationship\"],
 
-  "predictiveInsights": {
-    "likelyNextStep": "Prediction of what they'll likely do next",
-    "retentionProbability": number (0-100, likelihood of retention),
-    "growthProbability": number (0-100, likelihood of expanding spend),
-    "timeToDecision": "Estimated time for major decisions - days | weeks | months",
-    "influencers": ["key people who influence their decisions based on contacts"]
+  \"predictiveInsights\": {
+    \"likelyNextStep\": \"Prediction of what they'll likely do next\",
+    \"retentionProbability\": number (0-100, likelihood of retention),
+    \"growthProbability\": number (0-100, likelihood of expanding spend),
+    \"timeToDecision\": \"Estimated time for major decisions - days | weeks | months\",
+    \"influencers\": [\"key people who influence their decisions based on contacts\"]
   }
 }
 
 ## CRITICAL REQUIREMENTS:
 1. Base analysis ONLY on factual data provided - never invent information
-2. If data is limited, indicate "Limited data" and provide what you can
+2. If data is limited, indicate \"Limited data\" and provide what you can
 3. Use meeting transcripts to understand actual communication patterns and tone
 4. Use web search results to contextualize their market position and challenges
 5. Consider contact influence levels when analyzing decision-making
@@ -384,14 +384,19 @@ Analyze comprehensively and provide strategic, actionable intelligence.`;
     }
 
     const openaiData = await openaiResponse.json();
-    const insightsText = openaiData.choices[0].message.content;
+    let insightsText = openaiData.choices[0].message.content;
 
     let insights;
     try {
+      const jsonMatch = insightsText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        insightsText = jsonMatch[0];
+      }
       insights = JSON.parse(insightsText);
     } catch (e) {
       console.error('Failed to parse OpenAI response:', insightsText);
-      throw new Error('Failed to parse AI insights');
+      console.error('Parse error:', e);
+      throw new Error('Failed to parse AI insights. The AI response may not be valid JSON.');
     }
 
     console.log('Insights generated successfully');
