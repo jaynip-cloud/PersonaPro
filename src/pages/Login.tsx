@@ -44,8 +44,8 @@ export const Login: React.FC = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
               <LogIn className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-slate-900">Welcome Back</h1>
-            <p className="text-slate-600 mt-2">Sign in to access your dashboard</p>
+            <h1 className="text-3xl font-bold text-slate-900">Login to your account</h1>
+            {/* <p className="text-slate-600 mt-2">Sign in to access your dashboard</p> */}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,11 +94,18 @@ export const Login: React.FC = () => {
             </Button>
           </form>
 
-          <div className="text-center text-sm text-slate-600">
-            Don't have an account?{' '}
-            <Link to="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-              Sign up
-            </Link>
+          <div className="text-center text-sm text-slate-600 space-y-2">
+            <div>
+              Don't have an account?{' '}
+              <Link to="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+                Sign up
+              </Link>
+            </div>
+            <div>
+              <Link to="/forgot-password" className="text-blue-600 hover:text-blue-700 font-medium">
+                Forgot your password?
+              </Link>
+            </div>
           </div>
         </div>
       </div>

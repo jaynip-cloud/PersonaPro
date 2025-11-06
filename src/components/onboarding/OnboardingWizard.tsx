@@ -18,7 +18,9 @@ import {
   Newspaper,
   Code,
   Plus,
-  Trash2
+  Trash2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface OnboardingWizardProps {
@@ -79,6 +81,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [perplexityKey, setPerplexityKey] = useState('');
   const [showFirstClientWizard, setShowFirstClientWizard] = useState(false);
+  const [showServiceForm, setShowServiceForm] = useState(false);
+  const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null);
+  const [showOnboardingSuccessModal, setShowOnboardingSuccessModal] = useState(false);
   const { user, checkKnowledgeBaseStatus } = useAuth();
   const navigate = useNavigate();
 
@@ -94,7 +99,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     website: '',
     industry: '',
     description: '',
-    valueProposition: '',
     founded: '',
     location: '',
     size: '',
@@ -172,7 +176,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           website: profile.website || '',
           industry: profile.industry || '',
           description: profile.about || '',
-          valueProposition: profile.value_proposition || '',
           founded: profile.founded || '',
           location: profile.location || '',
           size: profile.size || '',
@@ -229,6 +232,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         serviceInput: '',
         serviceDescInput: ''
       }));
+      setShowServiceForm(false); // Hide form after adding
     }
   };
 
@@ -365,7 +369,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           website: formData.website,
           industry: formData.industry,
           about: formData.description,
-          value_proposition: formData.valueProposition,
           founded: formData.founded,
           location: formData.location,
           size: formData.size,
@@ -628,7 +631,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           website: formData.website,
           industry: formData.industry,
           about: formData.description,
-          value_proposition: formData.valueProposition,
           founded: formData.founded,
           location: formData.location,
           size: formData.size,
@@ -658,13 +660,19 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
       if (error) throw error;
 
       await checkKnowledgeBaseStatus();
-      setShowFirstClientWizard(true);
+      // Show success modal first
+      setShowOnboardingSuccessModal(true);
     } catch (error) {
       console.error('Error completing onboarding:', error);
       alert('Failed to complete setup. Please try again.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleProceedToFirstClient = () => {
+    setShowOnboardingSuccessModal(false);
+    setShowFirstClientWizard(true);
   };
 
   return (
@@ -676,17 +684,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             <Sparkles className="h-8 w-8 text-blue-600" />
           </div>
           <h2 className="text-2xl font-bold text-center text-slate-900">
-            Complete Your Knowledge Base
+            Complete your onboarding
           </h2>
           <p className="text-center text-slate-600 mt-2">
             Step {currentStep} of {totalSteps}
           </p>
         </div>
 
-        <div className="mb-8">
-          <div className="w-full bg-slate-200 rounded-full h-2">
+        <div className="mb-6">
+          <div className="w-full bg-slate-200 rounded-full h-1.5">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${(currentStep / totalSteps) * 100}%` }}
             />
           </div>
@@ -719,54 +727,30 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   </div>
 
                   <div className="mb-6">
-                    <div className="flex justify-between text-sm text-slate-600 mb-2">
-                      <span>Overall Progress</span>
-                      <span className="font-medium">{Math.round(extractionProgress)}%</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-3">
-                      <div
-                        className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
-                        style={{ width: `${extractionProgress}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {extractionSteps.map((step) => (
-                      <div
-                        key={step.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-                          step.status === 'in_progress'
-                            ? 'bg-blue-50 border border-blue-200'
-                            : step.status === 'completed'
-                            ? 'bg-green-50 border border-green-200'
-                            : step.status === 'error'
-                            ? 'bg-red-50 border border-red-200'
-                            : 'bg-slate-50 border border-slate-200'
-                        }`}
-                      >
-                        <div className="flex-shrink-0">
-                          {step.status === 'completed' ? (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                          ) : step.status === 'in_progress' ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                          ) : step.status === 'error' ? (
-                            <div className="h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">!</div>
-                          ) : (
-                            <div className="h-5 w-5 rounded-full border-2 border-slate-300"></div>
-                          )}
-                        </div>
-                        <span className={`text-sm font-medium ${
-                          step.status === 'completed' ? 'text-green-700' :
-                          step.status === 'in_progress' ? 'text-blue-700' :
-                          step.status === 'error' ? 'text-red-700' :
-                          'text-slate-500'
-                        }`}>
-                          {step.label}
-                          {step.message && <span className="ml-2 text-xs">({step.message})</span>}
-                        </span>
-                      </div>
-                    ))}
+                    {(() => {
+                      // Find the current active step (in_progress first, then error, then first pending)
+                      const inProgressStep = extractionSteps.find(step => step.status === 'in_progress');
+                      const errorStep = extractionSteps.find(step => step.status === 'error');
+                      const pendingStep = extractionSteps.find(step => step.status === 'pending');
+                      const currentStep = inProgressStep || errorStep || pendingStep || extractionSteps[0];
+                      
+                      return (
+                        <>
+                          <div className="flex justify-between items-center text-sm mb-2">
+                            <span className="text-slate-700 font-medium">
+                              {currentStep?.label || 'Processing...'}
+                            </span>
+                            <span className="text-slate-600 font-medium">{Math.round(extractionProgress)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-200 rounded-full h-3">
+                            <div
+                              className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
+                              style={{ width: `${extractionProgress}%` }}
+                            />
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <p className="text-xs text-slate-500 mt-4 text-center">
@@ -855,18 +839,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   value={formData.description}
                   onChange={(e) => handleChange('description', e.target.value)}
                   placeholder="Brief description of what your company does..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Value Proposition
-                </label>
-                <Input
-                  type="text"
-                  value={formData.valueProposition}
-                  onChange={(e) => handleChange('valueProposition', e.target.value)}
-                  placeholder="What unique value do you provide?"
                 />
               </div>
 
@@ -1049,44 +1021,71 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
           {currentStep === 4 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                Services & Products
-              </h3>
-
-              <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Service/Product Name *
-                  </label>
-                  <Input
-                    type="text"
-                    value={formData.serviceInput}
-                    onChange={(e) => handleChange('serviceInput', e.target.value)}
-                    placeholder="e.g., AI Consulting, Cloud Migration"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    className="w-full min-h-[80px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                    value={formData.serviceDescInput}
-                    onChange={(e) => handleChange('serviceDescInput', e.target.value)}
-                    placeholder="Describe what this service/product does and its key benefits..."
-                  />
-                </div>
-                <Button
-                  variant="primary"
-                  onClick={addService}
-                  type="button"
-                  disabled={!formData.serviceInput.trim()}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Service/Product
-                </Button>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Services & Products
+                </h3>
+                {!showServiceForm && (
+                  <Button variant="outline" onClick={() => setShowServiceForm(true)} type="button">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Service
+                  </Button>
+                )}
               </div>
+
+              {showServiceForm && (
+                <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Service/Product Name *
+                    </label>
+                    <Input
+                      type="text"
+                      value={formData.serviceInput}
+                      onChange={(e) => handleChange('serviceInput', e.target.value)}
+                      placeholder="e.g., AI Consulting, Cloud Migration"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      className="w-full min-h-[80px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      value={formData.serviceDescInput}
+                      onChange={(e) => handleChange('serviceDescInput', e.target.value)}
+                      placeholder="Describe what this service/product does and its key benefits..."
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="primary"
+                      onClick={addService}
+                      type="button"
+                      disabled={!formData.serviceInput.trim()}
+                      className="flex-1"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Service
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowServiceForm(false);
+                        setFormData({
+                          ...formData,
+                          serviceInput: '',
+                          serviceDescInput: ''
+                        });
+                      }}
+                      type="button"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {formData.services.length === 0 ? (
                 <div className="text-center py-12 text-slate-500">
@@ -1095,45 +1094,64 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {formData.services.map((service, index) => (
-                    <div
-                      key={service.id}
-                      className="p-4 bg-white rounded-lg border border-slate-200 space-y-2"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-medium text-slate-900">Service {index + 1}</h4>
-                        <button
-                          onClick={() => removeService(index)}
-                          className="text-red-600 hover:text-red-700"
-                          type="button"
+                  {formData.services.map((service, index) => {
+                    const isExpanded = expandedServiceId === service.id;
+                    return (
+                      <div
+                        key={service.id}
+                        className="bg-white rounded-lg border border-slate-200 overflow-hidden"
+                      >
+                        <div 
+                          className="p-4 flex items-center justify-between gap-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                          onClick={() => setExpandedServiceId(isExpanded ? null : service.id)}
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-slate-500 flex-shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <Input
+                                type="text"
+                                value={service.name}
+                                onChange={(e) => updateService(index, 'name', e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Service name"
+                                className="border-0 p-0 h-auto font-medium text-slate-900 focus:ring-0 focus:border-b focus:border-blue-500 rounded-none"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeService(index);
+                            }}
+                            className="text-red-600 hover:text-red-700 flex-shrink-0"
+                            type="button"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                        {isExpanded && (
+                          <div className="px-4 pb-4 pt-2 border-t border-slate-200 space-y-2">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">
+                                Description
+                              </label>
+                              <textarea
+                                className="w-full min-h-[60px] p-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                value={service.description}
+                                onChange={(e) => updateService(index, 'description', e.target.value)}
+                                placeholder="Service description..."
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">
-                          Name
-                        </label>
-                        <Input
-                          type="text"
-                          value={service.name}
-                          onChange={(e) => updateService(index, 'name', e.target.value)}
-                          placeholder="Service name"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">
-                          Description
-                        </label>
-                        <textarea
-                          className="w-full min-h-[60px] p-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                          value={service.description}
-                          onChange={(e) => updateService(index, 'description', e.target.value)}
-                          placeholder="Service description..."
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1169,18 +1187,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
-                      <Input
-                        type="text"
-                        value={leader.name}
-                        onChange={(e) => updateLeader(index, 'name', e.target.value)}
-                        placeholder="Full Name"
-                      />
-                      <Input
-                        type="text"
-                        value={leader.role}
-                        onChange={(e) => updateLeader(index, 'role', e.target.value)}
-                        placeholder="Role/Title"
-                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input
+                          type="text"
+                          value={leader.name}
+                          onChange={(e) => updateLeader(index, 'name', e.target.value)}
+                          placeholder="Full Name"
+                        />
+                        <Input
+                          type="text"
+                          value={leader.role}
+                          onChange={(e) => updateLeader(index, 'role', e.target.value)}
+                          placeholder="Role/Title"
+                        />
+                      </div>
                       <textarea
                         className="w-full min-h-[60px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                         value={leader.bio}
@@ -1509,6 +1529,35 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
       onComplete={handleFirstClientComplete}
       onSkip={handleSkipFirstClient}
     />
+
+    {/* Onboarding Success Modal */}
+    <Modal 
+      isOpen={showOnboardingSuccessModal} 
+      onClose={() => {}} 
+      size="md"
+      closeOnEscape={false}
+      closeOnClickOutside={false}
+    >
+      <div className="p-6 text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+          <CheckCircle className="w-8 h-8 text-green-600" />
+        </div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">
+          Onboarding Completed Successfully!
+        </h2>
+        <p className="text-slate-600 mb-6">
+          Your onboarding has been successfully completed. Proceed to add your first client.
+        </p>
+        <Button
+          variant="primary"
+          onClick={handleProceedToFirstClient}
+          className="w-full"
+        >
+          Proceed to Add First Client
+          <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
+      </div>
+    </Modal>
   </>
   );
 };

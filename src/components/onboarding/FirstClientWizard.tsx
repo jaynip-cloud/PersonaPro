@@ -419,7 +419,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onSkip} size="large">
+    <Modal isOpen={isOpen} onClose={onSkip} size="xl">
       <div className="p-6">
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
@@ -441,7 +441,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
             {[1, 2, 3, 4, 5].map((step) => (
               <div
                 key={step}
-                className={`h-2 flex-1 rounded-full ${
+                className={`h-1.5 flex-1 rounded-full ${
                   step <= currentStep ? 'bg-blue-600' : 'bg-slate-200'
                 }`}
               />
@@ -512,54 +512,30 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   </div>
 
                   <div className="mb-6">
-                    <div className="flex justify-between text-sm text-slate-600 mb-2">
-                      <span>Overall Progress</span>
-                      <span className="font-medium">{Math.round(extractionProgress)}%</span>
-                    </div>
-                    <div className="w-full bg-slate-200 rounded-full h-3">
-                      <div
-                        className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
-                        style={{ width: `${extractionProgress}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {extractionSteps.map((step) => (
-                      <div
-                        key={step.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${
-                          step.status === 'in_progress'
-                            ? 'bg-blue-50 border border-blue-200'
-                            : step.status === 'completed'
-                            ? 'bg-green-50 border border-green-200'
-                            : step.status === 'error'
-                            ? 'bg-red-50 border border-red-200'
-                            : 'bg-slate-50 border border-slate-200'
-                        }`}
-                      >
-                        <div className="flex-shrink-0">
-                          {step.status === 'completed' ? (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                          ) : step.status === 'in_progress' ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                          ) : step.status === 'error' ? (
-                            <div className="h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">!</div>
-                          ) : (
-                            <div className="h-5 w-5 rounded-full border-2 border-slate-300"></div>
-                          )}
-                        </div>
-                        <span className={`text-sm font-medium ${
-                          step.status === 'completed' ? 'text-green-700' :
-                          step.status === 'in_progress' ? 'text-blue-700' :
-                          step.status === 'error' ? 'text-red-700' :
-                          'text-slate-500'
-                        }`}>
-                          {step.label}
-                          {step.message && <span className="ml-2 text-xs">({step.message})</span>}
-                        </span>
-                      </div>
-                    ))}
+                    {(() => {
+                      // Find the current active step (in_progress first, then error, then first pending)
+                      const inProgressStep = extractionSteps.find(step => step.status === 'in_progress');
+                      const errorStep = extractionSteps.find(step => step.status === 'error');
+                      const pendingStep = extractionSteps.find(step => step.status === 'pending');
+                      const currentStep = inProgressStep || errorStep || pendingStep || extractionSteps[0];
+                      
+                      return (
+                        <>
+                          <div className="flex justify-between items-center text-sm mb-2">
+                            <span className="text-slate-700 font-medium">
+                              {currentStep?.label || 'Processing...'}
+                            </span>
+                            <span className="text-slate-600 font-medium">{Math.round(extractionProgress)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-200 rounded-full h-3">
+                            <div
+                              className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
+                              style={{ width: `${extractionProgress}%` }}
+                            />
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
                   <p className="text-xs text-slate-500 mt-4 text-center">

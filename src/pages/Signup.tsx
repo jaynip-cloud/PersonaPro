@@ -41,11 +41,20 @@ export const Signup: React.FC = () => {
 
     setLoading(true);
 
-    const { error } = await signUp(email, password, fullName);
+    const { error, requiresConfirmation } = await signUp(email, password, fullName);
 
     if (error) {
       setError(error.message);
       setLoading(false);
+    } else if (requiresConfirmation) {
+      setError('');
+      // Show success message about email confirmation
+      alert('Account created! Please check your email to confirm your account before signing in.');
+      navigate('/login');
+    } else {
+      // Signup successful, user is automatically signed in
+      setError('');
+      // Navigation will happen automatically via useEffect when user is set
     }
   };
 
@@ -58,7 +67,7 @@ export const Signup: React.FC = () => {
               <UserPlus className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold text-slate-900">Create Account</h1>
-            <p className="text-slate-600 mt-2">Get started with your free account</p>
+            {/* <p className="text-slate-600 mt-2">Get started with your free account</p> */}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -137,11 +146,20 @@ export const Signup: React.FC = () => {
             </Button>
           </form>
 
-          <div className="text-center text-sm text-slate-600">
-            Already have an account?{' '}
-            <Link to="/login" className="text-blue-600 hover:text-blue-700 font-medium">
-              Sign in
-            </Link>
+          <div className="text-center text-sm text-slate-600 space-y-2">
+            <div>
+              Already have an account?{' '}
+              <Link to="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+                Sign in
+              </Link>
+            </div>
+            {error && error.includes('already registered') && (
+              <div className="mt-2">
+                <Link to="/login" className="text-blue-600 hover:text-blue-700 font-medium text-xs">
+                  Forgot your password? Reset it here
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>

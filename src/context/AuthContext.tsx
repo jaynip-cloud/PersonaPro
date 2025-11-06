@@ -8,7 +8,7 @@ interface AuthContextType {
   loading: boolean;
   isKnowledgeBaseComplete: boolean;
   checkKnowledgeBaseStatus: () => Promise<void>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null; requiresConfirmation?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
@@ -68,21 +68,74 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
+      // Normalize email (lowercase and trim)
+      const normalizedEmail = email.toLowerCase().trim();
+
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
         password,
         options: {
           data: {
             full_name: fullName,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle specific Supabase error codes and messages
+        const errorMessage = error.message.toLowerCase();
+        
+        if (errorMessage.includes('already registered') || 
+            errorMessage.includes('already exists') ||
+            errorMessage.includes('user already registered') ||
+            error.code === 'signup_disabled' ||
+            error.status === 422) {
+          return { 
+            error: new Error('This email is already registered. Please sign in instead, or use a different email address.') 
+          };
+        }
+        
+        if (errorMessage.includes('email')) {
+          return { 
+            error: new Error('Invalid email address. Please check and try again.') 
+          };
+        }
+        
+        if (errorMessage.includes('password') || errorMessage.includes('weak')) {
+          return { 
+            error: new Error('Password does not meet requirements. Please use a stronger password (at least 6 characters).') 
+          };
+        }
+        
+        // Return the original error message for other cases
+        return { error: new Error(error.message || 'Failed to create account. Please try again.') };
+      }
 
+      // Check if email confirmation is required
+      // If user is created but no session, email confirmation is required
+      if (data.user && !data.session) {
+        return { 
+          error: null,
+          requiresConfirmation: true 
+        };
+      }
+
+      // Signup successful and user is automatically signed in
       return { error: null };
-    } catch (error) {
-      return { error: error as Error };
+    } catch (error: any) {
+      // Handle unexpected errors
+      const errorMessage = error?.message?.toLowerCase() || '';
+      
+      if (errorMessage.includes('already registered') || errorMessage.includes('already exists')) {
+        return { 
+          error: new Error('This email is already registered. Please sign in instead.') 
+        };
+      }
+      
+      return { 
+        error: new Error(error?.message || 'An unexpected error occurred. Please try again.') 
+      };
     }
   };
 

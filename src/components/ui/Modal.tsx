@@ -56,7 +56,7 @@ export const Modal: React.FC<ModalProps> = ({
       aria-describedby={description ? 'modal-description' : undefined}
     >
       <div
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/60 backdrop-blur-md"
         onClick={closeOnClickOutside ? onClose : undefined}
       />
       <div className={`relative bg-card rounded-lg shadow-lg border border-border w-full ${sizeClasses[size]} mx-4 max-h-[90vh] overflow-auto`}>
