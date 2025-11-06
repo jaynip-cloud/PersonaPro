@@ -19,6 +19,79 @@ interface CrawlResult {
   socialLinks: string[];
 }
 
+// ============================================
+// PERPLEXITY API RESPONSE LOGGING FUNCTIONS
+// ============================================
+
+function logPerplexityResponse(
+  context: string,
+  response: Response,
+  data: any,
+  content?: string,
+  extractedData?: any
+) {
+  const timestamp = new Date().toISOString();
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`[${timestamp}] PERPLEXITY API RESPONSE - ${context}`);
+  console.log(`${'='.repeat(60)}`);
+  
+  // Log response metadata
+  console.log("Response Status:", response.status);
+  console.log("Response OK:", response.ok);
+  
+  // Log full API response
+  console.log("\n--- Full API Response ---");
+  console.log(JSON.stringify(data, null, 2));
+  
+  // Log message content if available
+  if (content) {
+    console.log("\n--- Message Content ---");
+    console.log("Content Length:", content.length);
+    console.log("Content Preview (first 1000 chars):");
+    console.log(content.substring(0, 1000));
+    if (content.length > 1000) {
+      console.log("... (truncated, full length:", content.length, ")");
+    }
+  }
+  
+  // Log parsed/extracted data if available
+  if (extractedData) {
+    console.log("\n--- Parsed/Extracted Data ---");
+    console.log(JSON.stringify(extractedData, null, 2));
+    
+    // Log contact info specifically for debugging
+    if (extractedData.contactInfo) {
+      console.log("\n--- Contact Information Extracted ---");
+      console.log("Email:", extractedData.contactInfo.email || extractedData.contactInfo.primaryEmail || "NOT FOUND");
+      console.log("Phone:", extractedData.contactInfo.phone || extractedData.contactInfo.primaryPhone || "NOT FOUND");
+      console.log("Address:", extractedData.contactInfo.address || "NOT FOUND");
+      console.log("Alternate Email:", extractedData.contactInfo.alternateEmail || "NOT FOUND");
+      console.log("Alternate Phone:", extractedData.contactInfo.alternatePhone || "NOT FOUND");
+    }
+  }
+  
+  console.log(`${'='.repeat(60)}\n`);
+}
+
+function logPerplexityError(context: string, error: any, response?: Response) {
+  const timestamp = new Date().toISOString();
+  console.error(`\n${'='.repeat(60)}`);
+  console.error(`[${timestamp}] PERPLEXITY API ERROR - ${context}`);
+  console.error(`${'='.repeat(60)}`);
+  
+  if (response) {
+    console.error("Response Status:", response.status);
+    console.error("Response Status Text:", response.statusText);
+  }
+  
+  console.error("Error:", error);
+  console.error("Error Message:", error?.message || "Unknown error");
+  if (error?.stack) {
+    console.error("Error Stack:", error.stack);
+  }
+  console.error(`${'='.repeat(60)}\n`);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -383,13 +456,13 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
     \"vision\": \"Company vision statement if found (where they want to be in the future)\"
   },
   \"contactInfo\": {
-    \"email\": \"Primary general contact email (contact@, info@, hello@)\",
-    \"primaryEmail\": \"Primary contact email or general email\",
-    \"alternateEmail\": \"Secondary/alternate email if found (sales@, support@, different department)\",
-    \"phone\": \"Primary phone number with country code\",
-    \"primaryPhone\": \"Primary phone number\",
-    \"alternatePhone\": \"Secondary/alternate phone if found (different departments, toll-free)\",
-    \"address\": \"Full physical address (street, city, state, country, zip). Look in: contact page, footer, about page\"
+    \"email\": \"Primary general contact email - MUST be explicitly displayed on website (e.g., from contact page, footer). DO NOT guess or construct. Leave empty if not found.\",
+    \"primaryEmail\": \"Primary contact email - MUST be explicitly shown on website. This is the main contact email displayed most prominently (usually on contact page). DO NOT use generic patterns unless actually displayed.\",
+    \"alternateEmail\": \"Secondary/alternate email ONLY if multiple distinct emails are explicitly shown (e.g., sales@, support@, different department). DO NOT create if only one email is found. Leave empty if not found.\",
+    \"phone\": \"Primary phone number with country code - MUST be explicitly displayed on website (e.g., from contact page, footer). DO NOT guess based on location. Leave empty if not found.\",
+    \"primaryPhone\": \"Primary phone number - MUST be explicitly shown on website. This is the main contact phone displayed most prominently (usually on contact page). Include country code if shown.\",
+    \"alternatePhone\": \"Secondary/alternate phone ONLY if multiple distinct phone numbers are explicitly shown (e.g., different departments, toll-free). DO NOT create if only one phone is found. Leave empty if not found.\",
+    \"address\": \"Full physical address (street, city, state, country, zip) - MUST be explicitly displayed on website. Look in: contact page, footer, about page. Include postal/zip code if shown. DO NOT guess addresses. Leave empty if not found.\"
   },
   \"leadership\": {
     \"ceo\": {
@@ -546,11 +619,122 @@ DETAILED EXTRACTION GUIDELINES:
 - Extract at least 3-10 contacts if available on the website
 - Use web search to find LinkedIn profiles and additional contact details
 
-**Contact Information (CRITICAL):**
-- Email: Look for contact@, info@, hello@, support@, sales@ followed by domain
-- Search in: contact page, footer, header navigation, about page
-- Phone: Include country code (+1, +44, etc.), look in contact page and header
-- Extract both primary and alternate contact details if multiple found
+**Contact Information (CRITICAL - ACCURACY IS PARAMOUNT):**
+
+⚠️ STRICT RULES FOR CONTACT EXTRACTION:
+1. **ONLY extract contact information that is EXPLICITLY displayed** on the website
+2. **NEVER guess, infer, or construct** email addresses or phone numbers
+3. **NEVER use generic patterns** like "contact@domain.com" unless it's actually shown
+4. **VALIDATE all contact information** before including it
+
+**EMAIL EXTRACTION (Priority Order):**
+1. **Contact Page** - Look for:
+   - Explicitly displayed email addresses (e.g., "Email: info@company.com")
+   - Contact forms with pre-filled or visible email addresses
+   - "Contact us" sections with email listed
+   - Email links (mailto: links) - extract the actual email address
+   
+2. **Footer** - Look for:
+   - Email addresses in footer contact section
+   - Footer links that show email addresses
+   
+3. **Header/Navigation** - Look for:
+   - Contact links that reveal email addresses
+   - Navigation menus with contact information
+   
+4. **About Page** - Look for:
+   - Contact sections on about page
+   - Team member emails if explicitly listed
+   
+5. **Team/Leadership Pages** - Look for:
+   - Individual team member emails if explicitly shown
+   - Leadership contact information if displayed
+
+**EMAIL VALIDATION RULES:**
+✅ MUST contain @ symbol
+✅ MUST have valid domain (e.g., .com, .org, .co.uk)
+✅ MUST match the company's website domain (e.g., if website is example.com, email should be @example.com)
+✅ MUST be explicitly shown on the page (not inferred from patterns)
+❌ DO NOT use generic patterns like "contact@", "info@", "hello@" unless actually displayed
+❌ DO NOT construct emails from names (e.g., don't create "john@company.com" from "John Smith")
+❌ DO NOT use placeholder emails or example emails
+❌ DO NOT extract emails from JavaScript code or hidden elements
+
+**PHONE NUMBER EXTRACTION (Priority Order):**
+1. **Contact Page** - Look for:
+   - Explicitly displayed phone numbers
+   - "Call us" sections with phone numbers
+   - Phone links (tel: links) - extract the actual number
+   - Contact forms with phone number fields showing example or default values
+   
+2. **Footer** - Look for:
+   - Phone numbers in footer contact section
+   - Footer links that show phone numbers
+   
+3. **Header/Navigation** - Look for:
+   - Phone numbers in header contact section
+   - "Call" buttons with phone numbers
+   
+4. **About Page** - Look for:
+   - Contact sections on about page
+   
+5. **Team/Leadership Pages** - Look for:
+   - Individual team member phone numbers if explicitly shown
+
+**PHONE NUMBER VALIDATION RULES:**
+✅ MUST contain digits (0-9)
+✅ MAY include country code (+1, +44, etc.) if shown
+✅ MAY include formatting (spaces, dashes, parentheses) as shown
+✅ MUST be explicitly displayed on the page
+✅ SHOULD match the company's location (e.g., US companies typically have +1)
+❌ DO NOT guess phone numbers based on location
+❌ DO NOT construct phone numbers from patterns
+❌ DO NOT use placeholder or example phone numbers
+❌ DO NOT extract phone numbers from JavaScript code or hidden elements
+❌ DO NOT include phone numbers that are clearly for different companies
+
+**ADDRESS EXTRACTION:**
+1. **Contact Page** - Look for:
+   - Physical address sections
+   - "Visit us" or "Location" sections
+   - Maps with address labels
+   
+2. **Footer** - Look for:
+   - Address in footer
+   - Footer location information
+   
+3. **About Page** - Look for:
+   - Headquarters location
+   - Office locations
+
+**ADDRESS VALIDATION:**
+✅ MUST include street address, city, and country at minimum
+✅ SHOULD include state/province if applicable
+✅ SHOULD include postal/zip code if shown
+✅ MUST match the company's stated location
+❌ DO NOT guess addresses based on city name
+❌ DO NOT use incomplete or partial addresses
+
+**PRIMARY vs ALTERNATE CONTACT:**
+- **Primary Email/Phone**: The main contact method shown most prominently (usually on contact page)
+- **Alternate Email/Phone**: Additional contact methods shown (e.g., sales@, support@, different departments)
+- **ONLY mark as alternate if multiple distinct contact methods are explicitly shown**
+- **DO NOT create alternate contacts if only one is found**
+
+**CROSS-REFERENCE VALIDATION:**
+- Verify company name matches across all sources
+- Verify location matches across website and LinkedIn
+- If contact info conflicts between sources, prioritize:
+  1. Contact page (most reliable for contact info)
+  2. LinkedIn company page
+  3. Footer
+  4. Other pages
+
+**IF CONTACT INFORMATION IS NOT FOUND:**
+- Leave email fields empty ("") rather than guessing
+- Leave phone fields empty ("") rather than guessing
+- Leave address fields empty ("") rather than guessing
+- It's better to have no contact info than incorrect contact info
 
 **Testimonials & Client Feedback (CRITICAL - EXTRACT ALL):**
 - Look in: testimonials page, reviews page, case studies, success stories, clients page, homepage testimonial section
@@ -625,6 +809,15 @@ ${combinedContent.substring(0, 75000)}
 Now extract the comprehensive company information including services, blogs, technology, and leadership details. Use web search extensively to fill gaps. Return ONLY the JSON object:`;
 
   try {
+    console.log(`\n${'='.repeat(60)}`);
+    console.log("CALLING PERPLEXITY API - extractCompanyInfo");
+    console.log(`URL: ${rootUrl}`);
+    console.log(`Prompt Length: ${prompt.length} characters`);
+    console.log(`Model: sonar`);
+    console.log(`Temperature: 0.1`);
+    console.log(`Max Tokens: 4000`);
+    console.log(`${'='.repeat(60)}\n`);
+
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: {
@@ -636,7 +829,7 @@ Now extract the comprehensive company information including services, blogs, tec
         messages: [
           {
             role: "system",
-            content: "You are an expert business intelligence analyst who prioritizes ACCURACY over completeness. You NEVER guess, infer, or fabricate data. You follow a strict data source priority: 1) LinkedIn company page (most reliable), 2) Official website content, 3) Verified web search only for missing data. You validate all data: company names must match across sources, email formats must be valid, phone numbers must be real, dates must be accurate. If you cannot verify information with 100% confidence, you leave that field empty. You understand that incorrect data is worse than missing data. You always return properly formatted JSON. When extracting contacts, you only include people explicitly listed on team/leadership pages with verifiable titles. When extracting testimonials, you only include those with clear attribution. You cross-reference all information and prioritize LinkedIn data for company basics (name, industry, size, location, founded year). You are meticulous, thorough, and refuse to extract unverified information.",
+            content: "You are an expert business intelligence analyst who prioritizes ACCURACY over completeness. You NEVER guess, infer, or fabricate data. You follow a strict data source priority: 1) LinkedIn company page (most reliable), 2) Official website content, 3) Verified web search only for missing data. You validate all data: company names must match across sources, dates must be accurate. For contact information specifically: you ONLY extract emails, phone numbers, and addresses that are EXPLICITLY displayed on the website. You NEVER construct or guess contact information based on patterns. You NEVER use generic patterns like 'contact@domain.com' unless it's actually shown. You validate that emails match the company's domain and that phone numbers match the company's location. Email formats must be valid and explicitly displayed. Phone numbers must be real and explicitly shown. If you cannot verify contact information with 100% confidence, you leave that field empty. You understand that incorrect contact data is worse than missing contact data. You always return properly formatted JSON. When extracting contacts, you only include people explicitly listed on team/leadership pages with verifiable titles. When extracting testimonials, you only include those with clear attribution. You cross-reference all information and prioritize LinkedIn data for company basics (name, industry, size, location, founded year). You are meticulous, thorough, and refuse to extract unverified information.",
           },
           {
             role: "user",
@@ -650,24 +843,44 @@ Now extract the comprehensive company information including services, blogs, tec
 
     if (!response.ok) {
       const error = await response.text();
+      logPerplexityError("extractCompanyInfo - API Error", new Error(`Perplexity API error: ${error}`), response);
       throw new Error(`Perplexity API error: ${error}`);
     }
 
     const data = await response.json();
-    const content = data.choices[0].message.content;
+    const content = data.choices[0]?.message?.content || '';
+
+    // Log the response
+    logPerplexityResponse("extractCompanyInfo", response, data, content);
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     let extractedData;
 
     if (jsonMatch) {
-      extractedData = JSON.parse(jsonMatch[0]);
+      try {
+        extractedData = JSON.parse(jsonMatch[0]);
+        logPerplexityResponse("extractCompanyInfo - Parsed", response, data, content, extractedData);
+      } catch (parseError) {
+        console.error("JSON Parse Error (with match):", parseError);
+        console.error("Matched JSON Preview:", jsonMatch[0].substring(0, 500));
+        logPerplexityError("extractCompanyInfo - JSON Parse Error", parseError);
+        throw parseError;
+      }
     } else {
-      extractedData = JSON.parse(content);
+      try {
+        extractedData = JSON.parse(content);
+        logPerplexityResponse("extractCompanyInfo - Parsed (no match)", response, data, content, extractedData);
+      } catch (parseError) {
+        console.error("JSON Parse Error (no match):", parseError);
+        console.error("Full Content Preview:", content.substring(0, 500));
+        logPerplexityError("extractCompanyInfo - JSON Parse Error (no match)", parseError);
+        throw parseError;
+      }
     }
 
     return extractedData;
   } catch (error) {
-    console.error("Error calling Perplexity:", error);
+    logPerplexityError("extractCompanyInfo - Exception", error);
     throw error;
   }
 }
@@ -713,10 +926,13 @@ EXTRACTION REQUIREMENTS:
    - Minimum 10-20 people if available
    - Mark decision makers (C-level, VP, Director, Manager roles)
 
-4. **Contact Information**:
-   - Phone number from LinkedIn (if shown)
-   - Company email/contact info (if shown)
-   - Physical address (full address with zip code)
+4. **Contact Information (CRITICAL - ACCURACY REQUIRED)**:
+   - Phone number from LinkedIn - ONLY if explicitly shown on LinkedIn company page
+   - Company email/contact info - ONLY if explicitly displayed on LinkedIn
+   - Physical address - ONLY if explicitly shown (full address with zip code)
+   - ⚠️ DO NOT guess, infer, or construct contact information
+   - ⚠️ DO NOT use generic patterns unless actually displayed
+   - ⚠️ If contact info is not visible on LinkedIn, leave fields empty
 
 5. **Social Profiles**:
    - The LinkedIn URL itself: ${linkedinUrl}
@@ -764,14 +980,14 @@ Return ONLY valid JSON in this exact structure:
     \"vision\": \"Vision statement if shown\"
   },
   \"contactInfo\": {
-    \"email\": \"Contact email if shown\",
-    \"primaryEmail\": \"Primary email\",
-    \"alternateEmail\": \"Alternate email if shown\",
-    \"phone\": \"Phone number with country code\",
-    \"primaryPhone\": \"Primary phone\",
-    \"alternatePhone\": \"Alternate phone\",
-    \"address\": \"Full physical address\",
-    \"website\": \"Company website from LinkedIn\"
+    \"email\": \"Contact email ONLY if explicitly shown on LinkedIn company page. DO NOT guess or construct. Leave empty if not visible.\",
+    \"primaryEmail\": \"Primary email ONLY if explicitly displayed on LinkedIn. This is the main contact email shown on LinkedIn. Leave empty if not found.\",
+    \"alternateEmail\": \"Alternate email ONLY if multiple distinct emails are explicitly shown on LinkedIn. DO NOT create if only one is found. Leave empty if not found.\",
+    \"phone\": \"Phone number with country code ONLY if explicitly shown on LinkedIn company page. DO NOT guess. Leave empty if not visible.\",
+    \"primaryPhone\": \"Primary phone ONLY if explicitly displayed on LinkedIn. Include country code if shown. Leave empty if not found.\",
+    \"alternatePhone\": \"Alternate phone ONLY if multiple distinct phone numbers are explicitly shown on LinkedIn. DO NOT create if only one is found. Leave empty if not found.\",
+    \"address\": \"Full physical address ONLY if explicitly shown on LinkedIn (full address with zip code). DO NOT guess. Leave empty if not visible.\",
+    \"website\": \"Company website from LinkedIn (if shown)\"
   },
   \"leadership\": {
     \"ceo\": {
@@ -840,6 +1056,15 @@ CRITICAL FOCUS AREAS:
 Now extract the comprehensive company information from this LinkedIn page. Return ONLY the JSON object.`;
 
   try {
+    console.log(`\n${'='.repeat(60)}`);
+    console.log("CALLING PERPLEXITY API - extractFromLinkedInUrl");
+    console.log(`LinkedIn URL: ${linkedinUrl}`);
+    console.log(`Prompt Length: ${prompt.length} characters`);
+    console.log(`Model: sonar`);
+    console.log(`Temperature: 0.1`);
+    console.log(`Max Tokens: 4000`);
+    console.log(`${'='.repeat(60)}\n`);
+
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: {
@@ -851,7 +1076,7 @@ Now extract the comprehensive company information from this LinkedIn page. Retur
         messages: [
           {
             role: "system",
-            content: "You are an expert LinkedIn data extraction specialist. You have direct access to LinkedIn company pages and can extract all visible information with 100% accuracy. You extract company information, employee lists with their titles, recent company posts, and all available contact details. You follow LinkedIn's exact formatting for company size, industry, and other fields. You always return properly formatted JSON. You prioritize extracting comprehensive employee/people data from the LinkedIn People section, focusing on decision makers and leadership.",
+            content: "You are an expert LinkedIn data extraction specialist. You have direct access to LinkedIn company pages and can extract all visible information with 100% accuracy. You extract company information, employee lists with their titles, recent company posts, and all available contact details. For contact information specifically: you ONLY extract emails, phone numbers, and addresses that are EXPLICITLY displayed on the LinkedIn company page. You NEVER guess, infer, or construct contact information. You NEVER use generic patterns unless actually shown. If contact information is not visible on LinkedIn, you leave those fields empty. You understand that incorrect contact data is worse than missing contact data. You follow LinkedIn's exact formatting for company size, industry, and other fields. You always return properly formatted JSON. You prioritize extracting comprehensive employee/people data from the LinkedIn People section, focusing on decision makers and leadership.",
           },
           {
             role: "user",
@@ -865,24 +1090,44 @@ Now extract the comprehensive company information from this LinkedIn page. Retur
 
     if (!response.ok) {
       const error = await response.text();
+      logPerplexityError("extractFromLinkedInUrl - API Error", new Error(`Perplexity API error: ${error}`), response);
       throw new Error(`Perplexity API error: ${error}`);
     }
 
     const data = await response.json();
-    const content = data.choices[0].message.content;
+    const content = data.choices[0]?.message?.content || '';
+
+    // Log the response
+    logPerplexityResponse("extractFromLinkedInUrl", response, data, content);
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     let extractedData;
 
     if (jsonMatch) {
-      extractedData = JSON.parse(jsonMatch[0]);
+      try {
+        extractedData = JSON.parse(jsonMatch[0]);
+        logPerplexityResponse("extractFromLinkedInUrl - Parsed", response, data, content, extractedData);
+      } catch (parseError) {
+        console.error("JSON Parse Error (with match):", parseError);
+        console.error("Matched JSON Preview:", jsonMatch[0].substring(0, 500));
+        logPerplexityError("extractFromLinkedInUrl - JSON Parse Error", parseError);
+        throw parseError;
+      }
     } else {
-      extractedData = JSON.parse(content);
+      try {
+        extractedData = JSON.parse(content);
+        logPerplexityResponse("extractFromLinkedInUrl - Parsed (no match)", response, data, content, extractedData);
+      } catch (parseError) {
+        console.error("JSON Parse Error (no match):", parseError);
+        console.error("Full Content Preview:", content.substring(0, 500));
+        logPerplexityError("extractFromLinkedInUrl - JSON Parse Error (no match)", parseError);
+        throw parseError;
+      }
     }
 
     return extractedData;
   } catch (error) {
-    console.error("Error calling Perplexity for LinkedIn:", error);
+    logPerplexityError("extractFromLinkedInUrl - Exception", error);
     throw error;
   }
 }

@@ -745,30 +745,35 @@ Client Information:
   };
 
   const handleGenerateOpportunity = async () => {
-    if (!client || !user) return;
+    if (!client || !user || !id) return;
 
     setIsGeneratingOpportunity(true);
     try {
-      const { data, error } = await supabase
-        .from('opportunities')
-        .insert({
-          client_id: id,
-          user_id: user.id,
-          title: `${client.company} - Growth Opportunity`,
-          description: `AI-identified opportunity for ${client.company} based on recent interactions and market analysis.`,
-          is_ai_generated: true,
-          stage: 'qualified',
-        })
-        .select()
-        .single();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-growth-opportunities`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ clientId: id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate opportunity');
       }
 
-      setOpportunities([data, ...opportunities]);
-      showToast('success', 'Opportunity generated successfully');
+      const { opportunities: newOpportunities } = await response.json();
+
+      if (newOpportunities && newOpportunities.length > 0) {
+        setOpportunities([...newOpportunities, ...opportunities]);
+        showToast('success', `Generated ${newOpportunities.length} personalized opportunity`);
+      } else {
+        throw new Error('No opportunities generated');
+      }
     } catch (error: any) {
       console.error('Error generating opportunity:', error);
       showToast('error', `Failed to generate opportunity: ${error?.message || 'Unknown error'}`);
