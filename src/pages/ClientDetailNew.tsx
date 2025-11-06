@@ -1113,6 +1113,15 @@ Client Information:
       <div className="p-6">
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            <AIInsightsOverview
+              clientId={client.id}
+              clientName={client.name}
+              insights={client.aiInsights}
+              insightsGeneratedAt={client.aiInsightsGeneratedAt}
+              onRefresh={handleGenerateInsights}
+              isLoading={isGeneratingInsights}
+            />
+
             {financialData ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
