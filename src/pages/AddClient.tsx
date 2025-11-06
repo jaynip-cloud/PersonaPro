@@ -23,7 +23,6 @@ import {
   X,
   Upload,
   Target,
-  DollarSign,
   Smile,
   MapPin,
   Linkedin,
@@ -58,8 +57,6 @@ interface ClientFormData {
   alternatePhone: string;
   jobTitle: string;
   preferredContactMethod: 'email' | 'phone';
-  companyOverview: string;
-  budgetRange: string;
   shortTermGoals: string;
   longTermGoals: string;
   expectations: string;
@@ -109,8 +106,6 @@ export const AddClient: React.FC = () => {
     alternatePhone: '',
     jobTitle: '',
     preferredContactMethod: 'email',
-    companyOverview: '',
-    budgetRange: '',
     shortTermGoals: '',
     longTermGoals: '',
     expectations: '',
@@ -168,8 +163,6 @@ export const AddClient: React.FC = () => {
           alternatePhone: data.alternate_phone || '',
           jobTitle: data.job_title || '',
           preferredContactMethod: data.preferred_contact_method || 'email',
-          companyOverview: data.company_overview || '',
-          budgetRange: data.budget_range || '',
           shortTermGoals: data.short_term_goals || '',
           longTermGoals: data.long_term_goals || '',
           expectations: data.expectations || '',
@@ -210,18 +203,7 @@ export const AddClient: React.FC = () => {
   };
 
   const validateAdditionalInfo = () => {
-    const newErrors: Partial<Record<keyof ClientFormData, string>> = {};
-
-    if (!formData.budgetRange.trim()) {
-      newErrors.budgetRange = 'Budget range is required';
-    }
-
-    if (!formData.companyOverview.trim()) {
-      newErrors.companyOverview = 'Company overview is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return true;
   };
 
   const validateGoalsInfo = () => {
@@ -333,7 +315,6 @@ export const AddClient: React.FC = () => {
 
         if (data.data.name) updates.company = data.data.name;
         if (data.data.industry) updates.industry = data.data.industry;
-        if (data.data.description) updates.companyOverview = data.data.description;
         if (data.data.founded) updates.founded = data.data.founded;
         if (data.data.companySize) updates.companySize = data.data.companySize;
 
@@ -540,8 +521,6 @@ export const AddClient: React.FC = () => {
         alternate_phone: formData.alternatePhone,
         job_title: formData.jobTitle,
         preferred_contact_method: formData.preferredContactMethod,
-        company_overview: formData.companyOverview,
-        budget_range: formData.budgetRange,
         short_term_goals: formData.shortTermGoals,
         long_term_goals: formData.longTermGoals,
         expectations: formData.expectations,
@@ -889,18 +868,6 @@ export const AddClient: React.FC = () => {
 
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Company Overview
-                </label>
-                <textarea
-                  placeholder="Brief overview of the company, their mission, and what they do..."
-                  value={formData.companyOverview}
-                  onChange={(e) => handleInputChange('companyOverview', e.target.value)}
-                  className="w-full min-h-[100px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                />
-              </div>
-
               <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-border">
                 <Button variant="primary" onClick={handleNext}>
                   Next: Contact Details
@@ -1158,43 +1125,6 @@ export const AddClient: React.FC = () => {
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  <DollarSign className="h-4 w-4 inline mr-2" />
-                  Budget Range <span className="text-red-600">*</span>
-                </label>
-                <Input
-                  placeholder="e.g., $10K-$50K, $100K+, Contact for pricing"
-                  value={formData.budgetRange}
-                  onChange={(e) => handleInputChange('budgetRange', e.target.value)}
-                  className={errors.budgetRange ? 'border-red-500' : ''}
-                />
-                {errors.budgetRange && (
-                  <p className="text-xs text-red-600 mt-1">{errors.budgetRange}</p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Understanding the client's budget helps tailor solutions and expectations
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Company Overview <span className="text-red-600">*</span>
-                </label>
-                <textarea
-                  placeholder="Provide a comprehensive overview of the company: what they do, their mission, market position, key products/services, and unique value proposition..."
-                  value={formData.companyOverview}
-                  onChange={(e) => handleInputChange('companyOverview', e.target.value)}
-                  className={`w-full min-h-[120px] border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none ${errors.companyOverview ? 'border-red-500' : 'border-border'}`}
-                />
-                {errors.companyOverview && (
-                  <p className="text-xs text-red-600 mt-1">{errors.companyOverview}</p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  This helps build context for better client insights and recommendations
-                </p>
               </div>
 
               <div>
