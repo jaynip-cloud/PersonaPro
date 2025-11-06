@@ -133,17 +133,28 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
     if (!user || !project.client_id) return;
 
     try {
+      const content = `
+ELEVATOR PITCH
+${pitch.elevatorPitch}
+
+VALUE POINTS
+${pitch.valuePoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+
+NEXT ACTIONS
+${pitch.nextActions.map((action, i) => `${i + 1}. ${action}`).join('\n')}
+      `.trim();
+
       const { data, error } = await supabase
         .from('saved_pitches')
         .insert({
           project_id: project.id,
           client_id: project.client_id,
           title: `Pitch ${pitch.variant} - ${new Date().toLocaleDateString()}`,
-          content: pitch.content,
+          content: content,
           variant: pitch.variant,
-          services: pitch.metadata.services,
-          tone: pitch.metadata.tone,
-          length: pitch.metadata.length,
+          services: pitch.services,
+          tone: pitch.tone,
+          length: pitch.length,
           created_by: user.id,
         })
         .select()
