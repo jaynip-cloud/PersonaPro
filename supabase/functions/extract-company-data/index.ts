@@ -52,8 +52,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const crawledData = await crawlWebsite(url);
-    const extractedInfo = await extractCompanyInfo(crawledData, perplexityKey, url);
+    const isLinkedInUrl = url.includes('linkedin.com/company/') || url.includes('linkedin.com/in/');
+
+    let crawledData: CrawlResult[] = [];
+    let extractedInfo;
+
+    if (isLinkedInUrl) {
+      extractedInfo = await extractFromLinkedInUrl(url, perplexityKey);
+    } else {
+      crawledData = await crawlWebsite(url);
+      extractedInfo = await extractCompanyInfo(crawledData, perplexityKey, url);
+    }
 
     const simplifiedData = {
       success: true,
@@ -330,7 +339,7 @@ DISCOVERED SOCIAL MEDIA PROFILES:
 CRITICAL EXTRACTION INSTRUCTIONS:
 1. **START WITH LINKEDIN**: Search for and extract company data from LinkedIn company page FIRST
    - Company name, industry, company size, founded year, location from LinkedIn
-   - Employee list with titles from LinkedIn "People" section
+   - Employee list with titles from LinkedIn \"People\" section
 
 2. **THEN USE WEBSITE**: Extract from provided website content
    - Contact information (emails, phones) from contact page only
@@ -354,117 +363,117 @@ CRITICAL EXTRACTION INSTRUCTIONS:
    - Email format: must contain @ and valid domain
    - Phone format: must contain numbers (with optional + and -)
    - Founded year: must be 4 digits between 1800-2025
-   - Company size: use LinkedIn format (e.g., "11-50 employees")
+   - Company size: use LinkedIn format (e.g., \"11-50 employees\")
 
 6. Return ONLY valid JSON - no additional text or explanations
-7. Leave fields empty ("") rather than guessing or inferring data
+7. Leave fields empty (\"\") rather than guessing or inferring data
 
 REQUIRED JSON STRUCTURE (extract ALL available information):
 
 {
-  "companyInfo": {
-    "name": "Full official company name",
-    "industry": "Specific industry/vertical (e.g., 'Enterprise SaaS', 'Healthcare Technology', 'FinTech')",
-    "description": "Comprehensive 2-4 sentence company description",
-    "location": "Full location: 'City, State/Province, Country'",
-    "zipCode": "Postal/Zip code (e.g., '94102', 'SW1A 1AA'). Look in: contact page, footer address",
-    "size": "Company size (e.g., '1-10 employees', '50-200 employees')",
-    "founded": "Year founded in YYYY format (e.g., '2020')",
-    "mission": "Company mission statement if found (what they aim to do)",
-    "vision": "Company vision statement if found (where they want to be in the future)"
+  \"companyInfo\": {
+    \"name\": \"Full official company name\",
+    \"industry\": \"Specific industry/vertical (e.g., 'Enterprise SaaS', 'Healthcare Technology', 'FinTech')\",
+    \"description\": \"Comprehensive 2-4 sentence company description\",
+    \"location\": \"Full location: 'City, State/Province, Country'\",
+    \"zipCode\": \"Postal/Zip code (e.g., '94102', 'SW1A 1AA'). Look in: contact page, footer address\",
+    \"size\": \"Company size (e.g., '1-10 employees', '50-200 employees')\",
+    \"founded\": \"Year founded in YYYY format (e.g., '2020')\",
+    \"mission\": \"Company mission statement if found (what they aim to do)\",
+    \"vision\": \"Company vision statement if found (where they want to be in the future)\"
   },
-  "contactInfo": {
-    "email": "Primary general contact email (contact@, info@, hello@)",
-    "primaryEmail": "Primary contact email or general email",
-    "alternateEmail": "Secondary/alternate email if found (sales@, support@, different department)",
-    "phone": "Primary phone number with country code",
-    "primaryPhone": "Primary phone number",
-    "alternatePhone": "Secondary/alternate phone if found (different departments, toll-free)",
-    "address": "Full physical address (street, city, state, country, zip). Look in: contact page, footer, about page"
+  \"contactInfo\": {
+    \"email\": \"Primary general contact email (contact@, info@, hello@)\",
+    \"primaryEmail\": \"Primary contact email or general email\",
+    \"alternateEmail\": \"Secondary/alternate email if found (sales@, support@, different department)\",
+    \"phone\": \"Primary phone number with country code\",
+    \"primaryPhone\": \"Primary phone number\",
+    \"alternatePhone\": \"Secondary/alternate phone if found (different departments, toll-free)\",
+    \"address\": \"Full physical address (street, city, state, country, zip). Look in: contact page, footer, about page\"
   },
-  "leadership": {
-    "ceo": {
-      "name": "CEO full name",
-      "title": "CEO" or actual title,
-      "email": "CEO email if found",
-      "linkedin": "CEO LinkedIn profile URL from discovered profiles",
-      "bio": "Brief bio if available from website or LinkedIn"
+  \"leadership\": {
+    \"ceo\": {
+      \"name\": \"CEO full name\",
+      \"title\": \"CEO\" or actual title,
+      \"email\": \"CEO email if found\",
+      \"linkedin\": \"CEO LinkedIn profile URL from discovered profiles\",
+      \"bio\": \"Brief bio if available from website or LinkedIn\"
     },
-    "founder": {
-      "name": "Founder full name",
-      "title": "Founder" or "Co-Founder",
-      "email": "Founder email if found",
-      "linkedin": "Founder LinkedIn profile URL from discovered profiles",
-      "bio": "Brief bio if available"
+    \"founder\": {
+      \"name\": \"Founder full name\",
+      \"title\": \"Founder\" or \"Co-Founder\",
+      \"email\": \"Founder email if found\",
+      \"linkedin\": \"Founder LinkedIn profile URL from discovered profiles\",
+      \"bio\": \"Brief bio if available\"
     },
-    "owner": {
-      "name": "Owner full name",
-      "title": "Owner" or actual title,
-      "email": "Owner email if found",
-      "linkedin": "Owner LinkedIn profile URL from discovered profiles",
-      "bio": "Brief bio if available"
+    \"owner\": {
+      \"name\": \"Owner full name\",
+      \"title\": \"Owner\" or actual title,
+      \"email\": \"Owner email if found\",
+      \"linkedin\": \"Owner LinkedIn profile URL from discovered profiles\",
+      \"bio\": \"Brief bio if available\"
     },
-    "primaryContact": {
-      "name": "Primary contact person name (from contact page, team page)",
-      "title": "Their job title/role",
-      "email": "Their direct email",
-      "phone": "Their direct phone"
+    \"primaryContact\": {
+      \"name\": \"Primary contact person name (from contact page, team page)\",
+      \"title\": \"Their job title/role\",
+      \"email\": \"Their direct email\",
+      \"phone\": \"Their direct phone\"
     }
   },
-  "contacts": [
+  \"contacts\": [
     {
-      "name": "Full name of person (from team, about, leadership, contact pages)",
-      "title": "Job title/role (e.g., 'VP of Sales', 'Head of Marketing', 'Customer Success Manager')",
-      "email": "Direct email if available (firstname@company.com, or department email)",
-      "phone": "Direct phone number if available",
-      "linkedin": "LinkedIn profile URL if found",
-      "department": "Department/division (e.g., 'Sales', 'Engineering', 'Marketing')",
-      "isDecisionMaker": true or false (true if C-level, VP, Director, Manager, Decision Maker, Head of, or leadership role),
-      "influenceLevel": "high", "medium", or "low" based on role seniority
+      \"name\": \"Full name of person (from team, about, leadership, contact pages)\",
+      \"title\": \"Job title/role (e.g., 'VP of Sales', 'Head of Marketing', 'Customer Success Manager')\",
+      \"email\": \"Direct email if available (firstname@company.com, or department email)\",
+      \"phone\": \"Direct phone number if available\",
+      \"linkedin\": \"LinkedIn profile URL if found\",
+      \"department\": \"Department/division (e.g., 'Sales', 'Engineering', 'Marketing')\",
+      \"isDecisionMaker\": true or false (true if C-level, VP, Director, Manager, Decision Maker, Head of, or leadership role),
+      \"influenceLevel\": \"high\", \"medium\", or \"low\" based on role seniority
     }
   ],
-  "services": [
+  \"services\": [
     {
-      "name": "Service/Product name",
-      "description": "What this service/product does, key features and benefits"
+      \"name\": \"Service/Product name\",
+      \"description\": \"What this service/product does, key features and benefits\"
     }
   ],
-  "blogs": [
+  \"blogs\": [
     {
-      "title": "Blog article title",
-      "url": "Full URL to the blog post",
-      "date": "Publication date if available (any format)",
-      "summary": "Brief 1-2 sentence summary of the article",
-      "author": "Author name if mentioned"
+      \"title\": \"Blog article title\",
+      \"url\": \"Full URL to the blog post\",
+      \"date\": \"Publication date if available (any format)\",
+      \"summary\": \"Brief 1-2 sentence summary of the article\",
+      \"author\": \"Author name if mentioned\"
     }
   ],
-  "technology": {
-    "stack": ["Technology 1", "Technology 2", "Framework 1"],
-    "partners": ["Partner Company 1", "Partner Company 2"],
-    "integrations": ["Integration 1", "Integration 2", "Platform 1"]
+  \"technology\": {
+    \"stack\": [\"Technology 1\", \"Technology 2\", \"Framework 1\"],
+    \"partners\": [\"Partner Company 1\", \"Partner Company 2\"],
+    \"integrations\": [\"Integration 1\", \"Integration 2\", \"Platform 1\"]
   },
-  "businessInfo": {
-    "shortTermGoals": "Company's short-term goals, objectives, immediate priorities, current focus areas, quarterly/annual targets (next 6-12 months). Examples: 'Expand into 3 new markets', 'Increase revenue by 25%', 'Launch new product line', 'Scale team to 100 employees'",
-    "longTermGoals": "Company's long-term vision, strategic goals, future aspirations, 5-year plan, mission-driven objectives (2-5 years). Examples: 'Become market leader', 'IPO by 2027', 'Expand globally to 50 countries', 'Achieve $100M ARR'",
-    "expectations": "What the company expects from partnerships, client relationships, vendor services, collaboration outcomes. Examples: 'Expect 24/7 support', 'Need scalable solutions', 'Require data security compliance', 'Want strategic partnership growth'"
+  \"businessInfo\": {
+    \"shortTermGoals\": \"Company's short-term goals, objectives, immediate priorities, current focus areas, quarterly/annual targets (next 6-12 months). Examples: 'Expand into 3 new markets', 'Increase revenue by 25%', 'Launch new product line', 'Scale team to 100 employees'\",
+    \"longTermGoals\": \"Company's long-term vision, strategic goals, future aspirations, 5-year plan, mission-driven objectives (2-5 years). Examples: 'Become market leader', 'IPO by 2027', 'Expand globally to 50 countries', 'Achieve $100M ARR'\",
+    \"expectations\": \"What the company expects from partnerships, client relationships, vendor services, collaboration outcomes. Examples: 'Expect 24/7 support', 'Need scalable solutions', 'Require data security compliance', 'Want strategic partnership growth'\"
   },
-  "testimonials": [
+  \"testimonials\": [
     {
-      "clientName": "Name of client/customer who gave testimonial (company or person name)",
-      "clientTitle": "Their title/role if mentioned (e.g., 'CEO at Company X', 'Marketing Director')",
-      "clientCompany": "Company they work for if different from clientName",
-      "feedback": "The full testimonial text - what they said about the service/product",
-      "satisfactionIndicators": "Extract satisfaction cues: 'exceeded expectations', 'highly satisfied', 'would recommend', 'great support', 'transformed our business', 'amazing results' etc.",
-      "rating": "Star rating if shown (e.g., '5/5', '4.5 stars')",
-      "date": "Date of testimonial if available",
-      "source": "Where found: 'website testimonials page', 'case study', 'review site', etc."
+      \"clientName\": \"Name of client/customer who gave testimonial (company or person name)\",
+      \"clientTitle\": \"Their title/role if mentioned (e.g., 'CEO at Company X', 'Marketing Director')\",
+      \"clientCompany\": \"Company they work for if different from clientName\",
+      \"feedback\": \"The full testimonial text - what they said about the service/product\",
+      \"satisfactionIndicators\": \"Extract satisfaction cues: 'exceeded expectations', 'highly satisfied', 'would recommend', 'great support', 'transformed our business', 'amazing results' etc.\",
+      \"rating\": \"Star rating if shown (e.g., '5/5', '4.5 stars')\",
+      \"date\": \"Date of testimonial if available\",
+      \"source\": \"Where found: 'website testimonials page', 'case study', 'review site', etc.\"
     }
   ],
-  "socialProfiles": {
-    "linkedin": "${linkedinCompanyUrls[0] || ''}",
-    "twitter": "${twitterUrls[0] || ''}",
-    "facebook": "${facebookUrls[0] || ''}",
-    "instagram": "${instagramUrls[0] || ''}"
+  \"socialProfiles\": {
+    \"linkedin\": \"${linkedinCompanyUrls[0] || ''}\",
+    \"twitter\": \"${twitterUrls[0] || ''}\",
+    \"facebook\": \"${facebookUrls[0] || ''}\",
+    \"instagram\": \"${instagramUrls[0] || ''}\"
   }
 }
 
@@ -475,15 +484,15 @@ DETAILED EXTRACTION GUIDELINES:
 - If LinkedIn URL found above, access it and extract:
   - Official company name (exactly as shown on LinkedIn)
   - Industry/sector (from LinkedIn company page)
-  - Company size (e.g., "51-200 employees" - use exact LinkedIn format)
-  - Founded year (from LinkedIn "About" section)
+  - Company size (e.g., \"51-200 employees\" - use exact LinkedIn format)
+  - Founded year (from LinkedIn \"About\" section)
   - Headquarters location (City, State/Province, Country)
-  - Company description (from LinkedIn "About")
-- Navigate to "People" section on LinkedIn to find:
+  - Company description (from LinkedIn \"About\")
+- Navigate to \"People\" section on LinkedIn to find:
   - All employees with their current titles
   - Focus on decision makers (C-level, VPs, Directors, Managers)
 - LinkedIn data ALWAYS takes precedence over website data for these fields
-- If no LinkedIn found, search: "[Company Name from website] LinkedIn company"
+- If no LinkedIn found, search: \"[Company Name from website] LinkedIn company\"
 
 **STEP 2: EXTRACT FROM WEBSITE (SECONDARY SOURCE)**
 
@@ -491,35 +500,35 @@ DETAILED EXTRACTION GUIDELINES:
 - Look in: services page, products page, solutions page, homepage features section
 - Extract ALL services/products listed (minimum 3-5 if available, up to 10)
 - For each service: extract name and comprehensive description (what it does, key features, benefits)
-- Example: {"name": "Cloud Migration Service", "description": "End-to-end cloud migration services helping enterprises move legacy systems to AWS, Azure, or GCP with zero downtime, automated backups, and security compliance."}
+- Example: {\"name\": \"Cloud Migration Service\", \"description\": \"End-to-end cloud migration services helping enterprises move legacy systems to AWS, Azure, or GCP with zero downtime, automated backups, and security compliance.\"}
 
 **Blog Articles:**
 - Look in: /blog, /news, /insights, /resources pages
 - Extract recent articles (at least 5-10 if available)
 - For each article: title, full URL, publication date, 1-2 sentence summary, author name
 - If blog listing page found, extract article previews and metadata
-- Example: {"title": "How AI is Transforming Healthcare", "url": "https://example.com/blog/ai-healthcare", "date": "March 15, 2024", "summary": "Exploring the impact of artificial intelligence on patient care and medical diagnostics.", "author": "Dr. Jane Smith"}
+- Example: {\"title\": \"How AI is Transforming Healthcare\", \"url\": \"https://example.com/blog/ai-healthcare\", \"date\": \"March 15, 2024\", \"summary\": \"Exploring the impact of artificial intelligence on patient care and medical diagnostics.\", \"author\": \"Dr. Jane Smith\"}
 
 **Technology Stack:**
 - Look in: technology page, about page, partners page, integration pages, footer
 - Identify: programming languages, frameworks, platforms, tools they use or integrate with
-- Examples: ["React", "Node.js", "AWS", "PostgreSQL", "Docker", "Kubernetes"]
+- Examples: [\"React\", \"Node.js\", \"AWS\", \"PostgreSQL\", \"Docker\", \"Kubernetes\"]
 - Also search their job postings for technology requirements
 
 **Partners:**
 - Look in: partners page, about page, integration pages
 - Extract: partner company names, technology partners, strategic alliances
-- Examples: ["Salesforce", "Microsoft", "Google Cloud", "Stripe"]
+- Examples: [\"Salesforce\", \"Microsoft\", \"Google Cloud\", \"Stripe\"]
 
 **Integrations:**
 - Look in: integrations page, features page, API documentation
 - Extract: third-party platforms/services they integrate with
-- Examples: ["Slack", "Zapier", "HubSpot", "QuickBooks", "Shopify"]
+- Examples: [\"Slack\", \"Zapier\", \"HubSpot\", \"QuickBooks\", \"Shopify\"]
 
 **Leadership (CRITICAL - USE WEB SEARCH):**
 - Use the discovered LinkedIn profile URLs: ${linkedinProfileUrls.slice(0, 5).join(', ')}
 - Search the web for these LinkedIn profiles to get names, titles, and bios
-- Also search: "[Company Name] CEO", "[Company Name] Founder" to find leadership
+- Also search: \"[Company Name] CEO\", \"[Company Name] Founder\" to find leadership
 - Extract from: team page, about page, leadership section, press releases
 - For each leader: full name, title, email (if found), LinkedIn URL, brief bio
 - Prioritize: CEO > Founder > Owner > Primary Contact
@@ -531,9 +540,9 @@ DETAILED EXTRACTION GUIDELINES:
 - For each contact determine:
   - **isDecisionMaker**: true if title contains: CEO, CTO, CFO, COO, VP, Vice President, Director, Head of, Chief, President, Owner, Founder, Manager, Lead
   - **influenceLevel**:
-    - "high" for C-level (CEO, CTO, etc.), VP, President, Owner, Founder
-    - "medium" for Director, Head of, Manager, Lead, Senior roles
-    - "low" for Coordinator, Associate, Specialist, Junior roles
+    - \"high\" for C-level (CEO, CTO, etc.), VP, President, Owner, Founder
+    - \"medium\" for Director, Head of, Manager, Lead, Senior roles
+    - \"low\" for Coordinator, Associate, Specialist, Junior roles
 - Extract at least 3-10 contacts if available on the website
 - Use web search to find LinkedIn profiles and additional contact details
 
@@ -548,36 +557,36 @@ DETAILED EXTRACTION GUIDELINES:
 - Extract EVERY testimonial found on the website (aim for 5-20 if available)
 - For each testimonial extract:
   - **clientName**: The person or company who gave the testimonial
-  - **clientTitle**: Their job title (e.g., "CEO at Acme Corp", "Marketing Director")
+  - **clientTitle**: Their job title (e.g., \"CEO at Acme Corp\", \"Marketing Director\")
   - **clientCompany**: The company they represent (if different from clientName)
   - **feedback**: The complete testimonial text - what they said (full quotes, keep original wording)
   - **satisfactionIndicators**: Extract positive phrases like:
-    - "exceeded expectations", "highly recommend", "best decision we made"
-    - "outstanding support", "transformed our business", "incredible results"
-    - "5-star service", "couldn't be happier", "game-changer"
-    - "responsive team", "delivered on time", "within budget"
+    - \"exceeded expectations\", \"highly recommend\", \"best decision we made\"
+    - \"outstanding support\", \"transformed our business\", \"incredible results\"
+    - \"5-star service\", \"couldn't be happier\", \"game-changer\"
+    - \"responsive team\", \"delivered on time\", \"within budget\"
   - **rating**: If star rating shown (5/5, 4.5 stars, etc.)
   - **date**: When the testimonial was given if shown
-  - **source**: "website", "case study", "Google reviews", "Trustpilot", etc.
+  - **source**: \"website\", \"case study\", \"Google reviews\", \"Trustpilot\", etc.
 - Use testimonials to infer client expectations met: quality, responsiveness, expertise, support, results
 - If case studies found, extract: problem solved, solution provided, results achieved, client satisfaction
 
 **Business Goals & Expectations (IMPORTANT):**
 - **Short-term Goals** - Look in: about page, investor relations, press releases, blog posts, annual reports
-  - Search for: "goals for 2024", "this year we aim to", "current priorities", "our focus", "Q1/Q2/Q3/Q4 objectives"
+  - Search for: \"goals for 2024\", \"this year we aim to\", \"current priorities\", \"our focus\", \"Q1/Q2/Q3/Q4 objectives\"
   - Extract specific, measurable goals like revenue targets, expansion plans, product launches, hiring goals
-  - Examples: "Launch mobile app in Q2 2024", "Grow customer base by 40%", "Expand to European market"
+  - Examples: \"Launch mobile app in Q2 2024\", \"Grow customer base by 40%\", \"Expand to European market\"
 
 - **Long-term Goals** - Look in: about page, mission/vision section, investor deck, CEO interviews, strategy pages
-  - Search for: "vision for", "by 2025/2026/2027", "our long-term strategy", "5-year plan", "roadmap"
+  - Search for: \"vision for\", \"by 2025/2026/2027\", \"our long-term strategy\", \"5-year plan\", \"roadmap\"
   - Extract strategic direction, market position goals, transformation objectives
-  - Examples: "Become the leading SaaS platform in healthcare", "Achieve unicorn status", "Revolutionize the industry"
+  - Examples: \"Become the leading SaaS platform in healthcare\", \"Achieve unicorn status\", \"Revolutionize the industry\"
 
 - **Client/Partnership Expectations** - Look in: partnerships page, client testimonials, case studies, service agreements
-  - Search for: "we expect", "looking for partners who", "ideal client", "what we value", "our requirements"
+  - Search for: \"we expect\", \"looking for partners who\", \"ideal client\", \"what we value\", \"our requirements\"
   - Extract what they need from vendors/partners/clients (response time, quality standards, communication style)
   - Also infer from testimonials: what clients valued (support quality, communication, expertise, results)
-  - Examples: "24/7 support availability", "Transparent communication", "Scalability and flexibility", "Data security compliance"
+  - Examples: \"24/7 support availability\", \"Transparent communication\", \"Scalability and flexibility\", \"Data security compliance\"
 
 - **Use web search extensively** to find recent press releases, CEO interviews, blog posts about company goals
 - If explicit goals not found, infer from company description, recent news, product roadmap, hiring patterns
@@ -596,8 +605,8 @@ SEARCH STRATEGY:
 11. Investor Relations/Press - company goals, growth targets, strategic direction
 12. Careers/Jobs - hiring goals, team expansion plans (indicates growth ambitions)
 13. Use web search extensively to find: press releases, CEO interviews, recent news about company goals and strategy
-14. Search for: "[Company Name] goals", "[Company Name] strategy", "[Company Name] roadmap", "[Company Name] future plans"
-15. Search for: "[Company Name] team", "[Company Name] testimonials", "[Company Name] reviews"
+14. Search for: \"[Company Name] goals\", \"[Company Name] strategy\", \"[Company Name] roadmap\", \"[Company Name] future plans\"
+15. Search for: \"[Company Name] team\", \"[Company Name] testimonials\", \"[Company Name] reviews\"
 
 QUALITY REQUIREMENTS:
 - **Minimum 3-10 contacts** with names and titles (extract ALL people found on team/about/leadership pages)
@@ -663,6 +672,221 @@ Now extract the comprehensive company information including services, blogs, tec
   }
 }
 
+async function extractFromLinkedInUrl(linkedinUrl: string, perplexityKey: string) {
+  const prompt = `You are an expert business intelligence analyst specializing in LinkedIn company data extraction. Your task is to extract COMPREHENSIVE and ACCURATE company information from the LinkedIn company page.
+
+CRITICAL: You have DIRECT ACCESS to this LinkedIn page. Extract ALL available information with 100% accuracy.
+
+LinkedIn Company Page: ${linkedinUrl}
+
+EXTRACTION REQUIREMENTS:
+
+1. **Company Basics** (REQUIRED - extract from LinkedIn \"About\" section):
+   - Official company name (exact match from LinkedIn)
+   - Industry/sector (from LinkedIn)
+   - Company size (exact format: \"X-Y employees\")
+   - Founded year (from LinkedIn About)
+   - Headquarters location (City, State/Province, Country)
+   - Company description (full description from LinkedIn About)
+   - Website URL (from LinkedIn)
+   - Specialties/focus areas (from LinkedIn)
+
+2. **Company Information** (extract from About section):
+   - Mission statement
+   - Vision statement
+   - Company type (Public, Private, Partnership, etc.)
+   - Recent updates and posts about goals, strategy
+
+3. **Leadership & People** (CRITICAL - extract from \"People\" section):
+   - Navigate to the \"People\" tab on LinkedIn
+   - Extract ALL employees, focusing on:
+     * C-level executives (CEO, CTO, CFO, COO, etc.)
+     * VPs and Vice Presidents
+     * Directors and Heads of departments
+     * Managers and Team Leads
+   - For each person extract:
+     * Full name
+     * Current job title at this company
+     * LinkedIn profile URL
+     * Department/division if mentioned
+     * Brief headline/bio if visible
+   - Minimum 10-20 people if available
+   - Mark decision makers (C-level, VP, Director, Manager roles)
+
+4. **Contact Information**:
+   - Phone number from LinkedIn (if shown)
+   - Company email/contact info (if shown)
+   - Physical address (full address with zip code)
+
+5. **Social Profiles**:
+   - The LinkedIn URL itself: ${linkedinUrl}
+   - Any other social links shown on LinkedIn (Twitter, Facebook, etc.)
+
+6. **Recent Activity** (from LinkedIn posts/updates):
+   - Recent company posts about:
+     * Product launches
+     * Growth milestones
+     * Strategic initiatives
+     * Hiring announcements
+     * Company goals and objectives
+   - Extract short-term goals (next 6-12 months)
+   - Extract long-term vision (2-5 years)
+
+7. **Services/Products**:
+   - Infer from company description, specialties, and recent posts
+   - Extract what the company offers
+
+8. **Company Culture & Expectations**:
+   - From employee testimonials, company posts, about section
+   - What the company values in partnerships/collaborations
+
+ACCURACY RULES:
+✅ Extract ONLY what you can see on the LinkedIn page
+✅ Use exact text from LinkedIn (especially for name, industry, size)
+✅ For employee data, extract all visible employees with their exact titles
+✅ If a field is not visible on LinkedIn, leave it empty
+✅ Verify the LinkedIn page is for a company, not a person
+
+Return ONLY valid JSON in this exact structure:
+
+{
+  \"companyInfo\": {
+    \"name\": \"Official company name from LinkedIn\",
+    \"industry\": \"Industry from LinkedIn\",
+    \"description\": \"Full company description from LinkedIn About\",
+    \"location\": \"City, State/Province, Country\",
+    \"zipCode\": \"Postal code if shown\",
+    \"size\": \"Employee count in LinkedIn format (e.g., '51-200 employees')\",
+    \"founded\": \"Year founded (YYYY)\",
+    \"companyType\": \"Public/Private/Partnership/etc.\",
+    \"specialties\": \"Specialties from LinkedIn\",
+    \"mission\": \"Mission statement if shown\",
+    \"vision\": \"Vision statement if shown\"
+  },
+  \"contactInfo\": {
+    \"email\": \"Contact email if shown\",
+    \"primaryEmail\": \"Primary email\",
+    \"alternateEmail\": \"Alternate email if shown\",
+    \"phone\": \"Phone number with country code\",
+    \"primaryPhone\": \"Primary phone\",
+    \"alternatePhone\": \"Alternate phone\",
+    \"address\": \"Full physical address\",
+    \"website\": \"Company website from LinkedIn\"
+  },
+  \"leadership\": {
+    \"ceo\": {
+      \"name\": \"CEO name from LinkedIn People\",
+      \"title\": \"Exact title from LinkedIn\",
+      \"linkedin\": \"LinkedIn profile URL\",
+      \"bio\": \"Headline/bio if visible\"
+    },
+    \"founder\": {
+      \"name\": \"Founder name from LinkedIn People\",
+      \"title\": \"Exact title\",
+      \"linkedin\": \"LinkedIn profile URL\",
+      \"bio\": \"Headline/bio if visible\"
+    },
+    \"owner\": null,
+    \"primaryContact\": {
+      \"name\": \"Primary contact if identified\",
+      \"title\": \"Their title\",
+      \"email\": \"Email if available\",
+      \"phone\": \"Phone if available\"
+    }
+  },
+  \"contacts\": [
+    {
+      \"name\": \"Full name from LinkedIn People section\",
+      \"title\": \"Exact job title from LinkedIn\",
+      \"linkedin\": \"Their LinkedIn profile URL\",
+      \"department\": \"Department/division if visible\",
+      \"isDecisionMaker\": true or false (C-level, VP, Director, Manager = true),
+      \"influenceLevel\": \"high\" (C-level, VP), \"medium\" (Director, Manager), or \"low\"
+    }
+  ],
+  \"services\": [
+    {
+      \"name\": \"Service/product name\",
+      \"description\": \"What it does (infer from company info)\"
+    }
+  ],
+  \"blogs\": [],
+  \"technology\": {
+    \"stack\": [],
+    \"partners\": [],
+    \"integrations\": []
+  },
+  \"businessInfo\": {
+    \"shortTermGoals\": \"Goals for next 6-12 months (from recent posts, announcements)\",
+    \"longTermGoals\": \"Long-term vision 2-5 years (from About, vision, strategic posts)\",
+    \"expectations\": \"What company expects from partnerships (infer from culture, values)\"
+  },
+  \"testimonials\": [],
+  \"socialProfiles\": {
+    \"linkedin\": \"${linkedinUrl}\",
+    \"twitter\": \"Twitter URL if shown on LinkedIn\",
+    \"facebook\": \"Facebook URL if shown\",
+    \"instagram\": \"Instagram URL if shown\"
+  }
+}
+
+CRITICAL FOCUS AREAS:
+1. Extract AT LEAST 10-20 employees from the People section with exact titles
+2. Get accurate company size, industry, and founded year from About
+3. Extract recent posts to understand short-term and long-term goals
+4. Ensure all names and titles are exact matches from LinkedIn
+5. Mark decision makers correctly based on title seniority
+
+Now extract the comprehensive company information from this LinkedIn page. Return ONLY the JSON object.`;
+
+  try {
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${perplexityKey}`,
+      },
+      body: JSON.stringify({
+        model: "sonar",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert LinkedIn data extraction specialist. You have direct access to LinkedIn company pages and can extract all visible information with 100% accuracy. You extract company information, employee lists with their titles, recent company posts, and all available contact details. You follow LinkedIn's exact formatting for company size, industry, and other fields. You always return properly formatted JSON. You prioritize extracting comprehensive employee/people data from the LinkedIn People section, focusing on decision makers and leadership.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 4000,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Perplexity API error: ${error}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    let extractedData;
+
+    if (jsonMatch) {
+      extractedData = JSON.parse(jsonMatch[0]);
+    } else {
+      extractedData = JSON.parse(content);
+    }
+
+    return extractedData;
+  } catch (error) {
+    console.error("Error calling Perplexity for LinkedIn:", error);
+    throw error;
+  }
+}
+
 function extractLocationCity(location: string): string {
   if (!location) return '';
   const parts = location.split(',').map(p => p.trim());
@@ -678,11 +902,11 @@ function extractLocationCountry(location: string): string {
 function findLogoUrl(crawlResults: CrawlResult[]): string {
   for (const result of crawlResults) {
     const logoPatterns = [
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-      /<link[^>]+rel=["']icon["'][^>]+href=["']([^"']+)["']/i,
-      /<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i,
-      /<img[^>]+class=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/i,
-      /<img[^>]+alt=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/i,
+      /<meta[^>]+property=[\"']og:image[\"'][^>]+content=[\"']([^\"']+)[\"']/i,
+      /<link[^>]+rel=[\"']icon[\"'][^>]+href=[\"']([^\"']+)[\"']/i,
+      /<link[^>]+rel=[\"']apple-touch-icon[\"'][^>]+href=[\"']([^\"']+)[\"']/i,
+      /<img[^>]+class=[\"'][^\"']*logo[^\"']*[\"'][^>]+src=[\"']([^\"']+)[\"']/i,
+      /<img[^>]+alt=[\"'][^\"']*logo[^\"']*[\"'][^>]+src=[\"']([^\"']+)[\"']/i,
     ];
 
     for (const pattern of logoPatterns) {
