@@ -210,18 +210,7 @@ export const AddClient: React.FC = () => {
   };
 
   const validateAdditionalInfo = () => {
-    const newErrors: Partial<Record<keyof ClientFormData, string>> = {};
-
-    if (!formData.budgetRange.trim()) {
-      newErrors.budgetRange = 'Budget range is required';
-    }
-
-    if (!formData.companyOverview.trim()) {
-      newErrors.companyOverview = 'Company overview is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return true;
   };
 
   const validateGoalsInfo = () => {
@@ -410,11 +399,6 @@ export const AddClient: React.FC = () => {
       return;
     }
 
-    if (activeTab === 'additional' && !validateAdditionalInfo()) {
-      showToast('error', 'Please fill in all required additional information');
-      return;
-    }
-
     if (activeTab === 'goals' && !validateGoalsInfo()) {
       showToast('error', 'Please fill in all required goals information');
       return;
@@ -508,7 +492,7 @@ export const AddClient: React.FC = () => {
       return;
     }
 
-    if (!validateBasicInfo() || !validateContactInfo() || !validateAdditionalInfo() || !validateGoalsInfo()) {
+    if (!validateBasicInfo() || !validateContactInfo() || !validateGoalsInfo()) {
       showToast('error', 'Please fill in all required fields across all tabs');
       return;
     }
@@ -659,7 +643,7 @@ export const AddClient: React.FC = () => {
   };
 
   const canSave = () => {
-    return completedTabs.size >= 4;
+    return completedTabs.size >= 2;
   };
 
   const tabs = [
@@ -1163,17 +1147,13 @@ export const AddClient: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   <DollarSign className="h-4 w-4 inline mr-2" />
-                  Budget Range <span className="text-red-600">*</span>
+                  Budget Range
                 </label>
                 <Input
                   placeholder="e.g., $10K-$50K, $100K+, Contact for pricing"
                   value={formData.budgetRange}
                   onChange={(e) => handleInputChange('budgetRange', e.target.value)}
-                  className={errors.budgetRange ? 'border-red-500' : ''}
                 />
-                {errors.budgetRange && (
-                  <p className="text-xs text-red-600 mt-1">{errors.budgetRange}</p>
-                )}
                 <p className="text-xs text-muted-foreground mt-1">
                   Understanding the client's budget helps tailor solutions and expectations
                 </p>
@@ -1181,17 +1161,14 @@ export const AddClient: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
-                  Company Overview <span className="text-red-600">*</span>
+                  Company Overview
                 </label>
                 <textarea
                   placeholder="Provide a comprehensive overview of the company: what they do, their mission, market position, key products/services, and unique value proposition..."
                   value={formData.companyOverview}
                   onChange={(e) => handleInputChange('companyOverview', e.target.value)}
-                  className={`w-full min-h-[120px] border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none ${errors.companyOverview ? 'border-red-500' : 'border-border'}`}
+                  className="w-full min-h-[120px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
-                {errors.companyOverview && (
-                  <p className="text-xs text-red-600 mt-1">{errors.companyOverview}</p>
-                )}
                 <p className="text-xs text-muted-foreground mt-1">
                   This helps build context for better client insights and recommendations
                 </p>
