@@ -80,6 +80,7 @@ export const ClientDetailNew: React.FC = () => {
   const [isGeneratingProject, setIsGeneratingProject] = useState(false);
   const [deletingOpportunityId, setDeletingOpportunityId] = useState<string | null>(null);
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [newProjectForm, setNewProjectForm] = useState({
     name: '',
     description: '',
