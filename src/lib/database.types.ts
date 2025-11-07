@@ -26,6 +26,7 @@ export interface Database {
           last_contact: string | null
           next_follow_up: string | null
           persona_score: number
+          fit_score: number | null
           health_score: number | null
           csm: string | null
           tags: string[]
@@ -49,6 +50,7 @@ export interface Database {
           last_contact?: string | null
           next_follow_up?: string | null
           persona_score?: number
+          fit_score?: number | null
           health_score?: number | null
           csm?: string | null
           tags?: string[]
@@ -72,6 +74,7 @@ export interface Database {
           last_contact?: string | null
           next_follow_up?: string | null
           persona_score?: number
+          fit_score?: number | null
           health_score?: number | null
           csm?: string | null
           tags?: string[]

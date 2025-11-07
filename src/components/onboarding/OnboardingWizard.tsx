@@ -128,8 +128,55 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
   useEffect(() => {
     if (isOpen && user) {
       loadExistingData();
+      // Load persisted onboarding data from localStorage
+      loadPersistedData();
     }
   }, [isOpen, user]);
+
+  // Load persisted data from localStorage
+  const loadPersistedData = () => {
+    try {
+      const persistedData = localStorage.getItem('onboarding_wizard_data');
+      const persistedStep = localStorage.getItem('onboarding_wizard_step');
+      
+      if (persistedData) {
+        const parsedData = JSON.parse(persistedData);
+        // Merge persisted data with existing data, prioritizing persisted data
+        setFormData(prev => ({ ...prev, ...parsedData }));
+      }
+      
+      if (persistedStep) {
+        const step = parseInt(persistedStep, 10);
+        if (step >= 1 && step <= totalSteps) {
+          setCurrentStep(step);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading persisted onboarding data:', error);
+    }
+  };
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    if (isOpen && user) {
+      try {
+        localStorage.setItem('onboarding_wizard_data', JSON.stringify(formData));
+      } catch (error) {
+        console.error('Error saving onboarding data to localStorage:', error);
+      }
+    }
+  }, [formData, isOpen, user]);
+
+  // Save current step to localStorage whenever it changes
+  useEffect(() => {
+    if (isOpen && user) {
+      try {
+        localStorage.setItem('onboarding_wizard_step', currentStep.toString());
+      } catch (error) {
+        console.error('Error saving onboarding step to localStorage:', error);
+      }
+    }
+  }, [currentStep, isOpen, user]);
 
   const loadExistingData = async () => {
     if (!user) return;
@@ -601,12 +648,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
   const handleFirstClientComplete = () => {
     setShowFirstClientWizard(false);
+    // Clear persisted onboarding data
+    localStorage.removeItem('onboarding_wizard_data');
+    localStorage.removeItem('onboarding_wizard_step');
     onComplete();
     navigate('/clients');
   };
 
   const handleSkipFirstClient = () => {
     setShowFirstClientWizard(false);
+    // Clear persisted onboarding data
+    localStorage.removeItem('onboarding_wizard_data');
+    localStorage.removeItem('onboarding_wizard_step');
     onComplete();
     navigate('/dashboard');
   };
@@ -616,6 +669,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
     setSaving(true);
     try {
+      // Clear persisted onboarding data from localStorage on completion
+      localStorage.removeItem('onboarding_wizard_data');
+      localStorage.removeItem('onboarding_wizard_step');
       const servicesJson = formData.services.map(service => ({
         id: service.id || `service-${Date.now()}-${Math.random()}`,
         name: service.name || '',
@@ -660,7 +716,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
       if (error) throw error;
 
       await checkKnowledgeBaseStatus();
-      // Show success modal first
+      // Close onboarding wizard and show success modal
+      onComplete();
       setShowOnboardingSuccessModal(true);
     } catch (error) {
       console.error('Error completing onboarding:', error);
@@ -672,6 +729,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
   const handleProceedToFirstClient = () => {
     setShowOnboardingSuccessModal(false);
+    // Clear persisted onboarding data when proceeding to first client
+    localStorage.removeItem('onboarding_wizard_data');
+    localStorage.removeItem('onboarding_wizard_step');
     setShowFirstClientWizard(true);
   };
 
@@ -700,7 +760,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           </div>
         </div>
 
-        <div className="min-h-[500px] max-h-[500px] overflow-y-auto">
+        <div className="min-h-[500px] max-h-[500px] overflow-y-auto pr-8">
           {currentStep === 1 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
@@ -799,6 +859,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   onChange={(e) => handleChange('website', e.target.value)}
                   placeholder="https://yourcompany.com"
                   required
+                  className="pr-6"
                 />
                 <p className="text-xs text-slate-500 mt-1">
                   Enter your website and click AI Autofill to automatically extract ALL information across all 8 steps
@@ -815,6 +876,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   onChange={(e) => handleChange('companyName', e.target.value)}
                   placeholder="e.g., TechSolutions Inc."
                   required
+                  className="pr-6"
                 />
               </div>
 
@@ -827,6 +889,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   value={formData.industry}
                   onChange={(e) => handleChange('industry', e.target.value)}
                   placeholder="e.g., Technology, Healthcare, Finance"
+                  className="pr-6"
                 />
               </div>
 
@@ -835,7 +898,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   Description
                 </label>
                 <textarea
-                  className="w-full min-h-[80px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full min-h-[80px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   value={formData.description}
                   onChange={(e) => handleChange('description', e.target.value)}
                   placeholder="Brief description of what your company does..."
@@ -852,6 +915,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                     value={formData.founded}
                     onChange={(e) => handleChange('founded', e.target.value)}
                     placeholder="e.g., 2020"
+                    className="pr-6"
                   />
                 </div>
 
@@ -864,6 +928,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                     value={formData.size}
                     onChange={(e) => handleChange('size', e.target.value)}
                     placeholder="e.g., 50-100 employees"
+                    className="pr-6"
                   />
                 </div>
               </div>
@@ -877,6 +942,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   value={formData.location}
                   onChange={(e) => handleChange('location', e.target.value)}
                   placeholder="e.g., San Francisco, CA"
+                  className="pr-6"
                 />
               </div>
 
@@ -885,7 +951,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   Mission Statement
                 </label>
                 <textarea
-                  className="w-full min-h-[60px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full min-h-[60px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   value={formData.mission}
                   onChange={(e) => handleChange('mission', e.target.value)}
                   placeholder="Your company's mission..."
@@ -897,7 +963,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   Vision Statement
                 </label>
                 <textarea
-                  className="w-full min-h-[60px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full min-h-[60px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   value={formData.vision}
                   onChange={(e) => handleChange('vision', e.target.value)}
                   placeholder="Your company's vision..."
@@ -922,6 +988,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   onChange={(e) => handleChange('email', e.target.value)}
                   placeholder="contact@yourcompany.com"
                   required
+                  className="pr-6"
                 />
               </div>
 
@@ -934,6 +1001,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   value={formData.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
                   placeholder="+1 (555) 123-4567"
+                  className="pr-6"
                 />
               </div>
 
@@ -942,7 +1010,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   Physical Address
                 </label>
                 <textarea
-                  className="w-full min-h-[80px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full min-h-[80px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                   value={formData.address}
                   onChange={(e) => handleChange('address', e.target.value)}
                   placeholder="123 Main St, City, State, ZIP"
@@ -966,6 +1034,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   value={formData.linkedinUrl}
                   onChange={(e) => handleChange('linkedinUrl', e.target.value)}
                   placeholder="https://linkedin.com/company/yourcompany"
+                  className="pr-6"
                 />
               </div>
 
@@ -978,6 +1047,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   value={formData.twitterUrl}
                   onChange={(e) => handleChange('twitterUrl', e.target.value)}
                   placeholder="https://twitter.com/yourcompany"
+                  className="pr-6"
                 />
               </div>
 
@@ -990,6 +1060,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   value={formData.facebookUrl}
                   onChange={(e) => handleChange('facebookUrl', e.target.value)}
                   placeholder="https://facebook.com/yourcompany"
+                  className="pr-6"
                 />
               </div>
 
@@ -1002,6 +1073,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   value={formData.instagramUrl}
                   onChange={(e) => handleChange('instagramUrl', e.target.value)}
                   placeholder="https://instagram.com/yourcompany"
+                  className="pr-6"
                 />
               </div>
 
@@ -1014,6 +1086,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   value={formData.youtubeUrl}
                   onChange={(e) => handleChange('youtubeUrl', e.target.value)}
                   placeholder="https://youtube.com/@yourcompany"
+                  className="pr-6"
                 />
               </div>
             </div>
@@ -1045,6 +1118,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                       onChange={(e) => handleChange('serviceInput', e.target.value)}
                       placeholder="e.g., AI Consulting, Cloud Migration"
                       autoFocus
+                      className="pr-6"
                     />
                   </div>
                   <div>
@@ -1052,7 +1126,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                       Description
                     </label>
                     <textarea
-                      className="w-full min-h-[80px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      className="w-full min-h-[80px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                       value={formData.serviceDescInput}
                       onChange={(e) => handleChange('serviceDescInput', e.target.value)}
                       placeholder="Describe what this service/product does and its key benefits..."
@@ -1118,7 +1192,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                                 onChange={(e) => updateService(index, 'name', e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
                                 placeholder="Service name"
-                                className="border-0 p-0 h-auto font-medium text-slate-900 focus:ring-0 focus:border-b focus:border-blue-500 rounded-none"
+                                className="border-0 p-0 pr-6 h-auto font-medium text-slate-900 focus:ring-0 focus:border-b focus:border-blue-500 rounded-none"
                               />
                             </div>
                           </div>
@@ -1140,7 +1214,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                                 Description
                               </label>
                               <textarea
-                                className="w-full min-h-[60px] p-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                className="w-full min-h-[60px] p-2 pr-6 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                                 value={service.description}
                                 onChange={(e) => updateService(index, 'description', e.target.value)}
                                 placeholder="Service description..."
@@ -1193,16 +1267,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                           value={leader.name}
                           onChange={(e) => updateLeader(index, 'name', e.target.value)}
                           placeholder="Full Name"
+                          className="pr-6"
                         />
                         <Input
                           type="text"
                           value={leader.role}
                           onChange={(e) => updateLeader(index, 'role', e.target.value)}
                           placeholder="Role/Title"
+                          className="pr-6"
                         />
                       </div>
                       <textarea
-                        className="w-full min-h-[60px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        className="w-full min-h-[60px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                         value={leader.bio}
                         onChange={(e) => updateLeader(index, 'bio', e.target.value)}
                         placeholder="Bio/Background"
@@ -1249,12 +1325,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                         value={blog.title}
                         onChange={(e) => updateBlog(index, 'title', e.target.value)}
                         placeholder="Article Title"
+                        className="pr-6"
                       />
                       <Input
                         type="url"
                         value={blog.url}
                         onChange={(e) => updateBlog(index, 'url', e.target.value)}
                         placeholder="Article URL"
+                        className="pr-6"
                       />
                       <div className="grid grid-cols-2 gap-2">
                         <Input
@@ -1262,16 +1340,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                           value={blog.date}
                           onChange={(e) => updateBlog(index, 'date', e.target.value)}
                           placeholder="Date"
+                          className="pr-6"
                         />
                         <Input
                           type="text"
                           value={blog.author}
                           onChange={(e) => updateBlog(index, 'author', e.target.value)}
                           placeholder="Author"
+                          className="pr-6"
                         />
                       </div>
                       <textarea
-                        className="w-full min-h-[60px] p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        className="w-full min-h-[60px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                         value={blog.summary}
                         onChange={(e) => updateBlog(index, 'summary', e.target.value)}
                         placeholder="Summary"
@@ -1305,6 +1385,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                         addItem('techStack', 'techInput');
                       }
                     }}
+                    className="pr-6"
                   />
                   <Button
                     variant="primary"
@@ -1348,6 +1429,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                         addItem('partners', 'partnerInput');
                       }
                     }}
+                    className="pr-6"
                   />
                   <Button
                     variant="primary"
@@ -1391,6 +1473,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                         addItem('integrations', 'integrationInput');
                       }
                     }}
+                    className="pr-6"
                   />
                   <Button
                     variant="primary"

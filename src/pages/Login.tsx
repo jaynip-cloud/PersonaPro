@@ -3,36 +3,41 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { LogIn } from 'lucide-react';
+import { Logo } from '../components/ui/Logo';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { signIn, user, isKnowledgeBaseComplete } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { signIn, user, isKnowledgeBaseComplete, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
+    // Wait for auth to finish loading before redirecting
+    if (!loading && user) {
       if (isKnowledgeBaseComplete) {
         navigate('/dashboard');
       } else {
         navigate('/knowledge-base');
       }
     }
-  }, [user, isKnowledgeBaseComplete, navigate]);
+  }, [user, isKnowledgeBaseComplete, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+    setIsSubmitting(true);
 
     const { error } = await signIn(email, password);
 
     if (error) {
       setError(error.message);
-      setLoading(false);
+      setIsSubmitting(false);
+    } else {
+      // Status check is now done in signIn, but wait a moment for state to update
+      // The useEffect will handle navigation once isKnowledgeBaseComplete is set
+      setIsSubmitting(false);
     }
   };
 
@@ -41,8 +46,8 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-              <LogIn className="w-8 h-8 text-white" />
+            <div className="mb-0 w-full">
+              <Logo size="xl" theme="light" />
             </div>
             <h1 className="text-3xl font-bold text-slate-900">Login to your account</h1>
             {/* <p className="text-slate-600 mt-2">Sign in to access your dashboard</p> */}
@@ -81,16 +86,16 @@ export const Login: React.FC = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 required
-                disabled={loading}
+                disabled={isSubmitting}
               />
             </div>
 
             <Button
               type="submit"
               className="w-full"
-              disabled={loading}
+              disabled={isSubmitting}
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {isSubmitting ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
 

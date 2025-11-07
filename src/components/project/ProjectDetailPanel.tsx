@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
-import { Modal } from '../ui/Modal';
-import { X, Save, Sparkles, Calendar, DollarSign, Clock, ChevronRight, Trash2 } from 'lucide-react';
+import { X, Save, Sparkles, Calendar, DollarSign, Clock, ChevronRight, ChevronLeft, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PitchBuilderForm } from '../pitch/PitchBuilderForm';
 import { GeneratedPitchDisplay } from '../pitch/GeneratedPitchDisplay';
@@ -50,6 +49,7 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
   const [savedPitches, setSavedPitches] = useState<any[]>([]);
   const [prefilledClientId, setPrefilledClientId] = useState<string>('');
   const [clients, setClients] = useState<any[]>([]);
+  const [isPitchPanelMinimized, setIsPitchPanelMinimized] = useState(false);
 
   useEffect(() => {
     setEditedProject(project);
@@ -215,7 +215,7 @@ ${pitch.nextActions.map((action, i) => `${i + 1}. ${action}`).join('\n')}
       case 'win':
         return 100;
       case 'loss':
-        return 0;
+        return 100; // Show 100% but with red color
       default:
         return 0;
     }
@@ -237,6 +237,8 @@ ${pitch.nextActions.map((action, i) => `${i + 1}. ${action}`).join('\n')}
         className="fixed inset-0 bg-black/50 z-40"
         onClick={onClose}
       />
+      
+      {/* Project Details Panel - Right Side */}
       <div className="fixed right-0 top-0 h-full w-full max-w-2xl bg-background shadow-xl z-50 overflow-y-auto">
         <div className="sticky top-0 bg-background border-b border-border p-6 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-foreground">Project Details</h2>
@@ -400,37 +402,65 @@ ${pitch.nextActions.map((action, i) => `${i + 1}. ${action}`).join('\n')}
         </div>
       </div>
 
-      <Modal
-        isOpen={showPitchModal}
-        onClose={() => {
-          setShowPitchModal(false);
-          setGeneratedPitches([]);
-        }}
-        title="Generate Pitch"
-        size="xl"
-      >
-        <div className="space-y-6">
-          <PitchBuilderForm
-            clients={clients}
-            onGenerate={handlePitchGenerate}
-            isGenerating={isGenerating}
-            initialClientId={prefilledClientId}
-          />
-
-          {generatedPitches.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-foreground">Generated Pitches</h3>
-              {generatedPitches.map((pitch) => (
-                <GeneratedPitchDisplay
-                  key={pitch.id}
-                  pitch={pitch}
-                  onSave={handleSavePitch}
-                />
-              ))}
+      {/* Pitch Generator Panel - Slides in from right, positioned to left of Project Details */}
+      {showPitchModal && (
+        <div 
+          className={`fixed top-0 h-full bg-background shadow-xl z-50 overflow-y-auto border-r border-border transition-all duration-300 ease-in-out ${
+            isPitchPanelMinimized ? 'w-12' : 'w-full max-w-2xl'
+          }`}
+          style={{ 
+            right: isPitchPanelMinimized ? '672px' : '672px',
+            transform: 'translateX(0)'
+          }}
+        >
+          {isPitchPanelMinimized ? (
+            <div className="h-full flex flex-col items-center justify-center p-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsPitchPanelMinimized(false)}
+                className="rotate-180"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
+          ) : (
+            <>
+              <div className="sticky top-0 bg-background border-b border-border p-6 flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-foreground">Generate Pitch</h2>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setIsPitchPanelMinimized(true)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="p-6 space-y-6">
+            <PitchBuilderForm
+              clients={clients}
+              onGenerate={handlePitchGenerate}
+              isGenerating={isGenerating}
+              initialClientId={prefilledClientId}
+              projectTitle={editedProject.title}
+              projectDescription={editedProject.description}
+            />
+
+            {generatedPitches.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Generated Pitches</h3>
+                {generatedPitches.map((pitch) => (
+                  <GeneratedPitchDisplay
+                    key={pitch.id}
+                    pitch={pitch}
+                    onSave={handleSavePitch}
+                  />
+                ))}
+              </div>
+            )}
+              </div>
+            </>
           )}
         </div>
-      </Modal>
+      )}
     </>
   );
 };

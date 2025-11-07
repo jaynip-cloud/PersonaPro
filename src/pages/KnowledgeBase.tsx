@@ -53,14 +53,20 @@ export const KnowledgeBase: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
-  const { user, isKnowledgeBaseComplete, checkKnowledgeBaseStatus } = useAuth();
+  const { user, isKnowledgeBaseComplete, checkKnowledgeBaseStatus, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isKnowledgeBaseComplete) {
-      setShowWizard(true);
+    // Wait for auth to finish loading before checking status
+    if (!loading && user) {
+      if (!isKnowledgeBaseComplete) {
+        setShowWizard(true);
+      } else {
+        // If onboarding is complete, don't show wizard
+        setShowWizard(false);
+      }
     }
-  }, [isKnowledgeBaseComplete]);
+  }, [isKnowledgeBaseComplete, loading, user]);
 
   useEffect(() => {
     if (user && isKnowledgeBaseComplete) {
@@ -583,7 +589,7 @@ export const KnowledgeBase: React.FC = () => {
       {activeTab === 'overview' && (
         <div className="space-y-6">
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="pt-7 px-6 pb-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">AI-Powered Insights</h2>
@@ -633,7 +639,7 @@ export const KnowledgeBase: React.FC = () => {
               )}
 
               {aiInsights && (
-                <div className="space-y-6">
+                <div className="space-y-6 mt-8">
                   <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-6 border border-blue-100">
                     <div className="flex items-start gap-3">
                       <Lightbulb className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
@@ -646,7 +652,7 @@ export const KnowledgeBase: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Card>
-                      <CardContent className="p-6">
+                      <CardContent className="pt-7 px-6 pb-6">
                         <div className="flex items-center gap-2 mb-4">
                           <Zap className="h-5 w-5 text-green-600" />
                           <h3 className="text-lg font-semibold text-foreground">Strengths</h3>
@@ -663,7 +669,7 @@ export const KnowledgeBase: React.FC = () => {
                     </Card>
 
                     <Card>
-                      <CardContent className="p-6">
+                      <CardContent className="pt-7 px-6 pb-6">
                         <div className="flex items-center gap-2 mb-4">
                           <TrendingUp className="h-5 w-5 text-blue-600" />
                           <h3 className="text-lg font-semibold text-foreground">Growth Opportunities</h3>
@@ -682,7 +688,7 @@ export const KnowledgeBase: React.FC = () => {
 
                   {aiInsights.marketPosition && (
                     <Card>
-                      <CardContent className="p-6">
+                      <CardContent className="pt-7 px-6 pb-6">
                         <h3 className="text-lg font-semibold text-foreground mb-3">Market Position</h3>
                         <p className="text-muted-foreground leading-relaxed">{aiInsights.marketPosition}</p>
                       </CardContent>
@@ -691,7 +697,7 @@ export const KnowledgeBase: React.FC = () => {
 
                   {aiInsights.recommendations && aiInsights.recommendations.length > 0 && (
                     <Card>
-                      <CardContent className="p-6">
+                      <CardContent className="pt-7 px-6 pb-6">
                         <h3 className="text-lg font-semibold text-foreground mb-4">Strategic Recommendations</h3>
                         <div className="space-y-3">
                           {aiInsights.recommendations.map((rec: string, idx: number) => (
@@ -710,7 +716,7 @@ export const KnowledgeBase: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {aiInsights.contentStrategy && (
                       <Card>
-                        <CardContent className="p-6">
+                        <CardContent className="pt-7 px-6 pb-6">
                           <h3 className="text-lg font-semibold text-foreground mb-3">Content Strategy</h3>
                           <p className="text-sm text-muted-foreground leading-relaxed">{aiInsights.contentStrategy}</p>
                         </CardContent>
@@ -719,7 +725,7 @@ export const KnowledgeBase: React.FC = () => {
 
                     {aiInsights.techStack && (
                       <Card>
-                        <CardContent className="p-6">
+                        <CardContent className="pt-7 px-6 pb-6">
                           <h3 className="text-lg font-semibold text-foreground mb-3">Technology Assessment</h3>
                           <p className="text-sm text-muted-foreground leading-relaxed">{aiInsights.techStack}</p>
                         </CardContent>
@@ -729,7 +735,7 @@ export const KnowledgeBase: React.FC = () => {
 
                   {aiInsights.kpis && (
                     <Card>
-                      <CardContent className="p-6">
+                      <CardContent className="pt-7 px-6 pb-6">
                         <div className="flex items-center gap-2 mb-6">
                           <Gauge className="h-5 w-5 text-blue-600" />
                           <h3 className="text-lg font-semibold text-foreground">Key Performance Indicators</h3>
@@ -767,7 +773,7 @@ export const KnowledgeBase: React.FC = () => {
 
                   {aiInsights.sentiment && (
                     <Card>
-                      <CardContent className="p-6">
+                      <CardContent className="pt-7 px-6 pb-6">
                         <div className="flex items-center gap-2 mb-6">
                           <Activity className="h-5 w-5 text-purple-600" />
                           <h3 className="text-lg font-semibold text-foreground">Sentiment Analysis</h3>
@@ -819,7 +825,7 @@ export const KnowledgeBase: React.FC = () => {
 
                   {aiInsights.behaviorAnalysis && (
                     <Card>
-                      <CardContent className="p-6">
+                      <CardContent className="pt-7 px-6 pb-6">
                         <div className="flex items-center gap-2 mb-6">
                           <Brain className="h-5 w-5 text-indigo-600" />
                           <h3 className="text-lg font-semibold text-foreground">Behavioral Analysis</h3>
@@ -875,7 +881,7 @@ export const KnowledgeBase: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {aiInsights.riskFactors && aiInsights.riskFactors.length > 0 && (
                       <Card>
-                        <CardContent className="p-6">
+                        <CardContent className="pt-7 px-6 pb-6">
                           <div className="flex items-center gap-2 mb-4">
                             <Shield className="h-5 w-5 text-orange-600" />
                             <h3 className="text-lg font-semibold text-foreground">Risk Factors</h3>
@@ -894,7 +900,7 @@ export const KnowledgeBase: React.FC = () => {
 
                     {aiInsights.competitiveEdge && aiInsights.competitiveEdge.length > 0 && (
                       <Card>
-                        <CardContent className="p-6">
+                        <CardContent className="pt-7 px-6 pb-6">
                           <div className="flex items-center gap-2 mb-4">
                             <Award className="h-5 w-5 text-yellow-600" />
                             <h3 className="text-lg font-semibold text-foreground">Competitive Edge</h3>
@@ -1239,7 +1245,7 @@ export const KnowledgeBase: React.FC = () => {
                 const isEditing = editingServiceId === service.id;
                 return (
                   <Card key={service.id}>
-                    <CardContent className="p-6">
+                    <CardContent className="pt-7 px-6 pb-6">
                       {isEditing ? (
                         <div className="space-y-4">
                           <div>
@@ -1367,7 +1373,7 @@ export const KnowledgeBase: React.FC = () => {
                 const isEditing = editingLeaderId === member.id;
                 return (
                   <Card key={member.id}>
-                    <CardContent className="p-6">
+                    <CardContent className="pt-7 px-6 pb-6">
                       {isEditing ? (
                         <div className="space-y-4">
                           <div>
@@ -1518,7 +1524,7 @@ export const KnowledgeBase: React.FC = () => {
                 const isEditing = editingBlogId === blog.id;
                 return (
                   <Card key={blog.id}>
-                    <CardContent className="p-6">
+                    <CardContent className="pt-7 px-6 pb-6">
                       {isEditing ? (
                         <div className="space-y-4">
                           <div>

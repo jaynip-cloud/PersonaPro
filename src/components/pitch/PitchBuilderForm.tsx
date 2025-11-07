@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { Client, PitchGeneratorInput } from '../../types';
 import { Sparkles } from 'lucide-react';
 
@@ -10,59 +9,58 @@ interface PitchBuilderFormProps {
   onGenerate: (input: PitchGeneratorInput) => void;
   isGenerating: boolean;
   initialClientId?: string;
+  projectTitle?: string;
+  projectDescription?: string;
 }
 
 export const PitchBuilderForm: React.FC<PitchBuilderFormProps> = ({
   clients,
   onGenerate,
   isGenerating,
-  initialClientId
+  initialClientId,
+  projectTitle,
+  projectDescription
 }) => {
-  const [selectedClientId, setSelectedClientId] = useState(initialClientId || '');
-  const [services, setServices] = useState<string[]>([]);
-  const [serviceInput, setServiceInput] = useState('');
-  const [companyDescription, setCompanyDescription] = useState(
-    'We are a leading technology consulting firm specializing in digital transformation and enterprise solutions.'
+  // Set default client: use initialClientId if provided, otherwise use first client
+  const getDefaultClientId = () => {
+    if (initialClientId) return initialClientId;
+    if (clients.length > 0) return clients[0].id;
+    return '';
+  };
+
+  // Auto-populate services from project title
+  const getDefaultServices = () => {
+    if (projectTitle) {
+      // Use project title as a service
+      return [projectTitle];
+    }
+    return [];
+  };
+
+  const [selectedClientId, setSelectedClientId] = useState(getDefaultClientId());
+  const [services] = useState<string[]>(getDefaultServices());
+  const [projectDesc, setProjectDesc] = useState(
+    projectDescription || ''
   );
   const [tone, setTone] = useState<'formal' | 'casual'>('formal');
   const [length, setLength] = useState<'short' | 'long'>('short');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
 
   React.useEffect(() => {
-    if (initialClientId) {
-      const client = clients.find(c => c.id === initialClientId);
-      if (client) {
-        setSelectedClientId(initialClientId);
-        setSearchTerm(`${client.name} - ${client.company}`);
-      }
+    const defaultId = getDefaultClientId();
+    if (defaultId && defaultId !== selectedClientId) {
+      setSelectedClientId(defaultId);
     }
   }, [initialClientId, clients]);
 
-  const filteredClients = clients.filter(
-    client =>
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.company.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  React.useEffect(() => {
+    // Update description when project description changes
+    if (projectDescription) {
+      setProjectDesc(projectDescription);
+    }
+  }, [projectDescription]);
+
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
-
-  const handleClientSelect = (client: Client) => {
-    setSelectedClientId(client.id);
-    setSearchTerm(`${client.name} - ${client.company}`);
-    setShowDropdown(false);
-  };
-
-  const handleAddService = () => {
-    if (serviceInput.trim() && !services.includes(serviceInput.trim())) {
-      setServices([...services, serviceInput.trim()]);
-      setServiceInput('');
-    }
-  };
-
-  const handleRemoveService = (index: number) => {
-    setServices(services.filter((_, i) => i !== index));
-  };
 
   const handleGenerate = () => {
     console.log('handleGenerate in form called');
@@ -78,7 +76,7 @@ export const PitchBuilderForm: React.FC<PitchBuilderFormProps> = ({
     console.log('Calling onGenerate with:', {
       clientId: selectedClientId,
       services,
-      companyDescription,
+      companyDescription: projectDesc,
       tone,
       length
     });
@@ -86,7 +84,7 @@ export const PitchBuilderForm: React.FC<PitchBuilderFormProps> = ({
     onGenerate({
       clientId: selectedClientId,
       services,
-      companyDescription,
+      companyDescription: projectDesc,
       tone,
       length
     });
@@ -101,96 +99,39 @@ export const PitchBuilderForm: React.FC<PitchBuilderFormProps> = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          <div className="relative">
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Select Client
-            </label>
-            <Input
-              type="text"
-              placeholder="Search clients..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setShowDropdown(true);
-              }}
-              onFocus={() => setShowDropdown(true)}
-              disabled={!!initialClientId}
-            />
-            {showDropdown && filteredClients.length > 0 && !initialClientId && (
-              <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
-                {filteredClients.map(client => (
-                  <button
-                    key={client.id}
-                    onClick={() => handleClientSelect(client)}
-                    className="w-full text-left px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-b-0"
-                  >
-                    <p className="font-medium text-foreground">{client.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {client.company} • {client.role}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            )}
-            {selectedClient && (
-              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          {selectedClient && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Selected Client
+              </label>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
                 <p className="text-sm font-medium text-blue-900">{selectedClient.name}</p>
                 <p className="text-xs text-blue-700">
-                  {selectedClient.company} • {selectedClient.industry}
+                  {selectedClient.company} • {selectedClient.industry || selectedClient.role}
                 </p>
               </div>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Services to Pitch
-            </label>
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                placeholder="Enter service name..."
-                value={serviceInput}
-                onChange={(e) => setServiceInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddService();
-                  }
-                }}
-              />
-              <Button onClick={handleAddService} variant="outline">
-                Add
-              </Button>
             </div>
-            {services.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {services.map((service, index) => (
-                  <div
-                    key={index}
-                    className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
-                  >
-                    <span>{service}</span>
-                    <button
-                      onClick={() => handleRemoveService(index)}
-                      className="hover:text-primary/70"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+          )}
+
+          {services.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Services to Pitch
+              </label>
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm font-medium text-blue-900">{services[0]}</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">
-              Company Description
+              Description of Project
             </label>
             <textarea
-              value={companyDescription}
-              onChange={(e) => setCompanyDescription(e.target.value)}
-              placeholder="Describe your company..."
+              value={projectDesc}
+              onChange={(e) => setProjectDesc(e.target.value)}
+              placeholder="Describe the project..."
               className="w-full min-h-[100px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
             />
           </div>

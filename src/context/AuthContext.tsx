@@ -148,6 +148,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) throw error;
 
+      // Immediately check knowledge base status after successful sign-in
+      await checkKnowledgeBaseStatus();
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };

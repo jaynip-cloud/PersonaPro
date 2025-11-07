@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Logo } from '../components/ui/Logo';
+import { ArrowLeft, CheckCircle } from 'lucide-react';
 
 export const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -95,10 +96,10 @@ export const ForgotPassword: React.FC = () => {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-              <Mail className="w-8 h-8 text-white" />
+            <div className="flex justify-center mb-4">
+              <Logo size="lg" theme="light" />
             </div>
-            <h1 className="text-3xl font-bold text-slate-900">Forgot Password?</h1>
+            <h1 className="text-3xl font-bold text-slate-900 mt-2">Forgot Password?</h1>
             <p className="text-slate-600 mt-2">
               No worries! Enter your email address and we'll send you a link to reset your password.
             </p>

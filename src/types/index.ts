@@ -12,6 +12,7 @@ export interface Client {
   lastContact: string;
   nextFollowUp?: string;
   personaScore: number;
+  fitScore: number;
   tags: string[];
   createdAt: string;
   location?: string;

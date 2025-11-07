@@ -5,12 +5,13 @@ import {
   Users,
   Briefcase,
   Settings,
-  Sparkles,
   BookOpen,
   History,
   TrendingUp,
 } from 'lucide-react';
 import { ComingSoonModal } from '../ui/ComingSoonModal';
+import { Logo } from '../ui/Logo';
+import { useApp } from '../../context/AppContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, comingSoon: false },
@@ -23,6 +24,7 @@ const navigation = [
 ];
 
 export const Sidebar: React.FC = () => {
+  const { theme } = useApp();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState('');
 
@@ -39,8 +41,7 @@ export const Sidebar: React.FC = () => {
       <aside className="fixed left-0 top-0 z-40 h-screen w-60 bg-sidebar border-r border-sidebar-border">
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-            <Sparkles className="h-6 w-6 text-sidebar-primary" />
-            <span className="text-xl font-bold text-sidebar-foreground font-serif">PersonaPro</span>
+            <Logo size="lg" theme={theme} />
           </div>
 
           <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">

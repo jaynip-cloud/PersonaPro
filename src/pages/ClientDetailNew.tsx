@@ -25,6 +25,7 @@ import { useToast } from '../components/ui/Toast';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { semanticSearch } from '../utils/documentEmbeddings';
+import { vectorizeMeetingTranscript } from '../utils/transcriptEmbeddings';
 
 export const ClientDetailNew: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -106,6 +107,45 @@ export const ClientDetailNew: React.FC = () => {
       loadClientData();
     }
   }, [id, user]);
+
+  // Reload contacts when switching to relationships tab
+  useEffect(() => {
+    if (activeTab === 'relationships' && id && user && !isLoading) {
+      loadContacts();
+    }
+  }, [activeTab, id, user]);
+
+  const loadContacts = async () => {
+    if (!id || !user) return;
+
+    try {
+      const { data: contactsData, error: contactsError } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('client_id', id)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!contactsError && contactsData) {
+        setContacts(contactsData.map(c => ({
+          id: c.id,
+          clientId: c.client_id || '',
+          name: c.name,
+          email: c.email,
+          phone: c.phone || undefined,
+          role: c.role,
+          department: c.department || undefined,
+          isPrimary: c.is_primary,
+          isDecisionMaker: c.is_decision_maker,
+          influenceLevel: c.influence_level as 'high' | 'medium' | 'low' | undefined,
+          source: c.source || undefined,
+          lastContact: c.last_contact || undefined,
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading contacts:', error);
+    }
+  };
 
   const loadClientData = async () => {
     if (!user) return;
@@ -276,6 +316,14 @@ export const ClientDetailNew: React.FC = () => {
           setMeetingTranscripts(prev =>
             prev.map(t => t.id === editingTranscriptId ? data[0] : t)
           );
+          
+          // Vectorize the updated transcript
+          try {
+            await vectorizeMeetingTranscript(editingTranscriptId, { clientId: client.id });
+          } catch (vectorizeError) {
+            console.error('Error vectorizing transcript:', vectorizeError);
+            // Don't fail the save operation if vectorization fails
+          }
         }
 
         showToast('success', 'Meeting transcript updated successfully');
@@ -298,6 +346,14 @@ export const ClientDetailNew: React.FC = () => {
 
         if (data) {
           setMeetingTranscripts(prev => [data, ...prev]);
+          
+          // Vectorize the new transcript
+          try {
+            await vectorizeMeetingTranscript(data.id, { clientId: client.id });
+          } catch (vectorizeError) {
+            console.error('Error vectorizing transcript:', vectorizeError);
+            // Don't fail the save operation if vectorization fails
+          }
         }
 
         showToast('success', 'Meeting transcript saved successfully');
@@ -628,20 +684,8 @@ export const ClientDetailNew: React.FC = () => {
       if (error) throw error;
 
       if (data) {
-        setContacts([...contacts, {
-          id: data.id,
-          clientId: data.client_id || '',
-          name: data.name,
-          email: data.email,
-          phone: data.phone || undefined,
-          role: data.role,
-          department: data.department || undefined,
-          isPrimary: data.is_primary,
-          isDecisionMaker: data.is_decision_maker,
-          influenceLevel: data.influence_level as 'high' | 'medium' | 'low' | undefined,
-          source: data.source || undefined,
-          lastContact: data.last_contact || undefined,
-        }]);
+        // Reload contacts from database to ensure consistency
+        await loadContacts();
 
         setNewContactForm({
           name: '',
@@ -1218,9 +1262,9 @@ Client Information:
             </div>
             ) : (
               <Card>
-                <CardContent className="p-6 text-center">
-                  <p className="text-muted-foreground">No financial data available for this client.</p>
-                </CardContent>
+                {/* <CardContent className="p-6 text-center"> */}
+                  {/* <p className="text-muted-foreground">No financial data available for this client.</p> */}
+                {/* </CardContent> */}
               </Card>
             )}
 
@@ -1608,9 +1652,9 @@ Client Information:
                                       project.status === 'in_progress' ? 50 :
                                       project.status === 'quote' ? 75 :
                                       project.status === 'win' ? 100 :
-                                      project.status === 'loss' ? 0 :
+                                      project.status === 'loss' ? 100 :
                                       project.status === 'completed' ? 100 : 0;
-                                    return (project.progress_percentage !== null && project.progress_percentage !== undefined && project.progress_percentage > 0)
+                                    return (project.progress_percentage !== null && project.progress_percentage !== undefined && project.progress_percentage > 0 && project.status !== 'loss')
                                       ? project.progress_percentage
                                       : calculatedProgress;
                                   })()}%
@@ -1618,7 +1662,11 @@ Client Information:
                               </div>
                               <div className="h-2 bg-muted rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-primary rounded-full transition-all duration-300"
+                                  className={`h-full rounded-full transition-all duration-300 ${
+                                    project.status === 'loss' ? 'bg-red-500' :
+                                    project.status === 'win' ? 'bg-green-500' :
+                                    'bg-primary'
+                                  }`}
                                   style={{ width: `${(() => {
                                     const calculatedProgress =
                                       project.status === 'opportunity_identified' ? 10 :
@@ -1626,9 +1674,9 @@ Client Information:
                                       project.status === 'in_progress' ? 50 :
                                       project.status === 'quote' ? 75 :
                                       project.status === 'win' ? 100 :
-                                      project.status === 'loss' ? 0 :
+                                      project.status === 'loss' ? 100 :
                                       project.status === 'completed' ? 100 : 0;
-                                    return (project.progress_percentage !== null && project.progress_percentage !== undefined && project.progress_percentage > 0)
+                                    return (project.progress_percentage !== null && project.progress_percentage !== undefined && project.progress_percentage > 0 && project.status !== 'loss')
                                       ? project.progress_percentage
                                       : calculatedProgress;
                                   })()}%` }}

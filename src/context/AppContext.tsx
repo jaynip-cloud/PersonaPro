@@ -165,7 +165,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           location: client.location || (client.city && client.country ? `${client.city}, ${client.country}` : client.city || client.country || ''),
           founded: client.founded || '',
           personaScore: client.persona_score || 0,
-          fitScore: 0,
+          fitScore: client.fit_score ?? 90,
           cooperationIndex: 0,
           sentiment: 'positive',
           lastInteraction: client.created_at,

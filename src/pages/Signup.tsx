@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { UserPlus } from 'lucide-react';
+import { Logo } from '../components/ui/Logo';
 
 export const Signup: React.FC = () => {
   const [fullName, setFullName] = useState('');
@@ -63,8 +63,8 @@ export const Signup: React.FC = () => {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-              <UserPlus className="w-8 h-8 text-white" />
+            <div className="mb-0 w-full">
+              <Logo size="xl" theme="light" />
             </div>
             <h1 className="text-3xl font-bold text-slate-900">Create Account</h1>
             {/* <p className="text-slate-600 mt-2">Get started with your free account</p> */}

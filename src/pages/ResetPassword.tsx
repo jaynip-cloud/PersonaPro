@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Lock, CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
+import { Logo } from '../components/ui/Logo';
+import { CheckCircle, XCircle, ArrowLeft } from 'lucide-react';
 
 export const ResetPassword: React.FC = () => {
   const [password, setPassword] = useState('');
@@ -149,10 +150,10 @@ export const ResetPassword: React.FC = () => {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4">
-              <Lock className="w-8 h-8 text-white" />
+            <div className="flex justify-center mb-4">
+              <Logo size="lg" theme="light" />
             </div>
-            <h1 className="text-3xl font-bold text-slate-900">Reset Password</h1>
+            <h1 className="text-3xl font-bold text-slate-900 mt-2">Reset Password</h1>
             <p className="text-slate-600 mt-2">
               Enter your new password below
             </p>

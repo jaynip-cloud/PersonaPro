@@ -156,12 +156,16 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     const progressPromise = simulateClientProgress();
 
     try {
+      // Get user session token for proper authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY;
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-company-data`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${authToken}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ url: urlToExtract })
@@ -188,44 +192,100 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
       setExtractionProgress(100);
 
       if (data.success && data.data) {
-        const updates: any = {};
+        // Use functional update to ensure we're working with the latest state
+        setFormData(prev => {
+          const updates: any = {};
 
-        if (data.data.name && !formData.company) updates.company = data.data.name;
-        if (data.data.industry && !formData.industry) updates.industry = data.data.industry;
-        if (data.data.description && !formData.companyOverview) updates.companyOverview = data.data.description;
-        if (data.data.founded && !formData.founded) updates.founded = data.data.founded;
-        if (data.data.companySize && !formData.companySize) updates.companySize = data.data.companySize;
+          // Only update fields that are empty or missing
+          if (data.data.name && !prev.company?.trim()) {
+            updates.company = data.data.name;
+          }
+          if (data.data.industry && !prev.industry?.trim()) {
+            updates.industry = data.data.industry;
+          }
+          if (data.data.description && !prev.companyOverview?.trim()) {
+            updates.companyOverview = data.data.description;
+          }
+          if (data.data.founded && !prev.founded?.trim()) {
+            updates.founded = data.data.founded;
+          }
+          if (data.data.companySize && !prev.companySize?.trim()) {
+            updates.companySize = data.data.companySize;
+          }
 
-        if (data.data.location?.city && !formData.city) updates.city = data.data.location.city;
-        if (data.data.location?.country && !formData.country) updates.country = data.data.location.country;
-        if (data.data.location?.zipCode && !formData.zipCode) updates.zipCode = data.data.location.zipCode;
+          if (data.data.location?.city && !prev.city?.trim()) {
+            updates.city = data.data.location.city;
+          }
+          if (data.data.location?.country && !prev.country?.trim()) {
+            updates.country = data.data.location.country;
+          }
+          if (data.data.location?.zipCode && !prev.zipCode?.trim()) {
+            updates.zipCode = data.data.location.zipCode;
+          }
 
-        if (data.data.contactInfo?.contactName && !formData.contactName) updates.contactName = data.data.contactInfo.contactName;
-        if (data.data.contactInfo?.jobTitle && !formData.jobTitle) updates.jobTitle = data.data.contactInfo.jobTitle;
-        if (data.data.contactInfo?.primaryEmail && !formData.primaryEmail) updates.primaryEmail = data.data.contactInfo.primaryEmail;
-        if (data.data.contactInfo?.alternateEmail && !formData.alternateEmail) updates.alternateEmail = data.data.contactInfo.alternateEmail;
-        if (data.data.contactInfo?.primaryPhone && !formData.primaryPhone) updates.primaryPhone = data.data.contactInfo.primaryPhone;
-        if (data.data.contactInfo?.alternatePhone && !formData.alternatePhone) updates.alternatePhone = data.data.contactInfo.alternatePhone;
+          if (data.data.contactInfo?.contactName && !prev.contactName?.trim()) {
+            updates.contactName = data.data.contactInfo.contactName;
+          }
+          if (data.data.contactInfo?.jobTitle && !prev.jobTitle?.trim()) {
+            updates.jobTitle = data.data.contactInfo.jobTitle;
+          }
+          if (data.data.contactInfo?.primaryEmail && !prev.primaryEmail?.trim()) {
+            updates.primaryEmail = data.data.contactInfo.primaryEmail;
+          }
+          if (data.data.contactInfo?.alternateEmail && !prev.alternateEmail?.trim()) {
+            updates.alternateEmail = data.data.contactInfo.alternateEmail;
+          }
+          if (data.data.contactInfo?.primaryPhone && !prev.primaryPhone?.trim()) {
+            updates.primaryPhone = data.data.contactInfo.primaryPhone;
+          }
+          if (data.data.contactInfo?.alternatePhone && !prev.alternatePhone?.trim()) {
+            updates.alternatePhone = data.data.contactInfo.alternatePhone;
+          }
 
-        if (data.data.businessInfo?.shortTermGoals && !formData.shortTermGoals) updates.shortTermGoals = data.data.businessInfo.shortTermGoals;
-        if (data.data.businessInfo?.longTermGoals && !formData.longTermGoals) updates.longTermGoals = data.data.businessInfo.longTermGoals;
-        if (data.data.businessInfo?.expectations && !formData.expectations) updates.expectations = data.data.businessInfo.expectations;
-        if (data.data.description && !formData.description) updates.description = data.data.description;
+          if (data.data.businessInfo?.shortTermGoals && !prev.shortTermGoals?.trim()) {
+            updates.shortTermGoals = data.data.businessInfo.shortTermGoals;
+          }
+          if (data.data.businessInfo?.longTermGoals && !prev.longTermGoals?.trim()) {
+            updates.longTermGoals = data.data.businessInfo.longTermGoals;
+          }
+          if (data.data.businessInfo?.expectations && !prev.expectations?.trim()) {
+            updates.expectations = data.data.businessInfo.expectations;
+          }
+          if (data.data.description && !prev.description?.trim()) {
+            updates.description = data.data.description;
+          }
 
-        if (data.data.socialProfiles?.linkedin && !formData.linkedinUrl) updates.linkedinUrl = data.data.socialProfiles.linkedin;
-        if (data.data.socialProfiles?.twitter && !formData.twitterUrl) updates.twitterUrl = data.data.socialProfiles.twitter;
-        if (data.data.socialProfiles?.facebook && !formData.facebookUrl) updates.facebookUrl = data.data.socialProfiles.facebook;
-        if (data.data.socialProfiles?.instagram && !formData.instagramUrl) updates.instagramUrl = data.data.socialProfiles.instagram;
+          if (data.data.socialProfiles?.linkedin && !prev.linkedinUrl?.trim()) {
+            updates.linkedinUrl = data.data.socialProfiles.linkedin;
+          }
+          if (data.data.socialProfiles?.twitter && !prev.twitterUrl?.trim()) {
+            updates.twitterUrl = data.data.socialProfiles.twitter;
+          }
+          if (data.data.socialProfiles?.facebook && !prev.facebookUrl?.trim()) {
+            updates.facebookUrl = data.data.socialProfiles.facebook;
+          }
+          if (data.data.socialProfiles?.instagram && !prev.instagramUrl?.trim()) {
+            updates.instagramUrl = data.data.socialProfiles.instagram;
+          }
 
-        if (data.data.logo && !formData.logoUrl) updates.logoUrl = data.data.logo;
+          if (data.data.logo && !prev.logoUrl?.trim()) {
+            updates.logoUrl = data.data.logo;
+          }
 
-
-        if (Object.keys(updates).length > 0) {
-          setFormData(prev => ({ ...prev, ...updates }));
-          alert(`Successfully populated ${Object.keys(updates).length} fields with company data!`);
-        } else {
-          alert('No new data found to populate. All fields are already filled or no data was available.');
-        }
+          // Return updated state only if there are changes
+          if (Object.keys(updates).length > 0) {
+            // Store update count for alert
+            const updateCount = Object.keys(updates).length;
+            setTimeout(() => {
+              alert(`Successfully populated ${updateCount} fields with company data!`);
+            }, 100);
+            return { ...prev, ...updates };
+          }
+          setTimeout(() => {
+            alert('No new data found to populate. All fields are already filled or no data was available.');
+          }, 100);
+          return prev; // Return unchanged state
+        });
       } else {
         alert('No company data could be extracted from the website.');
       }
@@ -437,19 +497,18 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
           <p className="text-slate-600">
             Let's get you started by adding your first client
           </p>
-          <div className="mt-4 flex gap-2">
-            {[1, 2, 3, 4, 5].map((step) => (
-              <div
-                key={step}
-                className={`h-1.5 flex-1 rounded-full ${
-                  step <= currentStep ? 'bg-blue-600' : 'bg-slate-200'
-                }`}
-              />
-            ))}
-          </div>
-          <p className="text-sm text-slate-500 mt-2">
+          <p className="text-center text-slate-600 mt-2">
             Step {currentStep} of {totalSteps}
           </p>
+        </div>
+
+        <div className="mb-6">
+          <div className="w-full bg-slate-200 rounded-full h-1.5">
+            <div
+              className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+              style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+            />
+          </div>
         </div>
 
         <div className="space-y-6 max-h-[60vh] overflow-y-auto">
