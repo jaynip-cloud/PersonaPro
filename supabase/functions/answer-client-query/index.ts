@@ -10,6 +10,264 @@ interface QueryRequest {
   query: string;
   clientId: string;
   mode?: 'quick' | 'deep';
+  conversationHistory?: Array<{ role: string; content: string }>;
+}
+
+interface QueryIntent {
+  type: 'factual' | 'analytical' | 'comparative' | 'recommendation' | 'exploratory';
+  topics: string[];
+  timeframe?: 'recent' | 'historical' | 'all';
+}
+
+function analyzeQueryIntent(query: string): QueryIntent {
+  const lowerQuery = query.toLowerCase();
+
+  let type: QueryIntent['type'] = 'factual';
+  const topics: string[] = [];
+  let timeframe: QueryIntent['timeframe'] = 'all';
+
+  // Intent detection
+  if (lowerQuery.match(/why|how|explain|analyze|understand|reason/)) {
+    type = 'analytical';
+  } else if (lowerQuery.match(/compare|versus|vs|difference|similar|contrast/)) {
+    type = 'comparative';
+  } else if (lowerQuery.match(/recommend|suggest|should|best|advice|what if/)) {
+    type = 'recommendation';
+  } else if (lowerQuery.match(/explore|possibilities|potential|opportunities/)) {
+    type = 'exploratory';
+  }
+
+  // Topic detection
+  if (lowerQuery.match(/pain point|problem|challenge|issue|concern/)) topics.push('challenges');
+  if (lowerQuery.match(/opportunity|growth|upsell|expansion/)) topics.push('opportunities');
+  if (lowerQuery.match(/meeting|discussion|call|conversation/)) topics.push('meetings');
+  if (lowerQuery.match(/contact|person|people|team|who/)) topics.push('contacts');
+  if (lowerQuery.match(/technology|tech stack|tools|software/)) topics.push('technology');
+  if (lowerQuery.match(/budget|cost|price|revenue|financial/)) topics.push('financial');
+  if (lowerQuery.match(/timeline|when|schedule|deadline/)) topics.push('timeline');
+  if (lowerQuery.match(/competitor|competition|market/)) topics.push('market');
+  if (lowerQuery.match(/service|solution|product|offering/)) topics.push('services');
+
+  // Timeframe detection
+  if (lowerQuery.match(/recent|latest|last|current|now/)) timeframe = 'recent';
+  if (lowerQuery.match(/historical|past|previous|history|over time/)) timeframe = 'historical';
+
+  return { type, topics, timeframe };
+}
+
+function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): string {
+  const { client, companyProfile, contacts, transcripts, opportunities, documentMatches } = data;
+  const contextParts = [];
+
+  // Strategic context based on intent
+  if (intent.type === 'recommendation' || intent.type === 'analytical') {
+    contextParts.push('=== STRATEGIC CONTEXT ===');
+  }
+
+  // Company profile - Always include key info
+  if (companyProfile) {
+    const companySection = [];
+    companySection.push('YOUR COMPANY PROFILE:');
+    companySection.push(`Name: ${companyProfile.company_name || 'N/A'}`);
+    companySection.push(`Industry: ${companyProfile.industry || 'N/A'}`);
+
+    if (companyProfile.value_proposition) {
+      companySection.push(`Value Proposition: ${companyProfile.value_proposition}`);
+    }
+
+    if (companyProfile.services && Array.isArray(companyProfile.services) && companyProfile.services.length > 0) {
+      const services = companyProfile.services.slice(0, 5).map((s: any) =>
+        `  • ${s.name || s.title || s}: ${s.description || ''}`
+      ).join('\n');
+      companySection.push(`\nYour Services:\n${services}`);
+    }
+
+    if (intent.topics.includes('services') && companyProfile.case_studies && Array.isArray(companyProfile.case_studies)) {
+      const caseStudies = companyProfile.case_studies.slice(0, 3).map((cs: any, i: number) =>
+        `  ${i + 1}. ${cs.title || 'Untitled'}\n     ${cs.description || ''}\n     Results: ${cs.results || 'N/A'}`
+      ).join('\n');
+      companySection.push(`\nRelevant Case Studies:\n${caseStudies}`);
+    }
+
+    contextParts.push(companySection.join('\n'));
+  }
+
+  // Client profile - Enhanced with relevant fields
+  const clientSection = [];
+  clientSection.push('\n=== CLIENT PROFILE ===');
+  clientSection.push(`Company: ${client.company || 'N/A'}`);
+  clientSection.push(`Industry: ${client.industry || 'N/A'}`);
+  clientSection.push(`Status: ${client.status || 'N/A'}`);
+
+  if (client.description) {
+    clientSection.push(`About: ${client.description}`);
+  }
+
+  if (intent.topics.includes('financial') || intent.topics.includes('opportunities')) {
+    if (client.annual_revenue) clientSection.push(`Revenue: ${client.annual_revenue}`);
+    if (client.employee_count) clientSection.push(`Employees: ${client.employee_count}`);
+  }
+
+  if (intent.topics.includes('technology') && client.technologies) {
+    clientSection.push(`Technologies: ${Array.isArray(client.technologies) ? client.technologies.join(', ') : client.technologies}`);
+  }
+
+  if (client.ai_insights) {
+    try {
+      const insights = typeof client.ai_insights === 'string'
+        ? JSON.parse(client.ai_insights)
+        : client.ai_insights;
+
+      if (insights.pain_points || insights.priorities || insights.goals) {
+        clientSection.push('\nKey AI Insights:');
+        if (insights.pain_points) clientSection.push(`  Pain Points: ${Array.isArray(insights.pain_points) ? insights.pain_points.join('; ') : insights.pain_points}`);
+        if (insights.priorities) clientSection.push(`  Priorities: ${Array.isArray(insights.priorities) ? insights.priorities.join('; ') : insights.priorities}`);
+        if (insights.goals) clientSection.push(`  Goals: ${Array.isArray(insights.goals) ? insights.goals.join('; ') : insights.goals}`);
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
+  }
+
+  contextParts.push(clientSection.join('\n'));
+
+  // Contacts - Prioritize decision makers
+  if (contacts && contacts.length > 0 && (intent.topics.includes('contacts') || mode === 'deep')) {
+    const decisionMakers = contacts.filter((c: any) => c.is_decision_maker);
+    const primaryContacts = contacts.filter((c: any) => c.is_primary);
+    const otherContacts = contacts.filter((c: any) => !c.is_decision_maker && !c.is_primary);
+
+    const contactsSection = ['\n=== KEY CONTACTS ==='];
+
+    if (decisionMakers.length > 0) {
+      contactsSection.push('Decision Makers:');
+      decisionMakers.forEach((c: any) => {
+        contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
+        contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
+        if (c.influence_level) contactsSection.push(`    Influence: ${c.influence_level}`);
+      });
+    }
+
+    if (primaryContacts.length > 0) {
+      contactsSection.push('\nPrimary Contacts:');
+      primaryContacts.forEach((c: any) => {
+        contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
+        contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
+      });
+    }
+
+    if (mode === 'deep' && otherContacts.length > 0) {
+      contactsSection.push('\nOther Contacts:');
+      otherContacts.slice(0, 3).forEach((c: any) => {
+        contactsSection.push(`  • ${c.name} - ${c.role}${c.email ? ` (${c.email})` : ''}`);
+      });
+    }
+
+    contextParts.push(contactsSection.join('\n'));
+  }
+
+  // Meeting transcripts - Prioritize by timeframe and relevance
+  if (transcripts && transcripts.length > 0) {
+    const transcriptsSection = ['\n=== MEETING HISTORY ==='];
+
+    transcripts.forEach((t: any, i: number) => {
+      const date = new Date(t.meeting_date).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+
+      transcriptsSection.push(`\nMeeting ${i + 1}: ${t.title} (${date})`);
+
+      if (t.sentiment) {
+        transcriptsSection.push(`Sentiment: ${t.sentiment}`);
+      }
+
+      if (t.action_items && Array.isArray(t.action_items) && t.action_items.length > 0) {
+        transcriptsSection.push(`Action Items: ${t.action_items.join('; ')}`);
+      }
+
+      const maxLength = mode === 'deep' ? 3000 : (intent.topics.includes('meetings') ? 1200 : 600);
+      const transcript = t.transcript_text || '';
+      transcriptsSection.push(`Content: ${transcript.substring(0, maxLength)}${transcript.length > maxLength ? '...' : ''}`);
+    });
+
+    contextParts.push(transcriptsSection.join('\n'));
+  }
+
+  // Document matches - Semantic search results
+  if (documentMatches && documentMatches.length > 0) {
+    const docMatches = documentMatches.filter((doc: any) => doc.source_type !== 'meeting_transcript');
+    const transcriptMatches = documentMatches.filter((doc: any) => doc.source_type === 'meeting_transcript');
+
+    if (docMatches.length > 0) {
+      const docsSection = ['\n=== RELEVANT DOCUMENTS ==='];
+      docMatches.forEach((doc: any, i: number) => {
+        docsSection.push(`\n[Document ${i + 1}] ${doc.document_name} (${(doc.similarity * 100).toFixed(1)}% relevant)`);
+        docsSection.push(doc.content_chunk);
+      });
+      contextParts.push(docsSection.join('\n'));
+    }
+
+    if (transcriptMatches.length > 0 && mode === 'quick') {
+      const transcriptSection = ['\n=== RELEVANT MEETING EXCERPTS ==='];
+      transcriptMatches.forEach((doc: any, i: number) => {
+        transcriptSection.push(`\n[Excerpt ${i + 1}] From: ${doc.document_name} (${(doc.similarity * 100).toFixed(1)}% relevant)`);
+        transcriptSection.push(doc.content_chunk);
+      });
+      contextParts.push(transcriptSection.join('\n'));
+    }
+  }
+
+  // Opportunities - Show if relevant
+  if (opportunities && opportunities.length > 0 && (intent.topics.includes('opportunities') || intent.type === 'recommendation')) {
+    const oppsSection = ['\n=== IDENTIFIED OPPORTUNITIES ==='];
+    opportunities.slice(0, 5).forEach((opp: any, i: number) => {
+      oppsSection.push(`\n${i + 1}. ${opp.title}`);
+      oppsSection.push(`   Status: ${opp.status || 'N/A'}`);
+      oppsSection.push(`   ${opp.description}`);
+      if (opp.estimated_value) oppsSection.push(`   Est. Value: ${opp.estimated_value}`);
+    });
+    contextParts.push(oppsSection.join('\n'));
+  }
+
+  return contextParts.join('\n\n');
+}
+
+function buildEnhancedPrompt(intent: QueryIntent, mode: string): string {
+  const basePrompt = `You are an expert business intelligence assistant analyzing client data to provide accurate, actionable insights.
+
+Your role is to help account managers understand their clients better and make informed decisions.`;
+
+  const intentSpecificGuidance: Record<string, string> = {
+    'factual': 'Provide clear, direct answers based on the data. Cite specific sources.',
+    'analytical': 'Analyze patterns and provide deep insights. Explain the "why" behind observations.',
+    'comparative': 'Make clear comparisons and highlight key differences or similarities.',
+    'recommendation': 'Provide strategic recommendations with reasoning and specific action items.',
+    'exploratory': 'Explore possibilities and potential scenarios. Think creatively about opportunities.',
+  };
+
+  const guidelines = [
+    '• Base all answers strictly on the provided data - never make assumptions',
+    '• Always cite your sources (e.g., "According to the meeting on June 15..." or "Based on the uploaded proposal document...")',
+    '• Be specific with numbers, dates, names, and quotes when available',
+    '• If information is missing or unclear, explicitly state what data would be needed',
+    `• ${intentSpecificGuidance[intent.type]}`,
+  ];
+
+  if (intent.topics.length > 0) {
+    guidelines.push(`• Focus on: ${intent.topics.join(', ')}`);
+  }
+
+  if (mode === 'deep') {
+    guidelines.push('• Provide comprehensive analysis with multiple perspectives');
+    guidelines.push('• Include relevant context and background information');
+  } else {
+    guidelines.push('• Keep responses concise and focused');
+    guidelines.push('• Prioritize the most important information');
+  }
+
+  return `${basePrompt}\n\n${guidelines.join('\n')}`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -41,7 +299,7 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unauthorized');
     }
 
-    const { query, clientId, mode = 'quick' }: QueryRequest = await req.json();
+    const { query, clientId, mode = 'quick', conversationHistory = [] }: QueryRequest = await req.json();
 
     if (!query || !clientId) {
       throw new Error('query and clientId are required');
@@ -52,47 +310,34 @@ Deno.serve(async (req: Request) => {
       throw new Error('OpenAI API key not configured. Please add it in Settings.');
     }
 
-    // Fetch client data
-    const { data: client, error: clientError } = await supabaseClient
-      .from('clients')
-      .select('*')
-      .eq('id', clientId)
-      .eq('user_id', user.id)
-      .single();
+    // Analyze query intent
+    const intent = analyzeQueryIntent(query);
+    console.log('Query intent:', intent);
 
-    if (clientError || !client) {
+    // Fetch all data in parallel for better performance
+    const [
+      clientResult,
+      companyProfileResult,
+      contactsResult,
+      transcriptsResult,
+      opportunitiesResult,
+    ] = await Promise.all([
+      supabaseClient.from('clients').select('*').eq('id', clientId).eq('user_id', user.id).single(),
+      supabaseClient.from('company_profiles').select('*').eq('user_id', user.id).single(),
+      supabaseClient.from('contacts').select('*').eq('client_id', clientId).eq('user_id', user.id),
+      supabaseClient.from('meeting_transcripts').select('*').eq('client_id', clientId).eq('user_id', user.id).order('meeting_date', { ascending: false }).limit(mode === 'deep' ? 5 : 3),
+      supabaseClient.from('opportunities').select('*').eq('client_id', clientId).eq('user_id', user.id),
+    ]);
+
+    if (clientResult.error || !clientResult.data) {
       throw new Error('Client not found');
     }
 
-    // Fetch company profile
-    const { data: companyProfile } = await supabaseClient
-      .from('company_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    // Fetch contacts
-    const { data: contacts } = await supabaseClient
-      .from('contacts')
-      .select('*')
-      .eq('client_id', clientId)
-      .eq('user_id', user.id);
-
-    // Fetch meeting transcripts
-    const { data: transcripts } = await supabaseClient
-      .from('meeting_transcripts')
-      .select('*')
-      .eq('client_id', clientId)
-      .eq('user_id', user.id)
-      .order('meeting_date', { ascending: false })
-      .limit(mode === 'deep' ? 5 : 2);
-
-    // Fetch opportunities
-    const { data: opportunities } = await supabaseClient
-      .from('opportunities')
-      .select('*')
-      .eq('client_id', clientId)
-      .eq('user_id', user.id);
+    const client = clientResult.data;
+    const companyProfile = companyProfileResult.data;
+    const contacts = contactsResult.data || [];
+    const transcripts = transcriptsResult.data || [];
+    const opportunities = opportunitiesResult.data || [];
 
     // Generate embedding for semantic search
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -114,137 +359,49 @@ Deno.serve(async (req: Request) => {
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
 
-    // Perform semantic search on documents
-    const searchLimit = mode === 'deep' ? 10 : 5;
+    // Perform semantic search with adaptive threshold
+    const searchLimit = mode === 'deep' ? 15 : 8;
+    const similarityThreshold = intent.type === 'factual' ? 0.75 : 0.65; // Higher threshold for factual queries
+
     const { data: documentMatches } = await supabaseClient.rpc('match_documents', {
       query_embedding: queryEmbedding,
-      match_threshold: mode === 'deep' ? 0.6 : 0.7,
+      match_threshold: similarityThreshold,
       match_count: searchLimit,
       filter_user_id: user.id,
       filter_client_id: clientId,
     });
 
-    // Build comprehensive context
-    const contextParts = [];
+    // Build enhanced context
+    const contextData = {
+      client,
+      companyProfile,
+      contacts,
+      transcripts,
+      opportunities,
+      documentMatches: documentMatches || [],
+    };
 
-    // Company information
-    if (companyProfile) {
-      contextParts.push(`YOUR COMPANY INFORMATION:
-Company: ${companyProfile.company_name || 'N/A'}
-Industry: ${companyProfile.industry || 'N/A'}
-About: ${companyProfile.about || 'N/A'}
-Value Proposition: ${companyProfile.value_proposition || 'N/A'}
-Mission: ${companyProfile.mission || 'N/A'}
-Services: ${companyProfile.services ? JSON.stringify(companyProfile.services).substring(0, 500) : 'N/A'}`);
+    const fullContext = buildEnhancedContext(contextData, intent, mode);
+    const systemPrompt = buildEnhancedPrompt(intent, mode);
 
-      if (companyProfile.case_studies && Array.isArray(companyProfile.case_studies)) {
-        const caseStudiesText = companyProfile.case_studies.slice(0, 3).map((cs: any, i: number) =>
-          `${i + 1}. ${cs.title || 'Untitled'}: ${cs.description || ''}`
-        ).join('\n');
-        contextParts.push(`\nYOUR CASE STUDIES:\n${caseStudiesText}`);
-      }
+    // Build conversation with context
+    const messages: any[] = [
+      { role: 'system', content: systemPrompt },
+    ];
+
+    // Include recent conversation history for context
+    if (conversationHistory.length > 0) {
+      const recentHistory = conversationHistory.slice(-4); // Last 2 exchanges
+      messages.push(...recentHistory);
     }
 
-    // Client information
-    contextParts.push(`\nCLIENT INFORMATION:
-Company: ${client.company || 'N/A'}
-Industry: ${client.industry || 'N/A'}
-Status: ${client.status || 'N/A'}
-Location: ${client.location || 'N/A'}
-Email: ${client.email || 'N/A'}
-Phone: ${client.phone || 'N/A'}
-Website: ${client.website || 'N/A'}
-Description: ${client.description || 'N/A'}
-Annual Revenue: ${client.annual_revenue || 'N/A'}
-Employee Count: ${client.employee_count || 'N/A'}
-Technologies: ${client.technologies ? client.technologies.join(', ') : 'N/A'}`);
+    // Add current query with context
+    messages.push({
+      role: 'user',
+      content: `CLIENT DATA:\n${fullContext}\n\n---\n\nQUESTION: ${query}\n\nProvide a thorough, accurate answer based solely on the data above.`,
+    });
 
-    // AI Insights
-    if (client.ai_insights) {
-      contextParts.push(`\nCLIENT AI INSIGHTS: ${JSON.stringify(client.ai_insights).substring(0, 800)}`);
-    }
-
-    // Contacts
-    if (contacts && contacts.length > 0) {
-      const contactsText = contacts.map((c: any) =>
-        `• ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''} - ${c.email}${c.is_decision_maker ? ' [Decision Maker]' : ''}`
-      ).join('\n');
-      contextParts.push(`\nCLIENT CONTACTS:\n${contactsText}`);
-    }
-
-    // Meeting transcripts - Include FULL transcripts in deep mode
-    if (transcripts && transcripts.length > 0) {
-      if (mode === 'deep') {
-        // In deep mode, include full or large portions of transcripts
-        const transcriptsText = transcripts.map((t: any, i: number) =>
-          `${i + 1}. ${t.title} (${new Date(t.meeting_date).toLocaleDateString()}):\n${t.transcript_text.substring(0, 3000)}${t.transcript_text.length > 3000 ? '...' : ''}`
-        ).join('\n\n');
-        contextParts.push(`\nMEETING TRANSCRIPTS (${transcripts.length} meetings - FULL CONTENT):\n${transcriptsText}`);
-      } else {
-        // In quick mode, include summaries
-        const transcriptsText = transcripts.map((t: any, i: number) =>
-          `${i + 1}. ${t.title} (${new Date(t.meeting_date).toLocaleDateString()}):\n${t.transcript_text.substring(0, 600)}...`
-        ).join('\n\n');
-        contextParts.push(`\nMEETING TRANSCRIPTS (${transcripts.length} meetings):\n${transcriptsText}`);
-      }
-    }
-
-    // Document matches from semantic search (includes both documents and transcript embeddings)
-    if (documentMatches && documentMatches.length > 0) {
-      // Separate documents from transcript embeddings
-      const docMatches = documentMatches.filter((doc: any) =>
-        doc.source_type !== 'meeting_transcript'
-      );
-      const transcriptMatches = documentMatches.filter((doc: any) =>
-        doc.source_type === 'meeting_transcript'
-      );
-
-      if (docMatches.length > 0) {
-        const docsText = docMatches.map((doc: any, i: number) =>
-          `[${i + 1}] ${doc.content_chunk} (from ${doc.document_name}, ${(doc.similarity * 100).toFixed(1)}% relevant)`
-        ).join('\n\n');
-        contextParts.push(`\nRELEVANT DOCUMENTS (${docMatches.length} matches):\n${docsText}`);
-      }
-
-      if (transcriptMatches.length > 0 && mode === 'quick') {
-        // Only show transcript matches in quick mode (deep mode already has full transcripts)
-        const transcriptMatchesText = transcriptMatches.map((doc: any, i: number) =>
-          `[${i + 1}] ${doc.content_chunk} (from ${doc.document_name}, ${(doc.similarity * 100).toFixed(1)}% relevant)`
-        ).join('\n\n');
-        contextParts.push(`\nRELEVANT TRANSCRIPT SECTIONS (${transcriptMatches.length} matches):\n${transcriptMatchesText}`);
-      }
-    }
-
-    // Growth opportunities
-    if (opportunities && opportunities.length > 0) {
-      const oppsText = opportunities.slice(0, 5).map((opp: any, i: number) =>
-        `${i + 1}. ${opp.title}: ${opp.description.substring(0, 200)}...`
-      ).join('\n');
-      contextParts.push(`\nIDENTIFIED OPPORTUNITIES:\n${oppsText}`);
-    }
-
-    const fullContext = contextParts.join('\n');
-
-    // Generate AI response using OpenAI
-    const systemPrompt = `You are an intelligent business assistant helping to answer questions about a client using comprehensive data from multiple sources.
-
-Your knowledge includes:
-- Your company's services, case studies, and capabilities
-- Detailed client information and history
-- Meeting transcripts and interactions
-- Uploaded documents and materials
-- Contact information
-- Growth opportunities
-
-Guidelines:
-- Be conversational and helpful
-- Provide specific, actionable insights
-- Reference sources when possible (e.g., "According to the meeting on...", "In the transcript from...")
-- When answering from meeting transcripts, quote relevant parts if helpful
-- If you find relevant case studies or services from your company that could help the client, mention them naturally
-- If information is not available, say so clearly
-- Keep responses concise in quick mode, more detailed in deep mode`;
-
+    // Generate AI response
     const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -253,12 +410,9 @@ Guidelines:
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Context:\n${fullContext}\n\nQuestion: ${query}\n\nProvide a helpful, informed answer based on the context above.` },
-        ],
-        temperature: 0.7,
-        max_tokens: mode === 'deep' ? 1500 : 800,
+        messages,
+        temperature: intent.type === 'factual' ? 0.3 : 0.7, // Lower temp for factual queries
+        max_tokens: mode === 'deep' ? 2000 : 1000,
       }),
     });
 
@@ -271,15 +425,33 @@ Guidelines:
     const chatData = await chatResponse.json();
     const answer = chatData.choices[0].message.content;
 
+    // Calculate confidence score based on available data
+    const dataQuality = {
+      hasTranscripts: transcripts.length > 0,
+      hasContacts: contacts.length > 0,
+      hasDocuments: (documentMatches?.length || 0) > 0,
+      hasOpportunities: opportunities.length > 0,
+      hasAIInsights: !!client.ai_insights,
+    };
+
+    const qualityScore = Object.values(dataQuality).filter(Boolean).length;
+    const confidence = qualityScore >= 4 ? 'high' : qualityScore >= 2 ? 'medium' : 'low';
+
     return new Response(
       JSON.stringify({
         success: true,
         answer,
-        sources: {
-          documentsSearched: documentMatches?.length || 0,
-          transcriptsIncluded: transcripts?.length || 0,
-          contactsFound: contacts?.length || 0,
-          opportunitiesFound: opportunities?.length || 0,
+        metadata: {
+          intent: intent.type,
+          confidence,
+          sources: {
+            documentsSearched: documentMatches?.filter((d: any) => d.source_type !== 'meeting_transcript').length || 0,
+            transcriptsIncluded: transcripts.length,
+            transcriptMatchesFound: documentMatches?.filter((d: any) => d.source_type === 'meeting_transcript').length || 0,
+            contactsFound: contacts.length,
+            opportunitiesFound: opportunities.length,
+          },
+          dataQuality,
         },
       }),
       {

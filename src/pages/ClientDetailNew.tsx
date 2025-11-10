@@ -795,9 +795,22 @@ export const ClientDetailNew: React.FC = () => {
 
       setIsProcessingQuery(false);
 
-      const sourcesInfo = data.sources
-        ? `\n\n---\n📊 Sources: ${data.sources.documentsSearched} documents, ${data.sources.transcriptsIncluded} transcripts, ${data.sources.contactsFound} contacts`
-        : '';
+      // Build enhanced sources info with metadata
+      let sourcesInfo = '';
+      if (data.metadata) {
+        const { sources, confidence, intent } = data.metadata;
+
+        const sourcesParts = [];
+        if (sources.documentsSearched > 0) sourcesParts.push(`${sources.documentsSearched} documents`);
+        if (sources.transcriptsIncluded > 0) sourcesParts.push(`${sources.transcriptsIncluded} meetings`);
+        if (sources.transcriptMatchesFound > 0) sourcesParts.push(`${sources.transcriptMatchesFound} meeting excerpts`);
+        if (sources.contactsFound > 0) sourcesParts.push(`${sources.contactsFound} contacts`);
+
+        const confidenceEmoji = confidence === 'high' ? '🟢' : confidence === 'medium' ? '🟡' : '🔴';
+
+        sourcesInfo = `\n\n---\n📊 Sources: ${sourcesParts.join(', ') || 'None'}\n${confidenceEmoji} Confidence: ${confidence}`;
+        if (intent) sourcesInfo += ` | Query type: ${intent}`;
+      }
 
       return data.answer + sourcesInfo;
     } catch (error) {
