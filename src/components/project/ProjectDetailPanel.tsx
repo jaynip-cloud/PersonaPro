@@ -181,26 +181,54 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
     if (!user || !project.client_id) return;
 
     try {
-      const content = `
+      // Support both new format and legacy format
+      const isNewFormat = pitch.title && pitch.openingHook;
+
+      let content = '';
+      if (isNewFormat) {
+        content = `
+${pitch.title.toUpperCase()}
+
+OPENING HOOK
+${pitch.openingHook}
+
+PROBLEM FRAMING
+${pitch.problemFraming}
+
+PROPOSED SOLUTION
+${pitch.proposedSolution}
+
+VALUE & OUTCOMES
+${pitch.valueOutcomes.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+
+WHY US
+${pitch.whyUs}
+
+NEXT STEP CTA
+${pitch.nextStepCTA}
+        `.trim();
+      } else {
+        content = `
 ELEVATOR PITCH
-${pitch.elevatorPitch}
+${pitch.elevatorPitch || ''}
 
 VALUE POINTS
-${pitch.valuePoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+${(pitch.valuePoints || []).map((point, i) => `${i + 1}. ${point}`).join('\n')}
 
 NEXT ACTIONS
-${pitch.nextActions.map((action, i) => `${i + 1}. ${action}`).join('\n')}
-      `.trim();
+${(pitch.nextActions || []).map((action, i) => `${i + 1}. ${action}`).join('\n')}
+        `.trim();
+      }
 
       const { data, error } = await supabase
         .from('saved_pitches')
         .insert({
           project_id: project.id,
           client_id: project.client_id,
-          title: `Pitch ${pitch.variant} - ${new Date().toLocaleDateString()}`,
+          title: isNewFormat ? pitch.title : `Pitch ${pitch.variant} - ${new Date().toLocaleDateString()}`,
           content: content,
           variant: pitch.variant,
-          services: pitch.services,
+          services: pitch.services || [],
           tone: pitch.tone,
           length: pitch.length,
           created_by: user.id,

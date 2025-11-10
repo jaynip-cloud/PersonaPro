@@ -172,15 +172,50 @@ export const PitchGenerator: React.FC = () => {
 
     setIsSaving(true);
     try {
+      // Support both new format and legacy format
+      const isNewFormat = pitch.title && pitch.openingHook;
+
+      let content = '';
+      if (isNewFormat) {
+        content = `${pitch.title.toUpperCase()}
+
+OPENING HOOK
+${pitch.openingHook}
+
+PROBLEM FRAMING
+${pitch.problemFraming}
+
+PROPOSED SOLUTION
+${pitch.proposedSolution}
+
+VALUE & OUTCOMES
+${pitch.valueOutcomes.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+WHY US
+${pitch.whyUs}
+
+NEXT STEP CTA
+${pitch.nextStepCTA}`;
+      } else {
+        // Legacy format
+        content = `${pitch.elevatorPitch || ''}
+
+Value Points:
+${(pitch.valuePoints || []).map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+Next Actions:
+${(pitch.nextActions || []).map((a, i) => `${i + 1}. ${a}`).join('\n')}`;
+      }
+
       const { data, error } = await supabase
         .from('saved_pitches')
         .insert({
           project_id: null,
           client_id: pitch.clientId,
-          title: `Pitch for ${pitch.clientCompany}`,
-          content: `${pitch.elevatorPitch}\n\nValue Points:\n${pitch.valuePoints.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n\nNext Actions:\n${pitch.nextActions.map((a, i) => `${i + 1}. ${a}`).join('\n')}`,
+          title: isNewFormat ? pitch.title : `Pitch for ${pitch.clientCompany}`,
+          content: content,
           variant: pitch.variant,
-          services: pitch.services,
+          services: pitch.services || [],
           tone: pitch.tone,
           length: pitch.length,
           created_by: user.id

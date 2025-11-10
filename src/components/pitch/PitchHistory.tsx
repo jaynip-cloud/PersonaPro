@@ -85,50 +85,114 @@ export const PitchHistory: React.FC<PitchHistoryProps> = ({
 
   const handleCopy = (pitch: GeneratedPitch, e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = `
+
+    // Support both new format and legacy format
+    const isNewFormat = pitch.title && pitch.openingHook;
+
+    let text = '';
+    if (isNewFormat) {
+      text = `
+${pitch.title.toUpperCase()}
+
+OPENING HOOK
+${pitch.openingHook}
+
+PROBLEM FRAMING
+${pitch.problemFraming}
+
+PROPOSED SOLUTION
+${pitch.proposedSolution}
+
+VALUE & OUTCOMES
+${pitch.valueOutcomes.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+
+WHY US
+${pitch.whyUs}
+
+NEXT STEP CTA
+${pitch.nextStepCTA}
+      `.trim();
+    } else {
+      text = `
 ELEVATOR PITCH
-${pitch.elevatorPitch}
+${pitch.elevatorPitch || ''}
 
 VALUE POINTS
-${pitch.valuePoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+${(pitch.valuePoints || []).map((point, i) => `${i + 1}. ${point}`).join('\n')}
 
 NEXT ACTIONS
-${pitch.nextActions.map((action, i) => `${i + 1}. ${action}`).join('\n')}
-    `.trim();
+${(pitch.nextActions || []).map((action, i) => `${i + 1}. ${action}`).join('\n')}
+      `.trim();
+    }
 
     navigator.clipboard.writeText(text);
   };
 
   const handleExport = (pitch: GeneratedPitch, e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = `
-PITCH FOR ${pitch.clientCompany.toUpperCase()}
+
+    // Support both new format and legacy format
+    const isNewFormat = pitch.title && pitch.openingHook;
+
+    let text = '';
+    if (isNewFormat) {
+      text = `
+PITCH FOR ${(pitch.clientCompany || 'Client').toUpperCase()}
 Generated: ${new Date(pitch.createdAt).toLocaleString()}
 
-CLIENT: ${pitch.clientName}
-COMPANY: ${pitch.clientCompany}
-SERVICES: ${pitch.services.join(', ')}
+CLIENT: ${pitch.clientName || 'N/A'}
+COMPANY: ${pitch.clientCompany || 'N/A'}
+SERVICES: ${(pitch.services || []).join(', ')}
+TONE: ${pitch.tone.toUpperCase()}
+
+${pitch.title.toUpperCase()}
+
+OPENING HOOK
+${pitch.openingHook}
+
+PROBLEM FRAMING
+${pitch.problemFraming}
+
+PROPOSED SOLUTION
+${pitch.proposedSolution}
+
+VALUE & OUTCOMES
+${pitch.valueOutcomes.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+
+WHY US
+${pitch.whyUs}
+
+NEXT STEP CTA
+${pitch.nextStepCTA}`;
+    } else {
+      text = `
+PITCH FOR ${(pitch.clientCompany || 'Client').toUpperCase()}
+Generated: ${new Date(pitch.createdAt).toLocaleString()}
+
+CLIENT: ${pitch.clientName || 'N/A'}
+COMPANY: ${pitch.clientCompany || 'N/A'}
+SERVICES: ${(pitch.services || []).join(', ')}
 TONE: ${pitch.tone.toUpperCase()}
 
 ELEVATOR PITCH
-${pitch.elevatorPitch}
+${pitch.elevatorPitch || ''}
 
 VALUE POINTS
-${pitch.valuePoints.map((point, i) => `${i + 1}. ${point}`).join('\n')}
+${(pitch.valuePoints || []).map((point, i) => `${i + 1}. ${point}`).join('\n')}
 
 SUGGESTED NEXT ACTIONS
-${pitch.nextActions.map((action, i) => `${i + 1}. ${action}`).join('\n')}
+${(pitch.nextActions || []).map((action, i) => `${i + 1}. ${action}`).join('\n')}
 
-CONFIDENCE SCORE: ${pitch.confidence}%
-EVIDENCE TAGS: ${pitch.evidenceTags.join(', ')}
-VARIANT: ${pitch.variant}
-    `.trim();
+CONFIDENCE SCORE: ${pitch.confidence || 0}%
+EVIDENCE TAGS: ${(pitch.evidenceTags || []).join(', ')}
+VARIANT: ${pitch.variant || 'A'}`;
+    }
 
-    const blob = new Blob([text], { type: 'text/plain' });
+    const blob = new Blob([text.trim()], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `pitch-${pitch.clientCompany.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.txt`;
+    link.download = `pitch-${(pitch.clientCompany || 'client').toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
