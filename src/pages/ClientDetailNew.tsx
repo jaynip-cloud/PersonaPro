@@ -1351,22 +1351,36 @@ Client Information:
                 ) : (
                   <div className="space-y-3">
                     {contacts.map(contact => (
-                      <div key={contact.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <div key={contact.id} className="flex items-start justify-between p-4 border border-border rounded-lg">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                             <span className="text-sm font-semibold text-primary">
                               {contact.name.split(' ').map(n => n[0]).join('')}
                             </span>
                           </div>
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <p className="font-medium text-foreground">{contact.name}</p>
                             <p className="text-sm text-muted-foreground">{contact.role}</p>
-                            {contact.email && (
-                              <p className="text-xs text-muted-foreground mt-1">{contact.email}</p>
+                            {contact.department && (
+                              <p className="text-xs text-muted-foreground">{contact.department}</p>
                             )}
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                              {contact.email && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Mail className="h-3 w-3" />
+                                  <span>{contact.email}</span>
+                                </div>
+                              )}
+                              {contact.phone && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Phone className="h-3 w-3" />
+                                  <span>{contact.phone}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-start gap-2 flex-shrink-0">
                           {contact.isPrimary && (
                             <Badge variant="default">Primary</Badge>
                           )}
