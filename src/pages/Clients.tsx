@@ -126,11 +126,6 @@ export const Clients: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-8">
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground mb-1">Fit Score</p>
-                        <p className="text-3xl font-bold text-primary">{client.fitScore ?? 90}</p>
-                      </div>
-
                       <div className="relative">
                         <Button
                           variant="ghost"
