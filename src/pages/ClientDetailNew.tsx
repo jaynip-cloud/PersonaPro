@@ -147,6 +147,30 @@ export const ClientDetailNew: React.FC = () => {
     }
   };
 
+  const vectorizeExistingTranscripts = async (transcripts: any[]) => {
+    // Check and vectorize any transcripts that haven't been vectorized yet
+    for (const transcript of transcripts) {
+      try {
+        // Check if already vectorized
+        const { data: existingEmbeddings } = await supabase
+          .from('document_embeddings')
+          .select('id')
+          .eq('user_id', user?.id)
+          .eq('source_type', 'meeting_transcript')
+          .eq('metadata->>transcript_id', transcript.id)
+          .limit(1);
+
+        // If not vectorized, vectorize it now
+        if (!existingEmbeddings || existingEmbeddings.length === 0) {
+          console.log(`Vectorizing transcript: ${transcript.title}`);
+          await vectorizeMeetingTranscript(transcript.id, { clientId: id });
+        }
+      } catch (error) {
+        console.error(`Failed to vectorize transcript ${transcript.title}:`, error);
+      }
+    }
+  };
+
   const loadClientData = async () => {
     if (!user) return;
 
@@ -247,6 +271,11 @@ export const ClientDetailNew: React.FC = () => {
 
       if (!transcriptsError && transcriptsData) {
         setMeetingTranscripts(transcriptsData);
+
+        // Auto-vectorize transcripts that haven't been vectorized yet
+        if (transcriptsData.length > 0) {
+          vectorizeExistingTranscripts(transcriptsData);
+        }
       }
 
       const { data: opportunitiesData, error: opportunitiesError } = await supabase

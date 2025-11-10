@@ -172,20 +172,47 @@ Technologies: ${client.technologies ? client.technologies.join(', ') : 'N/A'}`);
       contextParts.push(`\nCLIENT CONTACTS:\n${contactsText}`);
     }
 
-    // Meeting transcripts
+    // Meeting transcripts - Include FULL transcripts in deep mode
     if (transcripts && transcripts.length > 0) {
-      const transcriptsText = transcripts.map((t: any, i: number) =>
-        `${i + 1}. ${t.title} (${new Date(t.meeting_date).toLocaleDateString()}):\n${t.transcript_text.substring(0, mode === 'deep' ? 800 : 400)}...`
-      ).join('\n\n');
-      contextParts.push(`\nMEETING HISTORY (${transcripts.length} transcripts):\n${transcriptsText}`);
+      if (mode === 'deep') {
+        // In deep mode, include full or large portions of transcripts
+        const transcriptsText = transcripts.map((t: any, i: number) =>
+          `${i + 1}. ${t.title} (${new Date(t.meeting_date).toLocaleDateString()}):\n${t.transcript_text.substring(0, 3000)}${t.transcript_text.length > 3000 ? '...' : ''}`
+        ).join('\n\n');
+        contextParts.push(`\nMEETING TRANSCRIPTS (${transcripts.length} meetings - FULL CONTENT):\n${transcriptsText}`);
+      } else {
+        // In quick mode, include summaries
+        const transcriptsText = transcripts.map((t: any, i: number) =>
+          `${i + 1}. ${t.title} (${new Date(t.meeting_date).toLocaleDateString()}):\n${t.transcript_text.substring(0, 600)}...`
+        ).join('\n\n');
+        contextParts.push(`\nMEETING TRANSCRIPTS (${transcripts.length} meetings):\n${transcriptsText}`);
+      }
     }
 
-    // Document matches
+    // Document matches from semantic search (includes both documents and transcript embeddings)
     if (documentMatches && documentMatches.length > 0) {
-      const docsText = documentMatches.map((doc: any, i: number) =>
-        `[${i + 1}] ${doc.content_chunk} (from ${doc.document_name}, ${(doc.similarity * 100).toFixed(1)}% relevant)`
-      ).join('\n\n');
-      contextParts.push(`\nRELEVANT DOCUMENTS (${documentMatches.length} matches):\n${docsText}`);
+      // Separate documents from transcript embeddings
+      const docMatches = documentMatches.filter((doc: any) =>
+        doc.source_type !== 'meeting_transcript'
+      );
+      const transcriptMatches = documentMatches.filter((doc: any) =>
+        doc.source_type === 'meeting_transcript'
+      );
+
+      if (docMatches.length > 0) {
+        const docsText = docMatches.map((doc: any, i: number) =>
+          `[${i + 1}] ${doc.content_chunk} (from ${doc.document_name}, ${(doc.similarity * 100).toFixed(1)}% relevant)`
+        ).join('\n\n');
+        contextParts.push(`\nRELEVANT DOCUMENTS (${docMatches.length} matches):\n${docsText}`);
+      }
+
+      if (transcriptMatches.length > 0 && mode === 'quick') {
+        // Only show transcript matches in quick mode (deep mode already has full transcripts)
+        const transcriptMatchesText = transcriptMatches.map((doc: any, i: number) =>
+          `[${i + 1}] ${doc.content_chunk} (from ${doc.document_name}, ${(doc.similarity * 100).toFixed(1)}% relevant)`
+        ).join('\n\n');
+        contextParts.push(`\nRELEVANT TRANSCRIPT SECTIONS (${transcriptMatches.length} matches):\n${transcriptMatchesText}`);
+      }
     }
 
     // Growth opportunities
@@ -212,7 +239,8 @@ Your knowledge includes:
 Guidelines:
 - Be conversational and helpful
 - Provide specific, actionable insights
-- Reference sources when possible (e.g., "According to the meeting on...")
+- Reference sources when possible (e.g., "According to the meeting on...", "In the transcript from...")
+- When answering from meeting transcripts, quote relevant parts if helpful
 - If you find relevant case studies or services from your company that could help the client, mention them naturally
 - If information is not available, say so clearly
 - Keep responses concise in quick mode, more detailed in deep mode`;
