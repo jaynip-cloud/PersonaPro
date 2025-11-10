@@ -186,6 +186,8 @@ Deno.serve(async (req: Request) => {
           partners: extractedInfo.technology?.partners || [],
           integrations: extractedInfo.technology?.integrations || []
         },
+        challenges: extractedInfo.challenges || [],
+        competitors: extractedInfo.competitors || [],
         logo: findLogoUrl(crawledData),
       }
     };
@@ -525,6 +527,16 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
     \"partners\": [\"Partner Company 1\", \"Partner Company 2\"],
     \"integrations\": [\"Integration 1\", \"Integration 2\", \"Platform 1\"]
   },
+  \"challenges\": [
+    \"Business challenge or pain point 1\",
+    \"Business challenge or pain point 2\"
+  ],
+  \"competitors\": [
+    {
+      \"name\": \"Competitor Company Name\",
+      \"description\": \"Brief comparison or what makes them a competitor\"
+    }
+  ],
   \"businessInfo\": {
     \"shortTermGoals\": \"Company's short-term goals, objectives, immediate priorities, current focus areas, quarterly/annual targets (next 6-12 months). Examples: 'Expand into 3 new markets', 'Increase revenue by 25%', 'Launch new product line', 'Scale team to 100 employees'\",
     \"longTermGoals\": \"Company's long-term vision, strategic goals, future aspirations, 5-year plan, mission-driven objectives (2-5 years). Examples: 'Become market leader', 'IPO by 2027', 'Expand globally to 50 countries', 'Achieve $100M ARR'\",
@@ -597,6 +609,20 @@ DETAILED EXTRACTION GUIDELINES:
 - Look in: integrations page, features page, API documentation
 - Extract: third-party platforms/services they integrate with
 - Examples: [\"Slack\", \"Zapier\", \"HubSpot\", \"QuickBooks\", \"Shopify\"]
+
+**Business Challenges & Pain Points:**
+- Look in: about page, case studies, blog posts, problem statements, solution pages
+- Extract: business challenges they mention solving, pain points they address, problems they help clients overcome
+- Search for keywords: "challenge", "problem", "pain point", "difficulty", "struggle", "overcome", "solve"
+- Examples: ["Manual data entry consuming too much time", "Difficulty scaling operations", "Lack of real-time visibility into metrics", "High customer churn rates"]
+- If they describe what problems they solve for clients, those are pain points their clients face
+
+**Competitors:**
+- Look in: comparison pages, about page, alternative solutions, "vs" pages
+- Search the web for: "[Company Name] competitors", "[Company Name] alternatives"
+- Extract: competitor names and brief comparison notes
+- Examples: [{"name": "Competitor ABC", "description": "Similar product but focuses more on enterprise"}, {"name": "Alternative XYZ", "description": "Offers basic features at lower price point"}]
+- If not explicitly mentioned, use web search to find industry competitors
 
 **Leadership (CRITICAL - USE WEB SEARCH):**
 - Use the discovered LinkedIn profile URLs: ${linkedinProfileUrls.slice(0, 5).join(', ')}
@@ -1032,6 +1058,15 @@ Return ONLY valid JSON in this exact structure:
     \"partners\": [],
     \"integrations\": []
   },
+  \"challenges\": [
+    \"Business challenge or pain point mentioned in posts or description\"
+  ],
+  \"competitors\": [
+    {
+      \"name\": \"Competitor name if mentioned\",
+      \"description\": \"Brief comparison\"
+    }
+  ],
   \"businessInfo\": {
     \"shortTermGoals\": \"Goals for next 6-12 months (from recent posts, announcements)\",
     \"longTermGoals\": \"Long-term vision 2-5 years (from About, vision, strategic posts)\",
