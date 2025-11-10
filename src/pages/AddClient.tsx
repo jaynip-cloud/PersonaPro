@@ -331,6 +331,15 @@ export const AddClient: React.FC = () => {
 
       const data = await response.json();
 
+      console.log('=== AI PREFILL RAW DATA ===');
+      console.log('Full response:', data);
+      console.log('Services:', data.data?.services);
+      console.log('Technologies:', data.data?.technology);
+      console.log('Blogs:', data.data?.blogs);
+      console.log('Challenges:', data.data?.challenges);
+      console.log('Competitors:', data.data?.competitors);
+      console.log('=== END RAW DATA ===');
+
       if (data.success && data.data) {
         const updates: Partial<ClientFormData> = {};
 
@@ -410,6 +419,15 @@ export const AddClient: React.FC = () => {
         }
 
         if (Object.keys(updates).length > 0) {
+          console.log('=== APPLYING UPDATES ===');
+          console.log('Updates object:', updates);
+          console.log('Services being set:', updates.services);
+          console.log('Technologies being set:', updates.technologies);
+          console.log('Blogs being set:', updates.blogs);
+          console.log('Pain points being set:', updates.painPoints);
+          console.log('Competitors being set:', updates.competitors);
+          console.log('=== END UPDATES ===');
+
           setFormData({ ...formData, ...updates });
 
           const extractedInfo = [];
@@ -1259,6 +1277,11 @@ export const AddClient: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-3">
                   Services / Products They Use
+                  {formData.services.length > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({formData.services.length} added)
+                    </span>
+                  )}
                 </label>
                 {formData.services.map((service, index) => (
                   <div key={index} className="flex gap-2 mb-2">
@@ -1313,6 +1336,11 @@ export const AddClient: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-3">
                   Technologies / Tech Stack
+                  {formData.technologies.length > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({formData.technologies.length} added)
+                    </span>
+                  )}
                 </label>
                 {formData.technologies.map((tech, index) => (
                   <div key={index} className="flex gap-2 mb-2">
@@ -1367,6 +1395,11 @@ export const AddClient: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-3">
                   Blogs / Articles / Resources
+                  {formData.blogs.length > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({formData.blogs.length} added)
+                    </span>
+                  )}
                 </label>
                 {formData.blogs.map((blog, index) => (
                   <div key={index} className="flex gap-2 mb-2">
@@ -1432,6 +1465,11 @@ export const AddClient: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-3">
                   Pain Points / Challenges
+                  {formData.painPoints.length > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({formData.painPoints.length} added)
+                    </span>
+                  )}
                 </label>
                 {formData.painPoints.map((painPoint, index) => (
                   <div key={index} className="flex gap-2 mb-2">
@@ -1476,6 +1514,11 @@ export const AddClient: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-3">
                   Competitors
+                  {formData.competitors.length > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({formData.competitors.length} added)
+                    </span>
+                  )}
                 </label>
                 {formData.competitors.map((competitor, index) => (
                   <div key={index} className="flex gap-2 mb-2">
