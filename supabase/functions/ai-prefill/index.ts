@@ -46,6 +46,45 @@ interface ClientData {
     phone?: string;
     role?: string;
   }>;
+  annualRevenue?: string;
+  employeeCount?: string;
+  services?: Array<{
+    name: string;
+    description: string;
+  }>;
+  technologies?: Array<{
+    name: string;
+    category: string;
+  }>;
+  blogs?: Array<{
+    title: string;
+    url: string;
+    date: string;
+  }>;
+  painPoints?: Array<string>;
+  competitors?: Array<{
+    name: string;
+    comparison: string;
+  }>;
+  founded?: string;
+  city?: string;
+  country?: string;
+  zipCode?: string;
+  primaryContactName?: string;
+  primaryContactEmail?: string;
+  primaryPhone?: string;
+  alternateEmail?: string;
+  alternatePhone?: string;
+  jobTitle?: string;
+  shortTermGoals?: string;
+  longTermGoals?: string;
+  expectations?: string;
+  socialProfiles?: {
+    linkedin?: string;
+    twitter?: string;
+    facebook?: string;
+    instagram?: string;
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -169,17 +208,74 @@ Deno.serve(async (req: Request) => {
     let prefillData: CompanyData | ClientData;
 
     if (target === "client") {
+      // Map technologies from tech stack
+      const technologies = (rawData.technology?.stack || []).map((tech: any) => ({
+        name: typeof tech === 'string' ? tech : tech.name || '',
+        category: typeof tech === 'string' ? 'General' : tech.category || tech.type || 'General',
+      }));
+
+      // Extract pain points from various sources
+      const painPoints: string[] = [];
+      if (rawData.challenges) {
+        if (Array.isArray(rawData.challenges)) {
+          painPoints.push(...rawData.challenges);
+        } else if (typeof rawData.challenges === 'string') {
+          painPoints.push(rawData.challenges);
+        }
+      }
+
+      // Extract competitors
+      const competitors = (rawData.competitors || []).map((comp: any) => ({
+        name: typeof comp === 'string' ? comp : comp.name || '',
+        comparison: typeof comp === 'string' ? '' : comp.description || comp.comparison || '',
+      }));
+
+      // Map social profiles
+      const socialProfiles: any = {};
+      if (rawData.socialProfiles?.linkedin) socialProfiles.linkedin = rawData.socialProfiles.linkedin;
+      if (rawData.socialProfiles?.twitter) socialProfiles.twitter = rawData.socialProfiles.twitter;
+      if (rawData.socialProfiles?.facebook) socialProfiles.facebook = rawData.socialProfiles.facebook;
+      if (rawData.socialProfiles?.instagram) socialProfiles.instagram = rawData.socialProfiles.instagram;
+
       prefillData = {
         name: rawData.name || '',
         website: url,
         industry: rawData.industry || '',
         about: rawData.businessInfo?.mission || rawData.description || '',
+        founded: rawData.founded || '',
+        city: rawData.location?.city || '',
+        country: rawData.location?.country || '',
+        zipCode: rawData.location?.zipCode || '',
+        annualRevenue: rawData.annualRevenue || rawData.revenue || '',
+        employeeCount: rawData.companySize || rawData.employeeCount || '',
+        primaryContactName: rawData.contactInfo?.contactName || '',
+        primaryContactEmail: rawData.contactInfo?.primaryEmail || '',
+        primaryPhone: rawData.contactInfo?.primaryPhone || '',
+        alternateEmail: rawData.contactInfo?.alternateEmail || '',
+        alternatePhone: rawData.contactInfo?.alternatePhone || '',
+        jobTitle: rawData.contactInfo?.jobTitle || '',
+        shortTermGoals: rawData.businessInfo?.shortTermGoals || '',
+        longTermGoals: rawData.businessInfo?.longTermGoals || '',
+        expectations: rawData.businessInfo?.expectations || '',
         contacts: (rawData.contacts || []).map((contact: any) => ({
           name: contact.name || '',
           email: contact.email || '',
           phone: contact.phone || '',
-          role: contact.title || '',
+          role: contact.title || contact.role || '',
         })),
+        services: (rawData.services || []).map((service: any) => ({
+          name: service.name || service.title || '',
+          description: service.description || '',
+        })),
+        technologies: technologies,
+        blogs: (rawData.blogs || []).map((blog: any) => ({
+          title: blog.title || '',
+          url: blog.url || blog.link || '',
+          date: blog.date || blog.publishedDate || '',
+        })),
+        painPoints: painPoints,
+        competitors: competitors,
+        socialProfiles: Object.keys(socialProfiles).length > 0 ? socialProfiles : undefined,
       } as ClientData;
     } else {
       const socialProfiles = [];

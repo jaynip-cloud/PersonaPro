@@ -364,12 +364,69 @@ export const AddClient: React.FC = () => {
 
         if (data.data.logo) updates.logoUrl = data.data.logo;
 
+        // NEW FIELDS
+        if (data.data.companySize) updates.employeeCount = data.data.companySize;
+
+        // Map services
+        if (data.data.services && Array.isArray(data.data.services) && data.data.services.length > 0) {
+          updates.services = data.data.services.map((s: any) => ({
+            name: s.name || s.title || '',
+            description: s.description || ''
+          }));
+        }
+
+        // Map technologies from tech stack
+        if (data.data.technology?.stack && Array.isArray(data.data.technology.stack) && data.data.technology.stack.length > 0) {
+          updates.technologies = data.data.technology.stack.map((tech: any) => ({
+            name: typeof tech === 'string' ? tech : (tech.name || ''),
+            category: typeof tech === 'string' ? 'General' : (tech.category || tech.type || 'General')
+          }));
+        }
+
+        // Map blogs
+        if (data.data.blogs && Array.isArray(data.data.blogs) && data.data.blogs.length > 0) {
+          updates.blogs = data.data.blogs.map((blog: any) => ({
+            title: blog.title || '',
+            url: blog.url || blog.link || '',
+            date: blog.date || blog.publishedDate || ''
+          }));
+        }
+
+        // Extract pain points from challenges
+        if (data.data.challenges) {
+          if (Array.isArray(data.data.challenges)) {
+            updates.painPoints = data.data.challenges.filter((c: any) => c);
+          } else if (typeof data.data.challenges === 'string') {
+            updates.painPoints = [data.data.challenges];
+          }
+        }
+
+        // Map competitors
+        if (data.data.competitors && Array.isArray(data.data.competitors) && data.data.competitors.length > 0) {
+          updates.competitors = data.data.competitors.map((comp: any) => ({
+            name: typeof comp === 'string' ? comp : (comp.name || ''),
+            comparison: typeof comp === 'string' ? '' : (comp.description || comp.comparison || '')
+          }));
+        }
+
         if (Object.keys(updates).length > 0) {
           setFormData({ ...formData, ...updates });
 
           const extractedInfo = [];
           if (data.data.contacts && data.data.contacts.length > 0) {
             extractedInfo.push(`${data.data.contacts.length} contacts`);
+          }
+          if (data.data.services && data.data.services.length > 0) {
+            extractedInfo.push(`${data.data.services.length} services`);
+          }
+          if (data.data.technology?.stack && data.data.technology.stack.length > 0) {
+            extractedInfo.push(`${data.data.technology.stack.length} technologies`);
+          }
+          if (data.data.blogs && data.data.blogs.length > 0) {
+            extractedInfo.push(`${data.data.blogs.length} blogs`);
+          }
+          if (data.data.competitors && data.data.competitors.length > 0) {
+            extractedInfo.push(`${data.data.competitors.length} competitors`);
           }
           if (data.data.testimonials && data.data.testimonials.length > 0) {
             extractedInfo.push(`${data.data.testimonials.length} testimonials`);
@@ -384,8 +441,17 @@ export const AddClient: React.FC = () => {
           if (data.data.contacts && data.data.contacts.length > 0) {
             console.log('Extracted contacts:', data.data.contacts);
           }
-          if (data.data.testimonials && data.data.testimonials.length > 0) {
-            console.log('Extracted testimonials:', data.data.testimonials);
+          if (data.data.services && data.data.services.length > 0) {
+            console.log('Extracted services:', data.data.services);
+          }
+          if (data.data.technology?.stack && data.data.technology.stack.length > 0) {
+            console.log('Extracted technologies:', data.data.technology.stack);
+          }
+          if (data.data.blogs && data.data.blogs.length > 0) {
+            console.log('Extracted blogs:', data.data.blogs);
+          }
+          if (data.data.competitors && data.data.competitors.length > 0) {
+            console.log('Extracted competitors:', data.data.competitors);
           }
         } else {
           showToast('warning', 'No data could be extracted from the provided URL. Please check the URL and try again.');
