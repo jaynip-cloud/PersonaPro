@@ -116,12 +116,43 @@ Deno.serve(async (req: Request) => {
        marketIntelligenceError = 'Perplexity API key is required for market intelligence';
     } else {
       try {
-        const searchQuery = `Research current trends, challenges, and opportunities in the ${client.industry || 'business'} industry for ${client.name}. Focus on:
-1. Emerging technology trends affecting this industry
-2. Digital transformation opportunities
-3. Common pain points companies face
-4. Growth opportunities and market gaps
-5. Competitive landscape evolution`;
+        // Build comprehensive search query based on available client data
+        const searchComponents = [
+          `Research ${client.name} (${client.industry || 'business'} industry)`
+        ];
+
+        // Add specific queries based on available data
+        if (client.linkedin_url || client.twitter_url || client.website) {
+          searchComponents.push('Find recent company news, announcements, and leadership updates');
+        }
+
+        if (clientBlogs !== 'Not specified') {
+          searchComponents.push('Analyze their content themes and thought leadership focus areas');
+        }
+
+        if (clientTechnologies !== 'Not specified') {
+          searchComponents.push('Identify integration and technology modernization opportunities based on their current tech stack');
+        }
+
+        if (clientCompetitors !== 'Not specified') {
+          searchComponents.push('Compare their competitive positioning and identify differentiation opportunities');
+        }
+
+        const searchQuery = `${searchComponents.join('. ')}
+
+Focus on:
+1. Recent company news, initiatives, and strategic moves
+2. Industry trends and challenges affecting ${client.industry || 'their sector'}
+3. Technology adoption patterns and digital transformation needs
+4. Growth opportunities and expansion signals
+5. Leadership changes, funding rounds, or major announcements
+6. Social media activity and brand positioning
+7. Content marketing themes and customer pain points they're addressing
+8. Competitive threats and market positioning
+9. Innovation initiatives and R&D focus areas
+10. Partnership and collaboration opportunities
+
+Provide specific, actionable insights that could inform a growth opportunity proposal.`;
 
 
         const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -163,6 +194,27 @@ Deno.serve(async (req: Request) => {
        }
      }
 
+    // Build comprehensive client intelligence including new fields
+    const clientServices = client.services && Array.isArray(client.services) && client.services.length > 0
+      ? client.services.map((s: any) => `  • ${s.name || ''}: ${s.description || ''}`).join('\n')
+      : 'Not specified';
+
+    const clientTechnologies = client.technologies && Array.isArray(client.technologies) && client.technologies.length > 0
+      ? client.technologies.map((t: any) => `  • ${t.name || t} ${t.category ? `(${t.category})` : ''}`).join('\n')
+      : 'Not specified';
+
+    const clientBlogs = client.blogs && Array.isArray(client.blogs) && client.blogs.length > 0
+      ? client.blogs.slice(0, 8).map((b: any) => `  • "${b.title || ''}" ${b.date ? `(${b.date})` : ''} ${b.url ? `- ${b.url}` : ''}`).join('\n')
+      : 'Not specified';
+
+    const clientPainPoints = client.pain_points && Array.isArray(client.pain_points) && client.pain_points.length > 0
+      ? client.pain_points.map((p: string) => `  • ${p}`).join('\n')
+      : 'Not specified';
+
+    const clientCompetitors = client.competitors && Array.isArray(client.competitors) && client.competitors.length > 0
+      ? client.competitors.map((c: any) => `  • ${c.name || c} ${c.comparison || c.description ? `- ${c.comparison || c.description}` : ''}`).join('\n')
+      : 'Not specified';
+
     const intelligenceContext = `
 # INTELLIGENCE LAYER 1: CLIENT INTELLIGENCE
 
@@ -172,13 +224,32 @@ Industry: ${client.industry || 'Not specified'}
 Company Size: ${client.company_size || 'Not specified'}
 Location: ${client.city ? `${client.city}, ${client.country || ''}` : client.country || 'Not specified'}
 Website: ${client.website || 'Not specified'}
+LinkedIn: ${client.linkedin_url || 'Not specified'}
+Twitter: ${client.twitter_url || 'Not specified'}
+Facebook: ${client.facebook_url || 'Not specified'}
+
+## Services/Products They Currently Use
+${clientServices}
+
+## Technology Stack & Tools
+${clientTechnologies}
+
+## Recent Content & Thought Leadership
+Blog Posts & Articles:
+${clientBlogs}
 
 ## Strategic Context
 Short-term Goals: ${client.short_term_goals || 'Not specified'}
 Long-term Goals: ${client.long_term_goals || 'Not specified'}
 Expectations: ${client.expectations || 'Not specified'}
-Pain Points: ${client.pain_points || 'Not specified'}
 Budget Range: ${client.budget_range || 'Not specified'}
+
+## Pain Points & Challenges
+${clientPainPoints}
+
+## Competitive Landscape
+Competitors They Consider:
+${clientCompetitors}
 
 ## Behavioral & Sentiment Data
 ${client.ai_insights ? `
@@ -214,8 +285,20 @@ ${contacts?.map(c => `- ${c.name} (${c.title || 'No title'}) - ${c.is_decision_m
 ## Project History (${projects?.length || 0})
 ${projects?.slice(0, 5).map(p => `- ${p.name} (${p.status}) - Budget: ${p.budget_range || 'N/A'}`).join('\n') || 'No project history'}
 
-## Recent Interactions
-${meetings?.map(m => `- ${m.title} (${m.meeting_date})`).join('\n') || 'No recent meetings'}
+## Recent Interactions & Meeting Intelligence
+${meetings && meetings.length > 0 ? meetings.map(m => {
+  const parts = [`Meeting: ${m.title} (${new Date(m.meeting_date).toLocaleDateString()})`];
+  if (m.sentiment) parts.push(`  Sentiment: ${m.sentiment}`);
+  if (m.key_topics && Array.isArray(m.key_topics)) parts.push(`  Topics: ${m.key_topics.join(', ')}`);
+  if (m.action_items && Array.isArray(m.action_items) && m.action_items.length > 0) {
+    parts.push(`  Action Items: ${m.action_items.slice(0, 3).join('; ')}`);
+  }
+  if (m.transcript_text) {
+    const excerpt = m.transcript_text.substring(0, 500);
+    parts.push(`  Key Excerpt: ${excerpt}${m.transcript_text.length > 500 ? '...' : ''}`);
+  }
+  return parts.join('\n');
+}).join('\n\n') : 'No recent meetings'}
 
 # INTELLIGENCE LAYER 2: MARKET & EXTERNAL INTELLIGENCE
 
@@ -322,11 +405,24 @@ Analyze the 3 intelligence layers above and generate EXACTLY 1 (ONE) HIGH-QUALIT
 
 ## CRITICAL REQUIREMENTS
 
-### 1. Match Client Need to Company Capability
-The opportunity MUST logically connect:
-- **Client Need**: A specific pain point, goal, or gap from Layer 1 (Client Intelligence)
+### 1. Match Client Need to Company Capability (CRITICAL)
+The opportunity MUST logically connect and COMPARE:
+- **Client Need**: A specific pain point, goal, challenge, or technology gap from Layer 1 (Client Intelligence)
+  * Analyze their current services/products they use - can we provide better alternatives?
+  * Review their technology stack - are there integration or modernization opportunities?
+  * Examine their pain points - which ones directly align with our solutions?
+  * Study their blog content - what topics are they focused on that we can help with?
+  * Consider their competitors - how can we help them differentiate or compete better?
+  * Review meeting transcripts - what concerns or needs were expressed?
 - **Market Context**: A relevant industry trend, competitive pressure, or market opportunity from Layer 2
+  * Recent news or announcements about the client
+  * Industry shifts affecting their business
+  * Technology trends they should adopt
 - **Your Capability**: A specific service, strength, case study, or expertise from Layer 3 (Company Knowledge Base)
+  * Reference SPECIFIC services from your knowledge base that match their needs
+  * Cite SPECIFIC case studies that demonstrate similar success
+  * Highlight proven ROI areas that apply to their situation
+  * Connect your unique value propositions to their challenges
 
 ### 2. Consider Readiness & Timing
 - Account for client's decision-making speed, risk tolerance, innovation appetite
@@ -334,9 +430,13 @@ The opportunity MUST logically connect:
 - Factor in budget capacity, spending patterns, and maturity level
 - Ensure the opportunity matches their sophistication level
 
-### 3. Be Specific & Insight-Driven
+### 3. Be Specific & Insight-Driven (USE THE DATA)
 - **DON'T**: Suggest generic opportunities like "Cloud Migration" or "Digital Transformation"
-- **DO**: Suggest specific, personalized opportunities like "Migrate legacy inventory system to cloud platform to address scalability issues mentioned in Q3 meeting, leveraging our proven e-commerce migration framework (see Case Study: RetailCorp)"
+- **DO**: Suggest specific, personalized opportunities that reference actual client data:
+  * Example 1: "Integrate Salesforce with their current tech stack (React, Node.js) to automate lead management, addressing their pain point of 'manual data entry taking 10 hours/week' mentioned in the client profile"
+  * Example 2: "Based on their recent blog posts about AI adoption challenges, offer our AI Strategy Workshop (Case Study: FinTech Inc - 35% efficiency gain)"
+  * Example 3: "Help differentiate from competitor HubSpot by implementing custom automation workflows using our low-code platform (mentioned in their competitive analysis)"
+  * Example 4: "Following up on action item from March 15 meeting about 'exploring analytics solutions', propose our Business Intelligence Dashboard service (proven ROI: RetailCorp case study)"
 
 ### 4. Reference Your Knowledge Base
 - Reference specific services from your offerings
