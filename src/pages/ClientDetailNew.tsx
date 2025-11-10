@@ -737,50 +737,40 @@ export const ClientDetailNew: React.FC = () => {
     setIsProcessingQuery(true);
 
     try {
-      const searchLimit = mode === 'deep' ? 10 : 5;
-      const similarityThreshold = mode === 'deep' ? 0.6 : 0.7;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
 
-      const searchResults = await semanticSearch(query, {
-        clientId: id,
-        limit: searchLimit,
-        similarityThreshold: similarityThreshold,
+      const response = await fetch(`${supabaseUrl}/functions/v1/answer-client-query`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query,
+          clientId: id,
+          mode,
+        }),
       });
 
-      const transcriptsContext = meetingTranscripts.length > 0
-        ? `\n\nMeeting History (${meetingTranscripts.length} transcripts):\n` +
-          meetingTranscripts.slice(0, 3).map((t, i) =>
-            `${i + 1}. ${t.title} (${new Date(t.meeting_date).toLocaleDateString()})\n${t.transcript_text.substring(0, 300)}${t.transcript_text.length > 300 ? '...' : ''}`
-          ).join('\n\n')
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process query');
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to get answer');
+      }
+
+      setIsProcessingQuery(false);
+
+      const sourcesInfo = data.sources
+        ? `\n\n---\n📊 Sources: ${data.sources.documentsSearched} documents, ${data.sources.transcriptsIncluded} transcripts, ${data.sources.contactsFound} contacts`
         : '';
 
-      const clientContext = `
-Client Information:
-• Company: ${client?.company || 'N/A'}
-• Industry: ${client?.industry || 'N/A'}
-• Status: ${client?.status || 'N/A'}
-• Location: ${client?.location || 'N/A'}
-• Contact: ${client?.email || 'N/A'}${transcriptsContext}
-`;
-
-      if (searchResults && searchResults.length > 0) {
-        const documentContext = searchResults
-          .map((result, index) => `[${index + 1}] ${result.content_chunk} (from ${result.document_name}, similarity: ${(result.similarity * 100).toFixed(1)}%)`)
-          .join('\n\n');
-
-        const response = mode === 'deep'
-          ? `${clientContext}\n\nDocument Analysis:\n${documentContext}\n\nKey Insights:\n• Found ${searchResults.length} relevant document sections\n• Analysis includes client profile and ${uploadedDocuments.length} uploaded documents\n• Similarity scores range from ${(searchResults[searchResults.length - 1].similarity * 100).toFixed(1)}% to ${(searchResults[0].similarity * 100).toFixed(1)}%`
-          : `${clientContext}\n\nTop Document Match:\n${searchResults[0].content_chunk.substring(0, 300)}${searchResults[0].content_chunk.length > 300 ? '...' : ''}\n\n(Source: ${searchResults[0].document_name}, ${(searchResults[0].similarity * 100).toFixed(1)}% relevant)`;
-
-        setIsProcessingQuery(false);
-        return response;
-      } else {
-        const fallbackResponse = mode === 'deep'
-          ? `${clientContext}\n\nNo matching documents found for "${query}".\n\nAvailable Information:\n• Client profile data shown above\n• ${uploadedDocuments.length} document(s) uploaded\n• ${meetingTranscripts.length} meeting transcript(s) saved\n\nTo improve search results:\n• Upload more client documents\n• Add meeting transcripts\n• Try a different search query`
-          : `${clientContext}\n\nNo documents matched "${query}". ${uploadedDocuments.length === 0 ? 'Upload documents to enable document search.' : 'Try a different query or check uploaded documents.'}`;
-
-        setIsProcessingQuery(false);
-        return fallbackResponse;
-      }
+      return data.answer + sourcesInfo;
     } catch (error) {
       console.error('Error processing query:', error);
       setIsProcessingQuery(false);
