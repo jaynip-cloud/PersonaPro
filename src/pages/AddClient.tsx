@@ -66,6 +66,13 @@ interface ClientFormData {
   tags: string[];
   description: string;
   csm: string;
+  annualRevenue: string;
+  employeeCount: string;
+  services: Array<{ name: string; description: string }>;
+  technologies: Array<{ name: string; category: string }>;
+  blogs: Array<{ title: string; url: string; date: string }>;
+  painPoints: Array<string>;
+  competitors: Array<{ name: string; comparison: string }>;
 }
 
 export const AddClient: React.FC = () => {
@@ -114,7 +121,14 @@ export const AddClient: React.FC = () => {
     status: 'prospect',
     tags: [],
     description: '',
-    csm: ''
+    csm: '',
+    annualRevenue: '',
+    employeeCount: '',
+    services: [],
+    technologies: [],
+    blogs: [],
+    painPoints: [],
+    competitors: []
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof ClientFormData, string>>>({});
@@ -171,7 +185,14 @@ export const AddClient: React.FC = () => {
           status: data.status || 'prospect',
           tags: data.tags || [],
           description: data.description || '',
-          csm: data.csm || ''
+          csm: data.csm || '',
+          annualRevenue: data.annual_revenue || '',
+          employeeCount: data.employee_count || '',
+          services: data.services || [],
+          technologies: data.technologies || [],
+          blogs: data.blogs || [],
+          painPoints: data.pain_points || [],
+          competitors: data.competitors || []
         });
       }
     } catch (error) {
@@ -530,6 +551,13 @@ export const AddClient: React.FC = () => {
         tags: formData.tags,
         description: formData.description,
         csm: formData.csm,
+        annual_revenue: formData.annualRevenue,
+        employee_count: formData.employeeCount,
+        services: formData.services,
+        technologies: formData.technologies,
+        blogs: formData.blogs,
+        pain_points: formData.painPoints,
+        competitors: formData.competitors,
         location: formData.city && formData.country ? `${formData.city}, ${formData.country}` : formData.city || formData.country || '',
         updated_at: new Date().toISOString()
       };
@@ -1127,6 +1155,29 @@ export const AddClient: React.FC = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Annual Revenue
+                  </label>
+                  <Input
+                    placeholder="e.g., $10M - $50M"
+                    value={formData.annualRevenue}
+                    onChange={(e) => handleInputChange('annualRevenue', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Employee Count
+                  </label>
+                  <Input
+                    placeholder="e.g., 50-200"
+                    value={formData.employeeCount}
+                    onChange={(e) => handleInputChange('employeeCount', e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Notes / Description
@@ -1137,6 +1188,277 @@ export const AddClient: React.FC = () => {
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   className="w-full min-h-[120px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-3">
+                  Services / Products They Use
+                </label>
+                {formData.services.map((service, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <Input
+                      placeholder="Service name"
+                      value={service.name}
+                      onChange={(e) => {
+                        const newServices = [...formData.services];
+                        newServices[index] = { ...service, name: e.target.value };
+                        setFormData({ ...formData, services: newServices });
+                      }}
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="Description"
+                      value={service.description}
+                      onChange={(e) => {
+                        const newServices = [...formData.services];
+                        newServices[index] = { ...service, description: e.target.value };
+                        setFormData({ ...formData, services: newServices });
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const newServices = formData.services.filter((_, i) => i !== index);
+                        setFormData({ ...formData, services: newServices });
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      services: [...formData.services, { name: '', description: '' }]
+                    });
+                  }}
+                  className="mt-2"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Service
+                </Button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-3">
+                  Technologies / Tech Stack
+                </label>
+                {formData.technologies.map((tech, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <Input
+                      placeholder="Technology name"
+                      value={tech.name}
+                      onChange={(e) => {
+                        const newTech = [...formData.technologies];
+                        newTech[index] = { ...tech, name: e.target.value };
+                        setFormData({ ...formData, technologies: newTech });
+                      }}
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="Category (e.g., CRM, Database)"
+                      value={tech.category}
+                      onChange={(e) => {
+                        const newTech = [...formData.technologies];
+                        newTech[index] = { ...tech, category: e.target.value };
+                        setFormData({ ...formData, technologies: newTech });
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const newTech = formData.technologies.filter((_, i) => i !== index);
+                        setFormData({ ...formData, technologies: newTech });
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      technologies: [...formData.technologies, { name: '', category: '' }]
+                    });
+                  }}
+                  className="mt-2"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Technology
+                </Button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-3">
+                  Blogs / Articles / Resources
+                </label>
+                {formData.blogs.map((blog, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <Input
+                      placeholder="Title"
+                      value={blog.title}
+                      onChange={(e) => {
+                        const newBlogs = [...formData.blogs];
+                        newBlogs[index] = { ...blog, title: e.target.value };
+                        setFormData({ ...formData, blogs: newBlogs });
+                      }}
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="URL"
+                      value={blog.url}
+                      onChange={(e) => {
+                        const newBlogs = [...formData.blogs];
+                        newBlogs[index] = { ...blog, url: e.target.value };
+                        setFormData({ ...formData, blogs: newBlogs });
+                      }}
+                      className="flex-1"
+                    />
+                    <Input
+                      type="date"
+                      placeholder="Date"
+                      value={blog.date}
+                      onChange={(e) => {
+                        const newBlogs = [...formData.blogs];
+                        newBlogs[index] = { ...blog, date: e.target.value };
+                        setFormData({ ...formData, blogs: newBlogs });
+                      }}
+                      className="w-40"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const newBlogs = formData.blogs.filter((_, i) => i !== index);
+                        setFormData({ ...formData, blogs: newBlogs });
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      blogs: [...formData.blogs, { title: '', url: '', date: '' }]
+                    });
+                  }}
+                  className="mt-2"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Blog/Article
+                </Button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-3">
+                  Pain Points / Challenges
+                </label>
+                {formData.painPoints.map((painPoint, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <Input
+                      placeholder="Describe a pain point or challenge"
+                      value={painPoint}
+                      onChange={(e) => {
+                        const newPainPoints = [...formData.painPoints];
+                        newPainPoints[index] = e.target.value;
+                        setFormData({ ...formData, painPoints: newPainPoints });
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const newPainPoints = formData.painPoints.filter((_, i) => i !== index);
+                        setFormData({ ...formData, painPoints: newPainPoints });
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      painPoints: [...formData.painPoints, '']
+                    });
+                  }}
+                  className="mt-2"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Pain Point
+                </Button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-3">
+                  Competitors
+                </label>
+                {formData.competitors.map((competitor, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <Input
+                      placeholder="Competitor name"
+                      value={competitor.name}
+                      onChange={(e) => {
+                        const newCompetitors = [...formData.competitors];
+                        newCompetitors[index] = { ...competitor, name: e.target.value };
+                        setFormData({ ...formData, competitors: newCompetitors });
+                      }}
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="How they compare"
+                      value={competitor.comparison}
+                      onChange={(e) => {
+                        const newCompetitors = [...formData.competitors];
+                        newCompetitors[index] = { ...competitor, comparison: e.target.value };
+                        setFormData({ ...formData, competitors: newCompetitors });
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const newCompetitors = formData.competitors.filter((_, i) => i !== index);
+                        setFormData({ ...formData, competitors: newCompetitors });
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      competitors: [...formData.competitors, { name: '', comparison: '' }]
+                    });
+                  }}
+                  className="mt-2"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Competitor
+                </Button>
               </div>
 
               <div>
