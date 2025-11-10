@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { PitchBuilderForm } from '../components/pitch/PitchBuilderForm';
 import { GeneratedPitchDisplay } from '../components/pitch/GeneratedPitchDisplay';
 import { PitchHistory } from '../components/pitch/PitchHistory';
@@ -13,6 +13,7 @@ import { useToast } from '../components/ui/Toast';
 export const PitchGenerator: React.FC = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(true);
@@ -226,7 +227,12 @@ ${(pitch.nextActions || []).map((a, i) => `${i + 1}. ${a}`).join('\n')}`;
       if (error) throw error;
 
       setSavedPitchesCount(prev => prev + 1);
-      showToast('success', 'Pitch saved successfully!');
+      showToast('success', 'Pitch saved successfully! Redirecting to Pitch History...');
+
+      // Navigate to pitch history after a short delay to show the success message
+      setTimeout(() => {
+        navigate('/pitch-history');
+      }, 1500);
     } catch (error) {
       console.error('Error saving pitch:', error);
       showToast('error', 'Failed to save pitch');

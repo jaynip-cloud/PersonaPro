@@ -242,7 +242,12 @@ ${(pitch.nextActions || []).map((action, i) => `${i + 1}. ${action}`).join('\n')
       if (error) throw error;
 
       setSavedPitches([data, ...savedPitches]);
-      alert('Pitch saved successfully!');
+      alert('Pitch saved successfully! Redirecting to Pitch History...');
+
+      // Navigate to pitch history after a short delay
+      setTimeout(() => {
+        navigate('/pitch-history');
+      }, 1500);
     } catch (error: any) {
       console.error('Error saving pitch:', error);
       alert(`Failed to save pitch: ${error?.message || 'Unknown error'}`);
