@@ -207,7 +207,7 @@ export const Projects: React.FC = () => {
           is_ai_generated,
           clients!inner(
             id,
-            company_name
+            company
           )
         `)
         .eq('clients.organization_id', membership.organization_id)
@@ -220,7 +220,7 @@ export const Projects: React.FC = () => {
         name: p.name,
         projectCode: p.project_code || `PRJ-${p.id.substring(0, 8)}`,
         clientId: p.client_id,
-        clientName: p.clients?.company_name || 'Unknown Client',
+        clientName: p.clients?.company || 'Unknown Client',
         projectType: p.project_type || 'General',
         status: p.status || 'planned',
         startDate: p.start_date || new Date().toISOString().split('T')[0],

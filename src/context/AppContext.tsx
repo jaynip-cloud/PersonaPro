@@ -93,6 +93,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       }
 
       try {
+        console.log('🔍 Attempting to load clients from Supabase...');
         const { data, error } = await supabase
           .from('clients')
           .select('*')
@@ -100,9 +101,12 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
           .order('created_at', { ascending: false });
 
         if (error) {
-          console.error('Error loading clients:', error);
+          console.error('❌ Error loading clients from Supabase:', error);
+          console.log('⚠️ Falling back to mock data');
           setClients(mockClients);
         } else if (data) {
+          console.log('✅ Successfully loaded', data.length, 'clients from Supabase');
+          console.log('📊 Clients data:', data);
           const mappedClients: Client[] = data.map((client: any) => ({
             id: client.id,
             name: client.name || client.contact_name || 'Unknown',

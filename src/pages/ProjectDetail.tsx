@@ -155,7 +155,7 @@ export const ProjectDetail: React.FC = () => {
           *,
           clients!inner(
             id,
-            company_name
+            company
           )
         `)
         .eq('id', id)
@@ -172,7 +172,7 @@ export const ProjectDetail: React.FC = () => {
         id: projectData.id,
         name: projectData.name,
         clientId: projectData.client_id,
-        clientName: projectData.clients?.company_name || 'Unknown',
+        clientName: projectData.clients?.company || 'Unknown',
         projectType: projectData.project_type || 'General',
         status: projectData.status || 'planned',
         summary: projectData.summary || 'No summary available',

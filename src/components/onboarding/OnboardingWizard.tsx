@@ -127,9 +127,11 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
   useEffect(() => {
     if (isOpen && user) {
-      loadExistingData();
-      // Load persisted onboarding data from localStorage
-      loadPersistedData();
+      // Load database data first, then load persisted data from localStorage
+      // This ensures database data takes priority
+      loadExistingData().then(() => {
+        loadPersistedData();
+      });
     }
   }, [isOpen, user]);
 
@@ -141,8 +143,26 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
       
       if (persistedData) {
         const parsedData = JSON.parse(persistedData);
-        // Merge persisted data with existing data, prioritizing persisted data
-        setFormData(prev => ({ ...prev, ...parsedData }));
+        // Merge persisted data with existing data, but only fill in empty fields
+        // This ensures database data takes priority over localStorage
+        setFormData(prev => {
+          const merged = { ...prev };
+          // Only merge fields that are empty in the current state
+          Object.keys(parsedData).forEach(key => {
+            if (key === 'leadership' || key === 'services' || key === 'blogs') {
+              // For arrays, only use localStorage if database data is empty
+              if (!prev[key as keyof typeof prev] || (Array.isArray(prev[key as keyof typeof prev]) && (prev[key as keyof typeof prev] as any[]).length === 0)) {
+                merged[key as keyof typeof merged] = parsedData[key];
+              }
+            } else {
+              // For other fields, only use localStorage if database data is empty
+              if (!prev[key as keyof typeof prev] || prev[key as keyof typeof prev] === '') {
+                merged[key as keyof typeof merged] = parsedData[key];
+              }
+            }
+          });
+          return merged;
+        });
       }
       
       if (persistedStep) {
@@ -177,6 +197,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
       }
     }
   }, [currentStep, isOpen, user]);
+
+  // Debug: Log leadership data whenever it changes
+  useEffect(() => {
+    console.log('Leadership data in formData:', formData.leadership);
+    console.log('Leadership array length:', formData.leadership.length);
+    if (formData.leadership.length > 0) {
+      console.log('Leadership members:', formData.leadership);
+    }
+  }, [formData.leadership]);
 
   const loadExistingData = async () => {
     if (!user) return;
@@ -214,6 +243,23 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         });
 
         const leadership = parseJsonField(profile.leadership) || [];
+        // Normalize leadership data to ensure it's an array with proper structure
+        const leadershipArray = Array.isArray(leadership) 
+          ? leadership.map((l: any) => ({
+              id: l.id || `leader-${Date.now()}-${Math.random()}`,
+              name: l.name || '',
+              role: l.role || l.title || '',
+              bio: l.bio || '',
+              linkedinUrl: l.linkedinUrl || l.linkedin || '',
+              email: l.email || '',
+              experience: l.experience || '',
+              education: l.education || '',
+              skills: l.skills || []
+            }))
+          : [];
+        
+        console.log('Loaded leadership from database:', leadershipArray);
+        
         const blogs = parseJsonField(profile.blogs) || [];
         const technology = parseJsonField(profile.technology) || {};
 
@@ -237,7 +283,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
           instagramUrl: profile.instagram_url || '',
           youtubeUrl: profile.youtube_url || '',
           services: servicesArray,
-          leadership: leadership,
+          leadership: leadershipArray,
           blogs: blogs,
           techStack: technology.stack || [],
           partners: technology.partners || [],
@@ -532,33 +578,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
       const extractedData = result.data;
 
-      setFormData(prev => ({
-        ...prev,
-        companyName: extractedData.name || prev.companyName,
-        industry: extractedData.industry || prev.industry,
-        description: extractedData.description || prev.description,
-        founded: extractedData.founded || prev.founded,
-        size: extractedData.companySize || prev.size,
-        location: extractedData.location?.city && extractedData.location?.country
-          ? `${extractedData.location.city}, ${extractedData.location.country}`
-          : prev.location,
-        mission: extractedData.businessInfo?.mission || prev.mission,
-        vision: extractedData.businessInfo?.vision || prev.vision,
-        address: extractedData.contactInfo?.address || (extractedData.location?.city
-          ? `${extractedData.location.city}, ${extractedData.location.country || ''}${extractedData.location.zipCode ? ' ' + extractedData.location.zipCode : ''}`
-          : prev.address),
-        email: extractedData.contactInfo?.primaryEmail || prev.email,
-        phone: extractedData.contactInfo?.primaryPhone || prev.phone,
-        linkedinUrl: extractedData.socialProfiles?.linkedin || prev.linkedinUrl,
-        twitterUrl: extractedData.socialProfiles?.twitter || prev.twitterUrl,
-        facebookUrl: extractedData.socialProfiles?.facebook || prev.facebookUrl,
-        instagramUrl: extractedData.socialProfiles?.instagram || prev.instagramUrl,
-        services: extractedData.services?.map((s: any) => ({
-          id: `service-${Date.now()}-${Math.random()}`,
-          name: s.name || '',
-          description: s.description || ''
-        })) || prev.services,
-        leadership: extractedData.leadership ? [
+      // Log extracted leadership data for debugging
+      console.log('Extracted leadership data from API:', extractedData.leadership);
+
+      setFormData(prev => {
+        // Transform leadership data into array format
+        const extractedLeadership = extractedData.leadership ? [
           extractedData.leadership.ceo ? {
             id: `leader-ceo-${Date.now()}`,
             name: extractedData.leadership.ceo.name || '',
@@ -592,19 +617,51 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             education: '',
             skills: []
           } : null
-        ].filter(Boolean) : prev.leadership,
-        blogs: extractedData.blogs?.map((b: any) => ({
-          id: `blog-${Date.now()}-${Math.random()}`,
-          title: b.title || '',
-          url: b.url || '',
-          date: b.date || '',
-          summary: b.summary || '',
-          author: b.author || ''
-        })) || prev.blogs,
-        techStack: extractedData.technology?.stack || prev.techStack,
-        partners: extractedData.technology?.partners || prev.partners,
-        integrations: extractedData.technology?.integrations || prev.integrations,
-      }));
+        ].filter(Boolean) as LeadershipMember[] : prev.leadership;
+        
+        console.log('Transformed leadership array:', extractedLeadership);
+        console.log('Setting leadership in formData, length:', extractedLeadership.length);
+
+        return {
+          ...prev,
+          companyName: extractedData.name || prev.companyName,
+          industry: extractedData.industry || prev.industry,
+          description: extractedData.description || prev.description,
+          founded: extractedData.founded || prev.founded,
+          size: extractedData.companySize || prev.size,
+          location: extractedData.location?.city && extractedData.location?.country
+            ? `${extractedData.location.city}, ${extractedData.location.country}`
+            : prev.location,
+          mission: extractedData.businessInfo?.mission || prev.mission,
+          vision: extractedData.businessInfo?.vision || prev.vision,
+          address: extractedData.contactInfo?.address || (extractedData.location?.city
+            ? `${extractedData.location.city}, ${extractedData.location.country || ''}${extractedData.location.zipCode ? ' ' + extractedData.location.zipCode : ''}`
+            : prev.address),
+          email: extractedData.contactInfo?.primaryEmail || prev.email,
+          phone: extractedData.contactInfo?.primaryPhone || prev.phone,
+          linkedinUrl: extractedData.socialProfiles?.linkedin || prev.linkedinUrl,
+          twitterUrl: extractedData.socialProfiles?.twitter || prev.twitterUrl,
+          facebookUrl: extractedData.socialProfiles?.facebook || prev.facebookUrl,
+          instagramUrl: extractedData.socialProfiles?.instagram || prev.instagramUrl,
+          services: extractedData.services?.map((s: any) => ({
+            id: `service-${Date.now()}-${Math.random()}`,
+            name: s.name || '',
+            description: s.description || ''
+          })) || prev.services,
+          leadership: extractedLeadership,
+          blogs: extractedData.blogs?.map((b: any) => ({
+            id: `blog-${Date.now()}-${Math.random()}`,
+            title: b.title || '',
+            url: b.url || '',
+            date: b.date || '',
+            summary: b.summary || '',
+            author: b.author || ''
+          })) || prev.blogs,
+          techStack: extractedData.technology?.stack || prev.techStack,
+          partners: extractedData.technology?.partners || prev.partners,
+          integrations: extractedData.technology?.integrations || prev.integrations,
+        };
+      });
 
       const leadershipCount = extractedData.leadership ?
         [extractedData.leadership.ceo, extractedData.leadership.founder, extractedData.leadership.owner].filter(Boolean).length : 0;
@@ -1243,6 +1300,12 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                 </Button>
               </div>
 
+              {(() => {
+                console.log('Rendering Step 5 - Leadership length:', formData.leadership.length);
+                console.log('Rendering Step 5 - Leadership data:', formData.leadership);
+                return null;
+              })()}
+
               {formData.leadership.length === 0 ? (
                 <div className="text-center py-12 text-slate-500">
                   <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -1250,7 +1313,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {formData.leadership.map((leader, index) => (
+                  {formData.leadership.map((leader, index) => {
+                    console.log('Rendering leader:', leader);
+                    return (
                     <div key={leader.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
                       <div className="flex justify-between items-start">
                         <h4 className="font-medium text-slate-900">Leader {index + 1}</h4>
@@ -1284,7 +1349,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                         placeholder="Bio/Background"
                       />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

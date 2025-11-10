@@ -77,7 +77,7 @@ export const Dashboard: React.FC = () => {
             *,
             clients(
               id,
-              company_name,
+              company,
               name
             )
           `)
@@ -91,7 +91,7 @@ export const Dashboard: React.FC = () => {
         supabase
           .from('saved_pitches')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('created_by', user.id)
           .order('created_at', { ascending: false }),
         supabase
           .from('contacts')
@@ -389,7 +389,7 @@ export const Dashboard: React.FC = () => {
               <div className="space-y-4">
                 {projects.slice(0, 5).map((project) => {
                   const client = project.clients || (typeof project.clients === 'object' ? project.clients : null);
-                  const clientName = client?.company_name || client?.name || 'Unknown Client';
+                  const clientName = client?.company || client?.name || 'Unknown Client';
                   const projectDate = project.updated_at || project.created_at;
                   
                   const getStatusVariant = (status: string) => {

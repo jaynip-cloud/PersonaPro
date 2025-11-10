@@ -98,6 +98,14 @@ Deno.serve(async (req: Request) => {
       .order('meeting_date', { ascending: false })
       .limit(5);
 
+    // Fetch existing opportunities to avoid generating similar ones
+    const { data: existingOpportunities } = await supabase
+      .from('opportunities')
+      .select('id, title, description, created_at')
+      .eq('client_id', clientId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20); // Get recent opportunities to avoid duplicates
 
     let marketIntelligence = '';
     let marketIntelligenceError: string | null = null;
@@ -283,6 +291,24 @@ ${companyProfile?.ai_insights?.approach ? `Approach: ${companyProfile.ai_insight
 
 ${intelligenceContext}
 
+## EXISTING OPPORTUNITIES TO AVOID DUPLICATING
+
+${existingOpportunities && existingOpportunities.length > 0 ? `
+The following opportunities have already been identified for this client. You MUST generate a COMPLETELY DIFFERENT opportunity that:
+- Addresses a DIFFERENT need, pain point, or goal
+- Focuses on a DIFFERENT area or capability
+- Uses a DIFFERENT approach or solution
+- Is DISTINCT and UNIQUE from all existing opportunities below
+
+Existing Opportunities:
+${existingOpportunities.map((opp: any, idx: number) => `
+${idx + 1}. "${opp.title}"
+   Description: ${opp.description.substring(0, 200)}${opp.description.length > 200 ? '...' : ''}
+`).join('\n')}
+
+CRITICAL: Your new opportunity MUST be substantially different from ALL of the above. Do NOT suggest similar solutions, similar areas, or similar approaches. Think creatively and identify a NEW angle, NEW need, or NEW opportunity that hasn't been covered yet.
+` : 'No existing opportunities found - you can generate any relevant opportunity.'}
+
 ## YOUR TASK
 
 Analyze the 3 intelligence layers above and generate EXACTLY 1 (ONE) HIGH-QUALITY, PERSONALIZED, INSIGHT-DRIVEN growth opportunity that:
@@ -373,7 +399,11 @@ INVALID OUTPUT FORMATS (DO NOT USE THESE):
 - Multiple opportunity objects ❌ WRONG
 - An array of opportunities ❌ WRONG
 
-Analyze deeply across all 3 intelligence layers and provide THE SINGLE BEST, MOST STRATEGIC, HIGH-VALUE, PERSONALIZED opportunity that will drive real business growth. Remember: ONE opportunity only, in the exact format shown above.`;
+Analyze deeply across all 3 intelligence layers and provide THE SINGLE BEST, MOST STRATEGIC, HIGH-VALUE, PERSONALIZED opportunity that will drive real business growth. 
+
+CRITICAL REMINDER: If there are existing opportunities listed above, your new opportunity MUST be COMPLETELY DIFFERENT and UNIQUE from all of them. Think creatively and find a NEW angle, NEW need, or NEW opportunity that hasn't been suggested yet.
+
+Remember: ONE opportunity only, in the exact format shown above.`;
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -386,14 +416,14 @@ Analyze deeply across all 3 intelligence layers and provide THE SINGLE BEST, MOS
         messages: [
           {
             role: 'system',
-            content: 'You are an elite business development strategist specializing in opportunity identification and strategic selling. You analyze 3 intelligence layers (Client Intelligence, Market Intelligence, Company Knowledge Base) to generate EXACTLY 1 personalized, insight-driven growth opportunity. You MUST return only 1 opportunity, never multiple. You match specific client needs with company capabilities, reference case studies when relevant, and ensure opportunities are timely and strategically relevant. Always respond with valid JSON only in the format: {"opportunity": {"title": "...", "description": "..."}}. Never return an array of opportunities.',
+            content: 'You are an elite business development strategist specializing in opportunity identification and strategic selling. You analyze 3 intelligence layers (Client Intelligence, Market Intelligence, Company Knowledge Base) to generate EXACTLY 1 personalized, insight-driven growth opportunity. You MUST return only 1 opportunity, never multiple. You match specific client needs with company capabilities, reference case studies when relevant, and ensure opportunities are timely and strategically relevant. CRITICAL: When existing opportunities are provided, you MUST generate a COMPLETELY DIFFERENT and UNIQUE opportunity that addresses different needs, uses different approaches, and explores new angles. Always respond with valid JSON only in the format: {"opportunity": {"title": "...", "description": "..."}}. Never return an array of opportunities.',
           },
           {
             role: 'user',
             content: opportunityPrompt,
           },
         ],
-        temperature: 0.7, // Higher temperature for more variation between generations
+        temperature: 0.9, // Higher temperature for more variation and creativity between generations
         max_tokens: 1500, // Limit tokens to prevent multiple opportunities
       }),
     });

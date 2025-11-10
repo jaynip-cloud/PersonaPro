@@ -4,7 +4,6 @@ import { PitchBuilderForm } from '../components/pitch/PitchBuilderForm';
 import { GeneratedPitchDisplay } from '../components/pitch/GeneratedPitchDisplay';
 import { PitchHistory } from '../components/pitch/PitchHistory';
 import { GeneratedPitch, PitchGeneratorInput, Client } from '../types';
-import { generatePitchVariants } from '../utils/pitchGenerator';
 import { FileText, History, Sparkles, Loader2 } from 'lucide-react';
 import { Badge } from '../components/ui/Badge';
 import { supabase } from '../lib/supabase';
@@ -91,40 +90,81 @@ export const PitchGenerator: React.FC = () => {
     }
   };
 
-  const handleGenerate = (input: PitchGeneratorInput) => {
+  const handleGenerate = async (input: PitchGeneratorInput) => {
     console.log('handleGenerate called with input:', input);
     console.log('Available clients:', clients.length);
 
     setIsGenerating(true);
     setViewingPitch(null);
 
-    const simulatedDelay = Math.random() * 2000 + 2000;
+    try {
+      const client = clients.find(c => c.id === input.clientId);
+      console.log('Found client:', client);
 
-    setTimeout(() => {
-      try {
-        const client = clients.find(c => c.id === input.clientId);
-        console.log('Found client:', client);
-
-        if (!client) {
-          console.error('Client not found for ID:', input.clientId);
-          showToast('error', 'Client not found');
-          setIsGenerating(false);
-          return;
-        }
-
-        console.log('Generating pitch variants...');
-        const { variantA, variantB } = generatePitchVariants(input, client);
-        console.log('Generated variants:', variantA, variantB);
-
-        setGeneratedPitches([variantA, variantB]);
+      if (!client) {
+        console.error('Client not found for ID:', input.clientId);
+        showToast('error', 'Client not found');
         setIsGenerating(false);
-        showToast('success', 'Pitch variants generated successfully');
-      } catch (error) {
-        console.error('Error generating pitch:', error);
-        showToast('error', 'Failed to generate pitch');
-        setIsGenerating(false);
+        return;
       }
-    }, simulatedDelay);
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-pitch`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId: input.clientId,
+          opportunityId: input.opportunityId,
+          projectId: input.projectId,
+          services: input.services,
+          tone: input.tone || 'formal',
+          length: input.length || 'long',
+          customContext: input.customContext,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate pitch');
+      }
+
+      const { pitch, metadata } = await response.json();
+
+      // Convert API response to GeneratedPitch format
+      const generatedPitch: GeneratedPitch = {
+        id: `pitch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        clientId: input.clientId,
+        clientName: client.name,
+        clientCompany: client.company,
+        services: input.services || [],
+        tone: input.tone || 'formal',
+        length: input.length || 'long',
+        title: pitch.title,
+        openingHook: pitch.openingHook,
+        problemFraming: pitch.problemFraming,
+        proposedSolution: pitch.proposedSolution,
+        valueOutcomes: pitch.valueOutcomes,
+        whyUs: pitch.whyUs,
+        nextStepCTA: pitch.nextStepCTA,
+        createdAt: new Date().toISOString(),
+        companyDescription: input.companyDescription,
+        opportunityId: input.opportunityId,
+        projectId: input.projectId,
+      };
+
+      setGeneratedPitches([generatedPitch]);
+      setIsGenerating(false);
+      showToast('success', 'Pitch generated successfully');
+    } catch (error: any) {
+      console.error('Error generating pitch:', error);
+      showToast('error', `Failed to generate pitch: ${error?.message || 'Unknown error'}`);
+      setIsGenerating(false);
+    }
   };
 
   const handleSavePitch = async (pitch: GeneratedPitch) => {

@@ -7,7 +7,6 @@ import { useNavigate } from 'react-router-dom';
 import { PitchBuilderForm } from '../pitch/PitchBuilderForm';
 import { GeneratedPitchDisplay } from '../pitch/GeneratedPitchDisplay';
 import { mockClients } from '../../data/mockData';
-import { generatePitchVariants } from '../../utils/pitchGenerator';
 import { GeneratedPitch, PitchGeneratorInput } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -108,13 +107,11 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
     setShowPitchModal(true);
   };
 
-  const handlePitchGenerate = (input: PitchGeneratorInput) => {
+  const handlePitchGenerate = async (input: PitchGeneratorInput) => {
     console.log('handlePitchGenerate called with:', input);
     setIsGenerating(true);
 
-    const simulatedDelay = Math.random() * 2000 + 2000;
-
-    setTimeout(() => {
+    try {
       const client = clients.find(c => c.id === input.clientId);
       console.log('Found client:', client);
       if (!client) {
@@ -123,10 +120,61 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
         return;
       }
 
-      const { variantA, variantB } = generatePitchVariants(input, client);
-      setGeneratedPitches([variantA, variantB]);
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-pitch`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId: input.clientId,
+          opportunityId: input.opportunityId,
+          projectId: input.projectId || project.id,
+          services: input.services,
+          tone: input.tone || 'formal',
+          length: input.length || 'long',
+          customContext: input.customContext,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate pitch');
+      }
+
+      const { pitch, metadata } = await response.json();
+
+      // Convert API response to GeneratedPitch format
+      const generatedPitch: GeneratedPitch = {
+        id: `pitch-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        clientId: input.clientId,
+        clientName: client.name,
+        clientCompany: client.company,
+        services: input.services || [],
+        tone: input.tone || 'formal',
+        length: input.length || 'long',
+        title: pitch.title,
+        openingHook: pitch.openingHook,
+        problemFraming: pitch.problemFraming,
+        proposedSolution: pitch.proposedSolution,
+        valueOutcomes: pitch.valueOutcomes,
+        whyUs: pitch.whyUs,
+        nextStepCTA: pitch.nextStepCTA,
+        createdAt: new Date().toISOString(),
+        companyDescription: input.companyDescription,
+        opportunityId: input.opportunityId,
+        projectId: input.projectId || project.id,
+      };
+
+      setGeneratedPitches([generatedPitch]);
       setIsGenerating(false);
-    }, simulatedDelay);
+    } catch (error: any) {
+      console.error('Error generating pitch:', error);
+      setIsGenerating(false);
+    }
   };
 
   const handleSavePitch = async (pitch: GeneratedPitch) => {

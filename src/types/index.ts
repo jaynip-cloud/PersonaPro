@@ -381,25 +381,39 @@ export interface ClientMatch {
 export interface GeneratedPitch {
   id: string;
   clientId: string;
-  clientName: string;
-  clientCompany: string;
-  services: string[];
+  clientName?: string;
+  clientCompany?: string;
+  services?: string[];
   tone: 'formal' | 'casual';
   length: 'short' | 'long';
-  elevatorPitch: string;
-  valuePoints: string[];
-  nextActions: string[];
-  confidence: number;
-  evidenceTags: string[];
-  variant: 'A' | 'B';
+  // New format fields
+  title: string;
+  openingHook: string;
+  problemFraming: string;
+  proposedSolution: string;
+  valueOutcomes: string[];
+  whyUs: string;
+  nextStepCTA: string;
+  // Legacy format fields (for backward compatibility)
+  elevatorPitch?: string;
+  valuePoints?: string[];
+  nextActions?: string[];
+  confidence?: number;
+  evidenceTags?: string[];
+  variant?: 'A' | 'B';
   createdAt: string;
   companyDescription?: string;
+  opportunityId?: string;
+  projectId?: string;
 }
 
 export interface PitchGeneratorInput {
   clientId: string;
-  services: string[];
-  companyDescription: string;
-  tone: 'formal' | 'casual';
-  length: 'short' | 'long';
+  services?: string[];
+  companyDescription?: string;
+  tone?: 'formal' | 'casual';
+  length?: 'short' | 'long';
+  opportunityId?: string;
+  projectId?: string;
+  customContext?: string;
 }

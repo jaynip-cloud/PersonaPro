@@ -4,7 +4,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
-import { AIDataExtractor } from '../components/knowledge/AIDataExtractor';
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -45,7 +44,7 @@ import {
   Gauge
 } from 'lucide-react';
 
-type TabType = 'overview' | 'ai-extract' | 'company' | 'contact' | 'social' | 'services' | 'team' | 'blogs' | 'technology';
+type TabType = 'overview' | 'company' | 'contact' | 'social' | 'services' | 'team' | 'blogs' | 'technology';
 
 export const KnowledgeBase: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -462,78 +461,8 @@ export const KnowledgeBase: React.FC = () => {
     }
   };
 
-  const handleDataExtracted = (data: any) => {
-    console.log('Extracted data:', data);
-
-    if (data.companyInfo) {
-      setCompanyInfo(prev => ({
-        ...prev,
-        ...data.companyInfo
-      }));
-    }
-
-    if (data.contactInfo) {
-      setContactInfo(prev => ({
-        ...prev,
-        ...data.contactInfo
-      }));
-    }
-
-    if (data.socialProfiles) {
-      setSocialProfiles(prev => ({
-        ...prev,
-        ...data.socialProfiles
-      }));
-    }
-
-    if (data.leadership && data.leadership.length > 0) {
-      const newLeadership = data.leadership.map((member: any, index: number) => ({
-        id: `extracted-${Date.now()}-${index}`,
-        name: member.name || '',
-        role: member.role || '',
-        bio: member.bio || member.specialization || '',
-        experience: member.experience || ''
-      }));
-      setLeadership(newLeadership);
-    }
-
-    if (data.services && data.services.length > 0) {
-      const newServices = data.services.map((service: any, index: number) => ({
-        id: `extracted-${Date.now()}-${index}`,
-        name: service.name || '',
-        description: service.description || '',
-        tags: service.tags || [],
-        pricing: service.pricing || service.budgetRange || ''
-      }));
-      setServices(newServices);
-    }
-
-    if (data.blogs && data.blogs.length > 0) {
-      const newBlogs = data.blogs.map((blog: any, index: number) => ({
-        id: `extracted-${Date.now()}-${index}`,
-        title: blog.title || '',
-        url: blog.url || '',
-        date: blog.date || '',
-        summary: blog.summary || '',
-        author: blog.author || ''
-      }));
-      setBlogs(newBlogs);
-    }
-
-    if (data.technology) {
-      setTechnology({
-        stack: data.technology.stack || [],
-        partners: data.technology.partners || [],
-        integrations: data.technology.integrations || []
-      });
-    }
-
-    setActiveTab('company');
-  };
-
   const tabs = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
-    { id: 'ai-extract', label: 'AI Extract', icon: Sparkles },
     { id: 'company', label: 'Company', icon: Building2 },
     { id: 'contact', label: 'Contact', icon: Phone },
     { id: 'social', label: 'Social', icon: Globe },
@@ -922,10 +851,6 @@ export const KnowledgeBase: React.FC = () => {
             </CardContent>
           </Card>
         </div>
-      )}
-
-      {activeTab === 'ai-extract' && (
-        <AIDataExtractor onDataExtracted={handleDataExtracted} />
       )}
 
       {activeTab === 'company' && (

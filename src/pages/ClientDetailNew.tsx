@@ -938,6 +938,7 @@ Client Information:
           client_id: id,
           name: opportunity.title,
           summary: opportunity.description,
+          description: opportunity.description, // Also set description field for ProjectDetailPanel
           status: 'opportunity_identified',
           project_type: 'Pre-Sales',
           opportunity_id: opportunityId,
@@ -2412,7 +2413,7 @@ Client Information:
           project={{
             id: selectedProject.id,
             title: selectedProject.name,
-            description: selectedProject.description || '',
+            description: selectedProject.description || selectedProject.summary || '',
             status: selectedProject.status,
             budget: selectedProject.budget,
             timeline: selectedProject.timeline,
