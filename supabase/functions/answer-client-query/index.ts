@@ -38,15 +38,17 @@ function analyzeQueryIntent(query: string): QueryIntent {
   }
 
   // Topic detection
-  if (lowerQuery.match(/pain point|problem|challenge|issue|concern/)) topics.push('challenges');
+  if (lowerQuery.match(/pain point|problem|challenge|issue|concern|difficulty|struggle/)) topics.push('challenges');
   if (lowerQuery.match(/opportunity|growth|upsell|expansion/)) topics.push('opportunities');
   if (lowerQuery.match(/meeting|discussion|call|conversation/)) topics.push('meetings');
   if (lowerQuery.match(/contact|person|people|team|who/)) topics.push('contacts');
-  if (lowerQuery.match(/technology|tech stack|tools|software/)) topics.push('technology');
+  if (lowerQuery.match(/technology|tech stack|tools|software|platform|framework/)) topics.push('technology');
   if (lowerQuery.match(/budget|cost|price|revenue|financial/)) topics.push('financial');
   if (lowerQuery.match(/timeline|when|schedule|deadline/)) topics.push('timeline');
-  if (lowerQuery.match(/competitor|competition|market/)) topics.push('market');
+  if (lowerQuery.match(/competitor|competition|market|alternative|rival/)) topics.push('market');
+  if (lowerQuery.match(/competitor/)) topics.push('competitors');
   if (lowerQuery.match(/service|solution|product|offering/)) topics.push('services');
+  if (lowerQuery.match(/blog|article|content|post|publication|resource/)) topics.push('content');
 
   // Timeframe detection
   if (lowerQuery.match(/recent|latest|last|current|now/)) timeframe = 'recent';
@@ -108,8 +110,69 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     if (client.employee_count) clientSection.push(`Employees: ${client.employee_count}`);
   }
 
-  if (intent.topics.includes('technology') && client.technologies) {
-    clientSection.push(`Technologies: ${Array.isArray(client.technologies) ? client.technologies.join(', ') : client.technologies}`);
+  // Services/Products they use
+  if (client.services && Array.isArray(client.services) && client.services.length > 0) {
+    clientSection.push('\nServices/Products They Use:');
+    client.services.forEach((service: any) => {
+      const name = service.name || '';
+      const desc = service.description || '';
+      if (name) {
+        clientSection.push(`  • ${name}${desc ? `: ${desc}` : ''}`);
+      }
+    });
+  }
+
+  // Technologies
+  if (client.technologies && Array.isArray(client.technologies) && client.technologies.length > 0) {
+    clientSection.push('\nTechnology Stack:');
+    client.technologies.forEach((tech: any) => {
+      const name = tech.name || tech;
+      const category = tech.category || '';
+      if (name) {
+        clientSection.push(`  • ${name}${category ? ` (${category})` : ''}`);
+      }
+    });
+  }
+
+  // Blogs/Articles they publish
+  if (intent.topics.includes('content') || mode === 'deep') {
+    if (client.blogs && Array.isArray(client.blogs) && client.blogs.length > 0) {
+      clientSection.push('\nRecent Blog Posts/Articles:');
+      client.blogs.slice(0, 5).forEach((blog: any) => {
+        const title = blog.title || '';
+        const url = blog.url || '';
+        const date = blog.date || '';
+        if (title) {
+          clientSection.push(`  • ${title}${date ? ` (${date})` : ''}${url ? ` - ${url}` : ''}`);
+        }
+      });
+    }
+  }
+
+  // Pain Points/Challenges
+  if (intent.topics.includes('challenges') || intent.type === 'analytical' || intent.type === 'recommendation') {
+    if (client.pain_points && Array.isArray(client.pain_points) && client.pain_points.length > 0) {
+      clientSection.push('\nKnown Pain Points/Challenges:');
+      client.pain_points.forEach((painPoint: string) => {
+        if (painPoint) {
+          clientSection.push(`  • ${painPoint}`);
+        }
+      });
+    }
+  }
+
+  // Competitors
+  if (intent.topics.includes('market') || intent.topics.includes('competitors') || mode === 'deep') {
+    if (client.competitors && Array.isArray(client.competitors) && client.competitors.length > 0) {
+      clientSection.push('\nCompetitors/Alternatives They Consider:');
+      client.competitors.forEach((competitor: any) => {
+        const name = competitor.name || competitor;
+        const comparison = competitor.comparison || competitor.description || '';
+        if (name) {
+          clientSection.push(`  • ${name}${comparison ? `: ${comparison}` : ''}`);
+        }
+      });
+    }
   }
 
   if (client.ai_insights) {
@@ -432,10 +495,15 @@ Deno.serve(async (req: Request) => {
       hasDocuments: (documentMatches?.length || 0) > 0,
       hasOpportunities: opportunities.length > 0,
       hasAIInsights: !!client.ai_insights,
+      hasServices: !!(client.services && Array.isArray(client.services) && client.services.length > 0),
+      hasTechnologies: !!(client.technologies && Array.isArray(client.technologies) && client.technologies.length > 0),
+      hasPainPoints: !!(client.pain_points && Array.isArray(client.pain_points) && client.pain_points.length > 0),
+      hasCompetitors: !!(client.competitors && Array.isArray(client.competitors) && client.competitors.length > 0),
+      hasBlogs: !!(client.blogs && Array.isArray(client.blogs) && client.blogs.length > 0),
     };
 
     const qualityScore = Object.values(dataQuality).filter(Boolean).length;
-    const confidence = qualityScore >= 4 ? 'high' : qualityScore >= 2 ? 'medium' : 'low';
+    const confidence = qualityScore >= 6 ? 'high' : qualityScore >= 3 ? 'medium' : 'low';
 
     return new Response(
       JSON.stringify({

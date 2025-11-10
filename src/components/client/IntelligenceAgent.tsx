@@ -33,10 +33,13 @@ export const IntelligenceAgent: React.FC<IntelligenceAgentProps> = ({
 
   const suggestions = [
     'What are the key pain points for this client?',
+    'What technologies and tools do they currently use?',
+    'Who are their main competitors?',
+    'What services or products are they using?',
     'Summarize recent interactions and sentiment',
-    'What upsell opportunities exist?',
-    'Analyze communication patterns',
-    'Identify potential risks'
+    'What upsell opportunities exist based on their tech stack?',
+    'What content topics are they interested in based on their blogs?',
+    'How can we address their pain points with our solutions?'
   ];
 
   useEffect(() => {
