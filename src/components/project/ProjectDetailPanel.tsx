@@ -75,10 +75,13 @@ export const ProjectDetailPanel: React.FC<ProjectDetailPanelProps> = ({
 
   const loadSavedPitches = async (projectId: string) => {
     try {
+      // Load pitches that are either:
+      // 1. Directly associated with this project (project_id matches)
+      // 2. Associated with the same client (client_id matches and project_id is null)
       const { data, error } = await supabase
         .from('saved_pitches')
         .select('*')
-        .eq('project_id', projectId)
+        .or(`project_id.eq.${projectId},and(client_id.eq.${project.client_id},project_id.is.null)`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -448,10 +451,17 @@ ${(pitch.nextActions || []).map((action, i) => `${i + 1}. ${action}`).join('\n')
                 {savedPitches.map((pitch) => (
                   <div key={pitch.id} className="p-4 border border-border rounded-lg bg-muted/30">
                     <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h4 className="font-medium text-foreground">{pitch.title}</h4>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium text-foreground">{pitch.title}</h4>
+                          {pitch.project_id === project.id ? (
+                            <Badge variant="primary" size="sm">Project</Badge>
+                          ) : (
+                            <Badge variant="secondary" size="sm">Client</Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(pitch.created_at).toLocaleString()} • Variant {pitch.variant}
+                          {new Date(pitch.created_at).toLocaleString()} • Variant {pitch.variant || 'A'}
                         </p>
                       </div>
                       <div className="flex gap-2">
