@@ -263,10 +263,23 @@ export const KnowledgeBase: React.FC = () => {
     setServices(updatedServices);
   };
 
-  const deleteService = (index: number) => {
+  const deleteService = async (index: number) => {
     if (confirm('Are you sure you want to delete this service?')) {
       const updatedServices = services.filter((_, i) => i !== index);
       setServices(updatedServices);
+
+      // Save to database immediately
+      if (user) {
+        try {
+          await supabase
+            .from('company_profiles')
+            .update({ services: updatedServices, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id);
+        } catch (error) {
+          console.error('Error deleting service:', error);
+          alert('Failed to delete service. Please try again.');
+        }
+      }
     }
   };
 
@@ -291,10 +304,23 @@ export const KnowledgeBase: React.FC = () => {
     setLeadership(updatedLeadership);
   };
 
-  const deleteLeader = (index: number) => {
+  const deleteLeader = async (index: number) => {
     if (confirm('Are you sure you want to delete this leader?')) {
       const updatedLeadership = leadership.filter((_, i) => i !== index);
       setLeadership(updatedLeadership);
+
+      // Save to database immediately
+      if (user) {
+        try {
+          await supabase
+            .from('company_profiles')
+            .update({ leadership: updatedLeadership, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id);
+        } catch (error) {
+          console.error('Error deleting leader:', error);
+          alert('Failed to delete leader. Please try again.');
+        }
+      }
     }
   };
 
@@ -317,44 +343,135 @@ export const KnowledgeBase: React.FC = () => {
     setBlogs(updatedBlogs);
   };
 
-  const deleteBlog = (index: number) => {
+  const deleteBlog = async (index: number) => {
     if (confirm('Are you sure you want to delete this blog?')) {
       const updatedBlogs = blogs.filter((_, i) => i !== index);
       setBlogs(updatedBlogs);
+
+      // Save to database immediately
+      if (user) {
+        try {
+          await supabase
+            .from('company_profiles')
+            .update({ blogs: updatedBlogs, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id);
+        } catch (error) {
+          console.error('Error deleting blog:', error);
+          alert('Failed to delete blog. Please try again.');
+        }
+      }
     }
   };
 
-  const addTechItem = () => {
+  const addTechItem = async () => {
     if (newTechItem.trim()) {
-      setTechnology({ ...technology, stack: [...technology.stack, newTechItem.trim()] });
+      const updatedTech = { ...technology, stack: [...technology.stack, newTechItem.trim()] };
+      setTechnology(updatedTech);
       setNewTechItem('');
+
+      // Save to database immediately
+      if (user) {
+        try {
+          await supabase
+            .from('company_profiles')
+            .update({ technology: updatedTech, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id);
+        } catch (error) {
+          console.error('Error adding tech item:', error);
+        }
+      }
     }
   };
 
-  const removeTechItem = (index: number) => {
-    setTechnology({ ...technology, stack: technology.stack.filter((_, i) => i !== index) });
+  const removeTechItem = async (index: number) => {
+    const updatedTech = { ...technology, stack: technology.stack.filter((_, i) => i !== index) };
+    setTechnology(updatedTech);
+
+    // Save to database immediately
+    if (user) {
+      try {
+        await supabase
+          .from('company_profiles')
+          .update({ technology: updatedTech, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id);
+      } catch (error) {
+        console.error('Error removing tech item:', error);
+      }
+    }
   };
 
-  const addPartner = () => {
+  const addPartner = async () => {
     if (newPartnerItem.trim()) {
-      setTechnology({ ...technology, partners: [...technology.partners, newPartnerItem.trim()] });
+      const updatedTech = { ...technology, partners: [...technology.partners, newPartnerItem.trim()] };
+      setTechnology(updatedTech);
       setNewPartnerItem('');
+
+      // Save to database immediately
+      if (user) {
+        try {
+          await supabase
+            .from('company_profiles')
+            .update({ technology: updatedTech, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id);
+        } catch (error) {
+          console.error('Error adding partner:', error);
+        }
+      }
     }
   };
 
-  const removePartner = (index: number) => {
-    setTechnology({ ...technology, partners: technology.partners.filter((_, i) => i !== index) });
+  const removePartner = async (index: number) => {
+    const updatedTech = { ...technology, partners: technology.partners.filter((_, i) => i !== index) };
+    setTechnology(updatedTech);
+
+    // Save to database immediately
+    if (user) {
+      try {
+        await supabase
+          .from('company_profiles')
+          .update({ technology: updatedTech, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id);
+      } catch (error) {
+        console.error('Error removing partner:', error);
+      }
+    }
   };
 
-  const addIntegration = () => {
+  const addIntegration = async () => {
     if (newIntegrationItem.trim()) {
-      setTechnology({ ...technology, integrations: [...technology.integrations, newIntegrationItem.trim()] });
+      const updatedTech = { ...technology, integrations: [...technology.integrations, newIntegrationItem.trim()] };
+      setTechnology(updatedTech);
       setNewIntegrationItem('');
+
+      // Save to database immediately
+      if (user) {
+        try {
+          await supabase
+            .from('company_profiles')
+            .update({ technology: updatedTech, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id);
+        } catch (error) {
+          console.error('Error adding integration:', error);
+        }
+      }
     }
   };
 
-  const removeIntegration = (index: number) => {
-    setTechnology({ ...technology, integrations: technology.integrations.filter((_, i) => i !== index) });
+  const removeIntegration = async (index: number) => {
+    const updatedTech = { ...technology, integrations: technology.integrations.filter((_, i) => i !== index) };
+    setTechnology(updatedTech);
+
+    // Save to database immediately
+    if (user) {
+      try {
+        await supabase
+          .from('company_profiles')
+          .update({ technology: updatedTech, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id);
+      } catch (error) {
+        console.error('Error removing integration:', error);
+      }
+    }
   };
 
   const generateAIInsights = async () => {
@@ -420,10 +537,10 @@ export const KnowledgeBase: React.FC = () => {
           facebook_url: socialProfiles.facebook,
           instagram_url: socialProfiles.instagram,
           youtube_url: socialProfiles.youtube,
-          services: JSON.stringify(services),
-          leadership: JSON.stringify(leadership),
-          blogs: JSON.stringify(blogs),
-          technology: JSON.stringify(technology),
+          services: services,
+          leadership: leadership,
+          blogs: blogs,
+          technology: technology,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);
@@ -1213,7 +1330,19 @@ export const KnowledgeBase: React.FC = () => {
                             />
                           </div>
                           <div className="flex justify-end gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setEditingServiceId(null)}>
+                            <Button variant="outline" size="sm" onClick={async () => {
+                              setEditingServiceId(null);
+                              if (user) {
+                                try {
+                                  await supabase
+                                    .from('company_profiles')
+                                    .update({ services: services, updated_at: new Date().toISOString() })
+                                    .eq('user_id', user.id);
+                                } catch (error) {
+                                  console.error('Error saving service:', error);
+                                }
+                              }
+                            }}>
                               Done
                             </Button>
                           </div>
@@ -1353,7 +1482,19 @@ export const KnowledgeBase: React.FC = () => {
                             />
                           </div>
                           <div className="flex justify-end gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setEditingLeaderId(null)}>
+                            <Button variant="outline" size="sm" onClick={async () => {
+                              setEditingLeaderId(null);
+                              if (user) {
+                                try {
+                                  await supabase
+                                    .from('company_profiles')
+                                    .update({ leadership: leadership, updated_at: new Date().toISOString() })
+                                    .eq('user_id', user.id);
+                                } catch (error) {
+                                  console.error('Error saving leadership:', error);
+                                }
+                              }
+                            }}>
                               Done
                             </Button>
                           </div>
@@ -1506,7 +1647,19 @@ export const KnowledgeBase: React.FC = () => {
                             />
                           </div>
                           <div className="flex justify-end gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setEditingBlogId(null)}>
+                            <Button variant="outline" size="sm" onClick={async () => {
+                              setEditingBlogId(null);
+                              if (user) {
+                                try {
+                                  await supabase
+                                    .from('company_profiles')
+                                    .update({ blogs: blogs, updated_at: new Date().toISOString() })
+                                    .eq('user_id', user.id);
+                                } catch (error) {
+                                  console.error('Error saving blog:', error);
+                                }
+                              }
+                            }}>
                               Done
                             </Button>
                           </div>
