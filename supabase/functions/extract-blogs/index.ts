@@ -47,17 +47,28 @@ Deno.serve(async (req: Request) => {
 
     const html = await webpageResponse.text();
 
-    // Extract visible text from HTML for better processing
-    const textContent = html
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
     // Parse base URL for converting relative links
     const baseUrl = new URL(url);
     const baseOrigin = baseUrl.origin;
+
+    // Extract links with their anchor text from HTML for better URL accuracy
+    const linkPattern = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    const links: Array<{ href: string; text: string }> = [];
+    let match;
+
+    while ((match = linkPattern.exec(html)) !== null) {
+      const href = match[1];
+      const text = match[2].replace(/<[^>]+>/g, '').trim();
+      if (text && href) {
+        links.push({ href, text });
+      }
+    }
+
+    // Clean HTML while preserving structure for context
+    const cleanedHtml = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .substring(0, 50000);
 
     // Get OpenAI API key from environment
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -80,65 +91,71 @@ Deno.serve(async (req: Request) => {
             content: `You are a precise blog article extractor. Extract ONLY real blog articles that actually exist on the provided webpage.
 
 CRITICAL RULES - READ CAREFULLY:
-1. ONLY extract blog articles that are explicitly present in the provided content
+1. ONLY extract blog articles that are explicitly present in the HTML content
 2. DO NOT generate, invent, or hallucinate any blog articles
 3. DO NOT create example or placeholder articles
 4. If NO blog articles are found, return an empty blogs array
-5. Extract ONLY information that is clearly visible in the content
-6. Each article MUST have been explicitly mentioned in the provided text
+5. Each article MUST have an actual link/URL found in the HTML
+6. Match article titles with their corresponding URLs from the links list provided
 
 EXTRACTION REQUIREMENTS:
-- Extract ONLY articles that appear on the page (titles must match exactly)
-- Look for blog lists, article grids, blog archives, recent posts sections
-- Capture article titles, URLs, dates, authors, and excerpts AS THEY APPEAR
-- Do NOT paraphrase or modify titles - use exact text from the page
-- For URLs: convert relative URLs (e.g., "/blog/article") to absolute URLs using the base URL provided
+- Identify blog articles by looking for article elements, blog post cards, post listings
+- Extract EXACT titles as they appear in the HTML
+- Match each title with its corresponding URL from the provided links
+- URLs MUST be actual hrefs found in the HTML (from the links list)
+- Look for common blog patterns: article titles with dates, author names, excerpts
+- Verify the URL actually points to a blog post (typically contains /blog/, /post/, /article/, or year/month patterns)
 
 For each REAL blog article found, extract:
-- title: The EXACT article title from the page (do not modify or paraphrase)
-- url: Full URL to the article (convert relative URLs to absolute)
-- date: Publication date if shown (format as-is)
-- author: Author name if mentioned (use exact name from page)
-- excerpt: Brief excerpt or description if available (use actual text from page, 1-2 sentences max)
-- tags: Tags or categories if shown (max 5)
+- title: The EXACT article title from the HTML (do not modify)
+- url: The actual href URL that corresponds to this article title (match from links list)
+- date: Publication date if visible
+- author: Author name if mentioned
+- excerpt: Brief description if available (actual text from page)
+- tags: Categories or tags if shown
 
-VALIDATION CHECKLIST:
-✓ Is this article title actually on the webpage?
-✓ Did I copy the exact title without modification?
-✓ Is there a real link to this article?
-✓ Am I extracting real content, not making it up?
+URL MATCHING RULES:
+- Find the article title in the HTML
+- Look for the corresponding <a> tag that contains this title
+- Extract the exact href value from that <a> tag
+- If the URL is relative (starts with /), prepend the base URL
+- If the URL is absolute, use it as-is
+- The URL should logically match the article (not homepage, not category pages)
 
-If you cannot find ANY blog articles on the page, return: {"blogs": []}
+VALIDATION:
+✓ Does this title appear in the HTML?
+✓ Is there a real <a href="..."> for this article?
+✓ Does the URL make sense for this article?
+✓ Am I using the actual href value, not making it up?
 
-DO NOT include articles from:
-- Navigation menus (unless they link to actual blog posts on the page)
-- Footer links (unless they're clearly blog posts)
-- External websites or unrelated content
+If you cannot find ANY blog articles, return: {"blogs": []}
 
-OUTPUT FORMAT (JSON only, no markdown):
+OUTPUT FORMAT (JSON only):
 {
   "blogs": [
     {
-      "title": "EXACT title from webpage",
-      "url": "https://example.com/actual-url",
-      "date": "Actual date format from page",
-      "author": "Actual author name",
-      "excerpt": "Actual excerpt from page",
-      "tags": ["actual", "tags", "from", "page"]
+      "title": "Exact title from HTML",
+      "url": "Actual href URL from HTML",
+      "date": "Date if available",
+      "author": "Author if available",
+      "excerpt": "Description if available",
+      "tags": ["tags", "if", "available"]
     }
   ]
 }
 
-REMEMBER: Accuracy over quantity. Return ONLY real articles that exist on the page. When in doubt, DO NOT include it.`
+REMEMBER: Every URL must be an actual href found in the HTML. Match titles to their real links.`
           },
           {
             role: 'user',
-            content: `Extract ONLY the real blog articles that actually appear on this webpage. Base URL: ${baseOrigin}
+            content: `Extract blog articles from this webpage. Base URL for relative links: ${baseOrigin}
 
-DO NOT generate fake examples. DO NOT hallucinate content. ONLY extract what actually exists.
+Here are ALL the links found on the page with their anchor text:
+${JSON.stringify(links.slice(0, 200), null, 2)}
 
-Content:
-${textContent.substring(0, 40000)}`
+Now analyze the HTML to find blog articles and match them with their correct URLs from the links above:
+
+${cleanedHtml}`
           }
         ],
         temperature: 0.1,
@@ -169,42 +186,73 @@ ${textContent.substring(0, 40000)}`
       throw new Error('Failed to parse AI response. Please try again.');
     }
 
+    // Helper function to normalize and validate URLs
+    const normalizeUrl = (rawUrl: string): string | null => {
+      if (!rawUrl || typeof rawUrl !== 'string') return null;
+
+      let normalizedUrl = rawUrl.trim();
+
+      try {
+        // Remove query parameters and anchors for cleaner URLs (optional)
+        // normalizedUrl = normalizedUrl.split('?')[0].split('#')[0];
+
+        // Convert relative URLs to absolute
+        if (normalizedUrl.startsWith('/')) {
+          normalizedUrl = `${baseOrigin}${normalizedUrl}`;
+        } else if (normalizedUrl.startsWith('./')) {
+          normalizedUrl = `${baseOrigin}/${normalizedUrl.substring(2)}`;
+        } else if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+          // Relative URL without leading slash
+          normalizedUrl = `${baseOrigin}/${normalizedUrl}`;
+        }
+
+        // Validate the URL
+        const urlObj = new URL(normalizedUrl);
+
+        // Ensure the URL is from the same domain or subdomain
+        if (!urlObj.hostname.includes(baseUrl.hostname.split('.').slice(-2).join('.'))) {
+          console.log(`Skipping external URL: ${normalizedUrl}`);
+          return null;
+        }
+
+        return normalizedUrl;
+      } catch (err) {
+        console.error(`Invalid URL: ${rawUrl}`, err);
+        return null;
+      }
+    };
+
     // Validate and clean the blog data
     const blogs = Array.isArray(extractedData.blogs)
       ? extractedData.blogs
-          .filter((blog: any) => {
+          .map((blog: any) => {
             // Must have a title
             if (!blog.title || typeof blog.title !== 'string' || !blog.title.trim()) {
-              return false;
+              return null;
             }
-            // URL should exist and be valid if provided
-            if (blog.url && typeof blog.url === 'string') {
-              try {
-                // Convert relative URLs to absolute
-                if (blog.url.startsWith('/')) {
-                  blog.url = `${baseOrigin}${blog.url}`;
-                } else if (!blog.url.startsWith('http')) {
-                  blog.url = `${baseOrigin}/${blog.url}`;
-                }
-                new URL(blog.url);
-              } catch {
-                // Invalid URL, skip this blog
-                return false;
-              }
+
+            // Normalize the URL
+            const normalizedUrl = normalizeUrl(blog.url);
+            if (!normalizedUrl) {
+              console.log(`Skipping blog with invalid URL: ${blog.title}`);
+              return null;
             }
-            return true;
+
+            return {
+              title: blog.title.trim(),
+              url: normalizedUrl,
+              date: (blog.date || '').toString().trim(),
+              author: (blog.author || '').toString().trim(),
+              excerpt: (blog.excerpt || '').toString().trim(),
+              tags: Array.isArray(blog.tags)
+                ? blog.tags.slice(0, 5).filter((t: any) => typeof t === 'string' && t.trim()).map((t: string) => t.trim())
+                : []
+            };
           })
-          .map((blog: any) => ({
-            title: blog.title.trim(),
-            url: blog.url || '',
-            date: blog.date || '',
-            author: blog.author || '',
-            excerpt: blog.excerpt || '',
-            tags: Array.isArray(blog.tags) ? blog.tags.slice(0, 5).filter((t: any) => typeof t === 'string') : []
-          }))
+          .filter((blog: any) => blog !== null)
       : [];
 
-    console.log(`Extracted ${blogs.length} blog articles from ${url}`);
+    console.log(`Extracted and validated ${blogs.length} blog articles from ${url}`);
 
     return new Response(
       JSON.stringify({
