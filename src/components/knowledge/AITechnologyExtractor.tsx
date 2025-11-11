@@ -19,6 +19,7 @@ export function AITechnologyExtractor({ onDataExtracted }: AITechnologyExtractor
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [extractedCounts, setExtractedCounts] = useState({ techStack: 0, partners: 0, integrations: 0 });
 
   const handleExtract = async () => {
     if (!url.trim()) {
@@ -60,7 +61,19 @@ export function AITechnologyExtractor({ onDataExtracted }: AITechnologyExtractor
 
       const data = await response.json();
 
-      if (data.techStack || data.partners || data.integrations) {
+      const totalExtracted =
+        (data.techStack?.length || 0) +
+        (data.partners?.length || 0) +
+        (data.integrations?.length || 0);
+
+      if (totalExtracted > 0) {
+        const counts = {
+          techStack: data.techStack?.length || 0,
+          partners: data.partners?.length || 0,
+          integrations: data.integrations?.length || 0
+        };
+
+        setExtractedCounts(counts);
         onDataExtracted({
           techStack: data.techStack || [],
           partners: data.partners || [],
@@ -69,9 +82,11 @@ export function AITechnologyExtractor({ onDataExtracted }: AITechnologyExtractor
         setSuccess(true);
         setUrl('');
 
-        setTimeout(() => setSuccess(false), 3000);
+        console.log('Extracted technology data:', counts);
+
+        setTimeout(() => setSuccess(false), 5000);
       } else {
-        setError('No technology information found on the provided page');
+        setError('No technology information found on the provided page. Try a different URL like your about page, technology page, or careers page.');
       }
     } catch (err: any) {
       console.error('Error extracting technology:', err);
@@ -132,7 +147,9 @@ export function AITechnologyExtractor({ onDataExtracted }: AITechnologyExtractor
           <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-green-800">Success!</p>
-            <p className="text-sm text-green-700">Technology information extracted and added successfully</p>
+            <p className="text-sm text-green-700">
+              Extracted {extractedCounts.techStack} technologies, {extractedCounts.partners} partners, and {extractedCounts.integrations} integrations
+            </p>
           </div>
         </div>
       )}

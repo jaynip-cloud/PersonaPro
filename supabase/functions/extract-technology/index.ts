@@ -53,7 +53,15 @@ Deno.serve(async (req: Request) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Use OpenAI to extract technology information from the HTML
+    // Extract visible text from HTML for better processing
+    const textContent = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Use OpenAI to extract technology information
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -65,39 +73,65 @@ Deno.serve(async (req: Request) => {
         messages: [
           {
             role: 'system',
-            content: `You are a technology information extractor. Your task is to analyze HTML content and extract ALL technology stack, partners, and integrations mentioned on the page.
+            content: `You are an expert technology stack analyzer. Extract ALL technologies, partners, and integrations from the provided webpage content with PERFECT accuracy.
 
-CRITICAL REQUIREMENTS:
-1. Extract ALL technologies mentioned - programming languages, frameworks, libraries, databases, cloud providers, tools, platforms
-2. Look for technology information in all sections: about pages, technology pages, career pages, footer, headers, feature lists
-3. Identify business partners, strategic partnerships, and technology partners
-4. Find third-party integrations, APIs, and platform connections
-5. Extract both explicitly stated technologies and those implied by logos, badges, or references
-6. Include version-specific technologies (e.g., "React 18" becomes "React")
+EXTRACTION RULES:
 
-For technology extraction, identify:
-- techStack: Programming languages, frameworks, libraries, databases, cloud platforms, DevOps tools, etc.
-- partners: Business partners, strategic partners, technology partners, certified partnerships
-- integrations: Third-party integrations, API connections, platform integrations, embedded services
+1. TECHNOLOGY STACK (techStack):
+   - Programming Languages: JavaScript, TypeScript, Python, Java, Go, Ruby, PHP, C#, C++, Rust, Swift, Kotlin, etc.
+   - Frontend: React, Vue.js, Angular, Svelte, Next.js, Nuxt.js, Gatsby, etc.
+   - Backend: Node.js, Express, Django, Flask, FastAPI, Spring Boot, Ruby on Rails, Laravel, .NET, etc.
+   - Databases: PostgreSQL, MySQL, MongoDB, Redis, Elasticsearch, DynamoDB, Cassandra, Neo4j, etc.
+   - Cloud Providers: AWS, Google Cloud (GCP), Microsoft Azure, DigitalOcean, Heroku, Vercel, Netlify, etc.
+   - DevOps/Infrastructure: Docker, Kubernetes, Jenkins, GitLab CI, GitHub Actions, Terraform, Ansible, etc.
+   - Mobile: React Native, Flutter, SwiftUI, Jetpack Compose, Xamarin, etc.
+   - AI/ML: TensorFlow, PyTorch, scikit-learn, Keras, OpenAI API, Hugging Face, etc.
+   - Data Processing: Apache Spark, Kafka, Airflow, Hadoop, etc.
 
-Return a JSON object with these three arrays. Extract EVERYTHING - err on the side of including more rather than less.
+2. PARTNERS (partners):
+   - Technology/Platform Partners: AWS Partner, Microsoft Partner, Google Cloud Partner, Salesforce Partner, etc.
+   - Strategic Business Partners: Major companies they collaborate with
+   - Certified Partnerships: Official certifications and partner programs
+   - Reseller/Distribution Partners: Companies they work with for distribution
 
-IMPORTANT: Return simple, clean technology names without versions or extra descriptors.
+3. INTEGRATIONS (integrations):
+   - Business Tools: Slack, Microsoft Teams, Zoom, Google Workspace, etc.
+   - CRM/Sales: Salesforce, HubSpot, Pipedrive, Zoho CRM, etc.
+   - Marketing: Mailchimp, SendGrid, Marketo, ActiveCampaign, etc.
+   - Payment: Stripe, PayPal, Square, Braintree, etc.
+   - Analytics: Google Analytics, Mixpanel, Amplitude, Segment, etc.
+   - Communication: Twilio, SendGrid, Postmark, etc.
+   - Automation: Zapier, Make (Integromat), n8n, etc.
+   - Project Management: Jira, Asana, Trello, Monday.com, etc.
 
-Example format:
+CRITICAL INSTRUCTIONS:
+- Look for explicit mentions of technologies in text, lists, badges, and descriptions
+- Check for technology keywords in alt text, class names, and data attributes
+- Extract clean, standardized names (e.g., "React" not "React.js" or "ReactJS")
+- Remove version numbers (e.g., "Python 3.11" → "Python")
+- Avoid duplicates - each technology should appear once
+- If uncertain about categorization, prefer techStack for technical tools
+- Include technologies mentioned in job listings, tech blog posts, and about sections
+- Look for cloud provider logos, certification badges, and partnership mentions
+
+OUTPUT FORMAT:
+Return ONLY valid JSON with no extra text, markdown, or formatting:
 {
-  "techStack": ["React", "Node.js", "Python", "PostgreSQL", "AWS", "Docker", "Kubernetes", "TypeScript", "MongoDB", "Redis"],
-  "partners": ["Microsoft", "AWS", "Google Cloud", "Salesforce", "SAP"],
-  "integrations": ["Slack", "Zapier", "Stripe", "Twilio", "SendGrid", "HubSpot", "Mailchimp"]
-}`
+  "techStack": ["Technology1", "Technology2", ...],
+  "partners": ["Partner1", "Partner2", ...],
+  "integrations": ["Integration1", "Integration2", ...]
+}
+
+Be exhaustive and thorough - extract EVERY technology, partner, and integration mentioned.`
           },
           {
             role: 'user',
-            content: `Extract ALL technology stack, partners, and integrations from this webpage HTML. Be thorough and comprehensive:\n\n${html.substring(0, 30000)}`
+            content: `Analyze this webpage and extract ALL technologies, partners, and integrations with perfect accuracy:\n\n${textContent.substring(0, 40000)}`
           }
         ],
-        temperature: 0.3,
-        max_tokens: 2000,
+        temperature: 0.1,
+        max_tokens: 3000,
+        response_format: { type: "json_object" }
       }),
     });
 
@@ -117,23 +151,36 @@ Example format:
     // Parse the JSON response
     let extractedData;
     try {
-      // Try to extract JSON from markdown code blocks if present
-      const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
-      if (jsonMatch) {
-        extractedData = JSON.parse(jsonMatch[1]);
-      } else {
-        extractedData = JSON.parse(content);
-      }
+      extractedData = JSON.parse(content);
     } catch (parseError) {
       console.error('Failed to parse AI response:', content);
-      throw new Error('Failed to parse AI response');
+      throw new Error('Failed to parse AI response. Please try again.');
     }
+
+    // Validate and clean the data
+    const techStack = Array.isArray(extractedData.techStack)
+      ? [...new Set(extractedData.techStack.filter((t: any) => typeof t === 'string' && t.trim()))]
+      : [];
+
+    const partners = Array.isArray(extractedData.partners)
+      ? [...new Set(extractedData.partners.filter((p: any) => typeof p === 'string' && p.trim()))]
+      : [];
+
+    const integrations = Array.isArray(extractedData.integrations)
+      ? [...new Set(extractedData.integrations.filter((i: any) => typeof i === 'string' && i.trim()))]
+      : [];
+
+    console.log('Extracted technology data:', {
+      techStackCount: techStack.length,
+      partnersCount: partners.length,
+      integrationsCount: integrations.length
+    });
 
     return new Response(
       JSON.stringify({
-        techStack: extractedData.techStack || [],
-        partners: extractedData.partners || [],
-        integrations: extractedData.integrations || [],
+        techStack,
+        partners,
+        integrations,
         url: url,
       }),
       {
