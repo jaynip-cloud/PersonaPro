@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/Badge';
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard';
 import { AIServiceExtractor } from '../components/knowledge/AIServiceExtractor';
 import { AIBlogExtractor } from '../components/knowledge/AIBlogExtractor';
+import { AITechnologyExtractor } from '../components/knowledge/AITechnologyExtractor';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
@@ -1928,12 +1929,36 @@ export const KnowledgeBase: React.FC = () => {
       )}
 
       {isEditing && activeTab === 'technology' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Technology & Partners</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                AI Technology Extractor
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Extract technology stack, partners, and integrations automatically from your website
+              </p>
+            </CardHeader>
+            <CardContent>
+              <AITechnologyExtractor
+                onDataExtracted={(data) => {
+                  setTechnology({
+                    stack: [...technology.stack, ...data.techStack],
+                    partners: [...technology.partners, ...data.partners],
+                    integrations: [...technology.integrations, ...data.integrations],
+                  });
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Technology & Partners</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-3">
                   Technology Stack
@@ -2057,6 +2082,7 @@ export const KnowledgeBase: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+        </div>
       )}
     </div>
     </>
