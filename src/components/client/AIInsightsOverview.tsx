@@ -200,10 +200,25 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
                     </div>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-                  All insights are evidence-based and sourced from the data listed above. Recommendations reflect patterns
-                  identified across meetings, projects, and market research.
-                </p>
+                <div className="mt-3 pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    All insights are evidence-based and sourced from the data listed above. Recommendations reflect patterns
+                    identified across meetings, projects, and market research.
+                  </p>
+                  {(dataGathered.contacts < 2 || dataGathered.meetings < 3 || dataGathered.projects < 1 || dataGathered.documents < 1) && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                      <p className="text-xs font-medium text-yellow-900 mb-1">💡 Get More Comprehensive Insights</p>
+                      <p className="text-xs text-yellow-800">
+                        Add more data for deeper analysis:
+                        {dataGathered.contacts < 2 && ' • Add more contacts (decision makers, influencers)'}
+                        {dataGathered.meetings < 3 && ' • Upload meeting transcripts'}
+                        {dataGathered.projects < 1 && ' • Create projects/opportunities'}
+                        {dataGathered.documents < 1 && ' • Upload relevant documents'}
+                        {!dataGathered.marketIntelligence && ' • Configure Perplexity API key in Settings for market intelligence'}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
