@@ -127,11 +127,10 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
   useEffect(() => {
     if (isOpen && user) {
-      // Load database data first, then load persisted data from localStorage
-      // This ensures database data takes priority
-      loadExistingData().then(() => {
-        loadPersistedData();
-      });
+      // Load persisted data from localStorage first
+      loadPersistedData();
+      // Then check if there's database data to override with
+      loadExistingData();
     }
   }, [isOpen, user]);
 
@@ -140,31 +139,15 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     try {
       const persistedData = localStorage.getItem('onboarding_wizard_data');
       const persistedStep = localStorage.getItem('onboarding_wizard_step');
-      
+
       if (persistedData) {
         const parsedData = JSON.parse(persistedData);
-        // Merge persisted data with existing data, but only fill in empty fields
-        // This ensures database data takes priority over localStorage
-        setFormData(prev => {
-          const merged = { ...prev };
-          // Only merge fields that are empty in the current state
-          Object.keys(parsedData).forEach(key => {
-            if (key === 'leadership' || key === 'services' || key === 'blogs') {
-              // For arrays, only use localStorage if database data is empty
-              if (!prev[key as keyof typeof prev] || (Array.isArray(prev[key as keyof typeof prev]) && (prev[key as keyof typeof prev] as any[]).length === 0)) {
-                merged[key as keyof typeof merged] = parsedData[key];
-              }
-            } else {
-              // For other fields, only use localStorage if database data is empty
-              if (!prev[key as keyof typeof prev] || prev[key as keyof typeof prev] === '') {
-                merged[key as keyof typeof merged] = parsedData[key];
-              }
-            }
-          });
-          return merged;
-        });
+        setFormData(prev => ({
+          ...prev,
+          ...parsedData
+        }));
       }
-      
+
       if (persistedStep) {
         const step = parseInt(persistedStep, 10);
         if (step >= 1 && step <= totalSteps) {
@@ -263,31 +246,32 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         const blogs = parseJsonField(profile.blogs) || [];
         const technology = parseJsonField(profile.technology) || {};
 
+        // Only override with database data if the field has actual content
         setFormData(prev => ({
           ...prev,
-          companyName: profile.company_name || '',
-          website: profile.website || '',
-          industry: profile.industry || '',
-          description: profile.about || '',
-          founded: profile.founded || '',
-          location: profile.location || '',
-          size: profile.size || '',
-          mission: profile.mission || '',
-          vision: profile.vision || '',
-          email: profile.email || '',
-          phone: profile.phone || '',
-          address: profile.address || '',
-          linkedinUrl: profile.linkedin_url || '',
-          twitterUrl: profile.twitter_url || '',
-          facebookUrl: profile.facebook_url || '',
-          instagramUrl: profile.instagram_url || '',
-          youtubeUrl: profile.youtube_url || '',
-          services: servicesArray,
-          leadership: leadershipArray,
-          blogs: blogs,
-          techStack: technology.stack || [],
-          partners: technology.partners || [],
-          integrations: technology.integrations || []
+          companyName: profile.company_name || prev.companyName,
+          website: profile.website || prev.website,
+          industry: profile.industry || prev.industry,
+          description: profile.about || prev.description,
+          founded: profile.founded || prev.founded,
+          location: profile.location || prev.location,
+          size: profile.size || prev.size,
+          mission: profile.mission || prev.mission,
+          vision: profile.vision || prev.vision,
+          email: profile.email || prev.email,
+          phone: profile.phone || prev.phone,
+          address: profile.address || prev.address,
+          linkedinUrl: profile.linkedin_url || prev.linkedinUrl,
+          twitterUrl: profile.twitter_url || prev.twitterUrl,
+          facebookUrl: profile.facebook_url || prev.facebookUrl,
+          instagramUrl: profile.instagram_url || prev.instagramUrl,
+          youtubeUrl: profile.youtube_url || prev.youtubeUrl,
+          services: servicesArray.length > 0 ? servicesArray : prev.services,
+          leadership: leadershipArray.length > 0 ? leadershipArray : prev.leadership,
+          blogs: blogs.length > 0 ? blogs : prev.blogs,
+          techStack: (technology.stack && technology.stack.length > 0) ? technology.stack : prev.techStack,
+          partners: (technology.partners && technology.partners.length > 0) ? technology.partners : prev.partners,
+          integrations: (technology.integrations && technology.integrations.length > 0) ? technology.integrations : prev.integrations
         }));
       }
     } catch (error) {
