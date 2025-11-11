@@ -362,9 +362,9 @@ export const Dashboard: React.FC = () => {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Recent Projects</CardTitle>
+              <CardTitle>Recent Opportunities</CardTitle>
               <button
-                onClick={() => navigate('/projects')}
+                onClick={() => navigate('/growth-opportunities')}
                 className="text-sm text-primary hover:underline flex items-center gap-1"
               >
                 View all
@@ -374,67 +374,67 @@ export const Dashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading projects...</div>
-            ) : projects.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">Loading opportunities...</div>
+            ) : opportunities.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground mb-4">No projects yet</p>
+                <p className="text-muted-foreground mb-4">No opportunities yet</p>
                 <button
-                  onClick={() => navigate('/projects/new')}
+                  onClick={() => navigate('/growth-opportunities')}
                   className="text-sm text-primary hover:underline"
                 >
-                  Create your first project
+                  View growth opportunities
                 </button>
               </div>
             ) : (
               <div className="space-y-4">
-                {projects.slice(0, 5).map((project) => {
-                  const client = project.clients || (typeof project.clients === 'object' ? project.clients : null);
-                  const clientName = client?.company || client?.name || 'Unknown Client';
-                  const projectDate = project.updated_at || project.created_at;
-                  
-                  const getStatusVariant = (status: string) => {
-                    switch (status) {
-                      case 'win':
+                {opportunities.slice(0, 5).map((opportunity) => {
+                  const oppDate = opportunity.updated_at || opportunity.created_at;
+
+                  const getStageVariant = (stage: string) => {
+                    switch (stage) {
+                      case 'closed-won':
                         return 'success';
-                      case 'loss':
+                      case 'closed-lost':
                         return 'destructive';
-                      case 'completed':
-                        return 'success';
-                      case 'in_progress':
-                      case 'active':
-                      case 'discussion':
-                        return 'default';
-                      case 'quote':
-                      case 'opportunity_identified':
+                      case 'proposal':
+                      case 'negotiation':
                         return 'warning';
-                      case 'on_hold':
-                        return 'secondary';
+                      case 'qualification':
+                      case 'discovery':
+                        return 'default';
                       default:
                         return 'secondary';
                     }
                   };
 
-                  const formatStatus = (status: string) => {
-                    return status
-                      .split('_')
+                  const formatStage = (stage: string) => {
+                    return stage
+                      .split('-')
                       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                       .join(' ');
                   };
 
+                  const formatValue = (value: number) => {
+                    if (!value) return 'N/A';
+                    if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+                    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+                    return `$${value}`;
+                  };
+
                   return (
                     <div
-                      key={project.id}
+                      key={opportunity.id}
                       className="flex items-start justify-between pb-4 border-b border-border last:border-0 cursor-pointer hover:bg-accent/50 -mx-2 px-2 py-2 rounded transition-colors"
-                      onClick={() => navigate(`/clients/${project.client_id}/projects`)}
+                      onClick={() => navigate('/growth-opportunities')}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{project.name || 'Untitled Project'}</p>
+                        <p className="font-medium text-sm truncate">{opportunity.title || 'Untitled Opportunity'}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {clientName} • {project.project_type || 'General'}
+                          {formatValue(opportunity.value)} {opportunity.probability ? `• ${opportunity.probability}% prob` : ''}
                         </p>
-                        {projectDate && (
+                        {oppDate && (
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {new Date(projectDate).toLocaleDateString('en-US', {
+                            {new Date(oppDate).toLocaleDateString('en-US', {
                               month: 'short',
                               day: 'numeric',
                               year: 'numeric'
@@ -443,10 +443,10 @@ export const Dashboard: React.FC = () => {
                         )}
                       </div>
                       <Badge
-                        variant={getStatusVariant(project.status)}
+                        variant={getStageVariant(opportunity.stage)}
                         className="ml-2 flex-shrink-0"
                       >
-                        {formatStatus(project.status || 'unknown')}
+                        {formatStage(opportunity.stage || 'unknown')}
                       </Badge>
                     </div>
                   );
