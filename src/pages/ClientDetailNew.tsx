@@ -204,7 +204,14 @@ export const ClientDetailNew: React.FC = () => {
           founded: clientData.founded || '',
           csm: clientData.csm || '',
           avatar: clientData.avatar || undefined,
+          aiInsights: clientData.ai_insights || undefined,
+          aiInsightsGeneratedAt: clientData.ai_insights_generated_at || undefined,
         });
+
+        // Set dataGathered if it exists in the insights
+        if (clientData.ai_insights?.dataGathered) {
+          setDataGathered(clientData.ai_insights.dataGathered);
+        }
       }
 
       const { data: financialDataResult, error: financialError } = await supabase

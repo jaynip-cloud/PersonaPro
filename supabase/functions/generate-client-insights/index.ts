@@ -442,10 +442,28 @@ Analyze comprehensively and provide strategic, actionable intelligence.`;
 
     console.log('Insights generated successfully');
 
+    const dataGathered = {
+      client: true,
+      contacts: contacts?.length || 0,
+      meetings: meetings?.length || 0,
+      projects: projects?.length || 0,
+      pitches: pitches?.length || 0,
+      documents: documentsList.length,
+      marketIntelligence: !!marketIntelligence && marketIntelligenceStatus === 'success',
+      marketIntelligenceStatus,
+      marketIntelligenceError: marketIntelligenceError || undefined,
+    };
+
+    // Include dataGathered in the insights for persistence
+    const insightsWithMetadata = {
+      ...insights,
+      dataGathered,
+    };
+
     const { error: updateError } = await supabase
       .from('clients')
       .update({
-        ai_insights: insights,
+        ai_insights: insightsWithMetadata,
         ai_insights_generated_at: new Date().toISOString(),
       })
       .eq('id', clientId)
@@ -458,18 +476,8 @@ Analyze comprehensively and provide strategic, actionable intelligence.`;
     return new Response(
       JSON.stringify({
         success: true,
-        insights,
-        dataGathered: {
-          client: true,
-          contacts: contacts?.length || 0,
-          meetings: meetings?.length || 0,
-          projects: projects?.length || 0,
-          pitches: pitches?.length || 0,
-          documents: documentsList.length,
-          marketIntelligence: !!marketIntelligence && marketIntelligenceStatus === 'success',
-          marketIntelligenceStatus,
-          marketIntelligenceError: marketIntelligenceError || undefined,
-        },
+        insights: insightsWithMetadata,
+        dataGathered,
       }),
       {
         headers: {
