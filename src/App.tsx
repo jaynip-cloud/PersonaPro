@@ -22,7 +22,6 @@ import { PitchHistory } from './pages/PitchHistory';
 import { GrowthOpportunities } from './pages/GrowthOpportunities';
 import { Settings } from './pages/Settings';
 import { ToastProvider } from './components/ui/Toast';
-import { KeyboardShortcuts } from './components/ui/KeyboardShortcuts';
 
 function App() {
   return (
@@ -65,7 +64,6 @@ function App() {
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Route>
             </Routes>
-            <KeyboardShortcuts />
           </BrowserRouter>
         </AppProvider>
       </AuthProvider>
