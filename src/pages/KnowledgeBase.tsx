@@ -586,7 +586,6 @@ export const KnowledgeBase: React.FC = () => {
   };
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'company', label: 'Company', icon: Building2 },
     { id: 'contact', label: 'Contact', icon: Phone },
     { id: 'social', label: 'Social', icon: Globe },
@@ -827,11 +826,7 @@ export const KnowledgeBase: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        </div>
-      )}
 
-      {isEditing && activeTab === 'overview' && (
-        <div className="space-y-6">
           <Card>
             <CardContent className="pt-7 px-6 pb-6">
               <div className="flex items-center justify-between mb-6">
