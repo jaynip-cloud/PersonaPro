@@ -52,6 +52,7 @@ export const KnowledgeBase: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const { user, isKnowledgeBaseComplete, checkKnowledgeBaseStatus, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -616,8 +617,37 @@ export const KnowledgeBase: React.FC = () => {
               Comprehensive company intelligence powered by AI
             </p>
           </div>
+          <div className="flex gap-2">
+            {isEditing ? (
+              <>
+                <Button variant="outline" onClick={() => setIsEditing(false)}>
+                  Cancel
+                </Button>
+                <Button variant="primary" onClick={async () => {
+                  await handleSave();
+                  setIsEditing(false);
+                }} disabled={saving}>
+                  {saving ? 'Saving...' : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </>
+            ) : (
+              <Button variant="primary" onClick={() => {
+                setIsEditing(true);
+                setActiveTab('company');
+              }}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Knowledge Base
+              </Button>
+            )}
+          </div>
         </div>
 
+      {isEditing && (
       <div className="flex gap-2 border-b border-border overflow-x-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -637,8 +667,170 @@ export const KnowledgeBase: React.FC = () => {
           );
         })}
       </div>
+      )}
 
-      {activeTab === 'overview' && (
+      {!isEditing && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Company Name</h3>
+                  <p className="text-foreground">{companyInfo.name || 'Not set'}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Industry</h3>
+                  <p className="text-foreground">{companyInfo.industry || 'Not set'}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Website</h3>
+                  <p className="text-foreground">{companyInfo.canonicalUrl || 'Not set'}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Founded</h3>
+                  <p className="text-foreground">{companyInfo.founded || 'Not set'}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Location</h3>
+                  <p className="text-foreground">{companyInfo.location || 'Not set'}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Company Size</h3>
+                  <p className="text-foreground">{companyInfo.size || 'Not set'}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">About</h3>
+                  <p className="text-foreground">{companyInfo.description || 'Not set'}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Mission</h3>
+                  <p className="text-foreground">{companyInfo.mission || 'Not set'}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Vision</h3>
+                  <p className="text-foreground">{companyInfo.vision || 'Not set'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Contact Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Email</h3>
+                  <p className="text-foreground">{contactInfo.email || 'Not set'}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Phone</h3>
+                  <p className="text-foreground">{contactInfo.phone || 'Not set'}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-1">Address</h3>
+                  <p className="text-foreground">{contactInfo.address || 'Not set'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Services</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {services.length > 0 ? (
+                <div className="space-y-4">
+                  {services.map((service, index) => (
+                    <div key={index} className="border-l-4 border-primary pl-4">
+                      <h3 className="font-semibold text-foreground mb-1">{service.name}</h3>
+                      <p className="text-sm text-muted-foreground">{service.description}</p>
+                      {service.pricing && (
+                        <p className="text-sm text-primary mt-1">Pricing: {service.pricing}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No services added yet</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Leadership Team</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {leadership.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {leadership.map((member, index) => (
+                    <div key={index} className="border border-border rounded-lg p-4">
+                      <h3 className="font-semibold text-foreground mb-1">{member.name}</h3>
+                      <p className="text-sm text-primary mb-2">{member.role}</p>
+                      {member.bio && (
+                        <p className="text-sm text-muted-foreground">{member.bio}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No leadership members added yet</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Technology Stack</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {technology.stack.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-muted-foreground mb-2">Tech Stack</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {technology.stack.map((tech, idx) => (
+                        <Badge key={idx} variant="secondary">{tech}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {technology.partners.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-muted-foreground mb-2">Partners</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {technology.partners.map((partner, idx) => (
+                        <Badge key={idx} variant="secondary">{partner}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {technology.integrations.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-muted-foreground mb-2">Integrations</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {technology.integrations.map((integration, idx) => (
+                        <Badge key={idx} variant="secondary">{integration}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {technology.stack.length === 0 && technology.partners.length === 0 && technology.integrations.length === 0 && (
+                  <p className="text-muted-foreground">No technology information added yet</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {isEditing && activeTab === 'overview' && (
         <div className="space-y-6">
           <Card>
             <CardContent className="pt-7 px-6 pb-6">
@@ -976,7 +1168,7 @@ export const KnowledgeBase: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'company' && (
+      {isEditing && activeTab === 'company' && (
         <Card>
           <CardHeader>
             <CardTitle>Company Information</CardTitle>
@@ -1095,27 +1287,12 @@ export const KnowledgeBase: React.FC = () => {
                 />
               </div>
 
-              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
-                {saved ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Saved!
-                  </>
-                ) : saving ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Company Profile
-                  </>
-                )}
-              </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {activeTab === 'contact' && (
+      {isEditing && activeTab === 'contact' && (
         <Card>
           <CardHeader>
             <CardTitle>Contact Information</CardTitle>
@@ -1158,27 +1335,12 @@ export const KnowledgeBase: React.FC = () => {
                 />
               </div>
 
-              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
-                {saved ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Saved!
-                  </>
-                ) : saving ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Contact Info
-                  </>
-                )}
-              </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {activeTab === 'social' && (
+      {isEditing && activeTab === 'social' && (
         <Card>
           <CardHeader>
             <CardTitle>Social Media Profiles</CardTitle>
@@ -1250,27 +1412,12 @@ export const KnowledgeBase: React.FC = () => {
                 />
               </div>
 
-              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
-                {saved ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Saved!
-                  </>
-                ) : saving ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Social Profiles
-                  </>
-                )}
-              </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {activeTab === 'services' && (
+      {isEditing && activeTab === 'services' && (
         <div className="space-y-4">
           <div className="flex justify-end">
             <Button variant="primary" onClick={addService}>
@@ -1388,29 +1535,10 @@ export const KnowledgeBase: React.FC = () => {
             </div>
           )}
 
-          {services.length > 0 && (
-            <div className="flex justify-end">
-              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
-                {saved ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Saved!
-                  </>
-                ) : saving ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Services
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
-      {activeTab === 'team' && (
+      {isEditing && activeTab === 'team' && (
         <div className="space-y-4">
           <div className="flex justify-end">
             <Button variant="primary" onClick={addLeader}>
@@ -1551,29 +1679,10 @@ export const KnowledgeBase: React.FC = () => {
             </div>
           )}
 
-          {leadership.length > 0 && (
-            <div className="flex justify-end">
-              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
-                {saved ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Saved!
-                  </>
-                ) : saving ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Leadership
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
-      {activeTab === 'blogs' && (
+      {isEditing && activeTab === 'blogs' && (
         <div className="space-y-4">
           <div className="flex justify-end">
             <Button variant="primary" onClick={addBlog}>
@@ -1705,29 +1814,10 @@ export const KnowledgeBase: React.FC = () => {
             </div>
           )}
 
-          {blogs.length > 0 && (
-            <div className="flex justify-end">
-              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
-                {saved ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Saved!
-                  </>
-                ) : saving ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Blogs
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
-      {activeTab === 'technology' && (
+      {isEditing && activeTab === 'technology' && (
         <Card>
           <CardHeader>
             <CardTitle>Technology & Partners</CardTitle>
@@ -1854,21 +1944,6 @@ export const KnowledgeBase: React.FC = () => {
                 )}
               </div>
 
-              <Button variant="primary" onClick={handleSave} disabled={saved || saving}>
-                {saved ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Saved!
-                  </>
-                ) : saving ? (
-                  'Saving...'
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Technology Info
-                  </>
-                )}
-              </Button>
             </div>
           </CardContent>
         </Card>
