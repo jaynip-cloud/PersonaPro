@@ -149,7 +149,11 @@ export function AIServiceExtractor({ onServicesExtracted }: AIServiceExtractorPr
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary">•</span>
-            <span>AI will analyze the page and extract service information</span>
+            <span>AI will comprehensively analyze the page and extract ALL services, sub-services, and offerings</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-primary">•</span>
+            <span>Both main services and their variations/specializations will be captured</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary">•</span>

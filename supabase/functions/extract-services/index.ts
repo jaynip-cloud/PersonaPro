@@ -61,39 +61,65 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: `You are a service information extractor. Analyze the provided HTML content and extract all services or offerings mentioned.
+            content: `You are a comprehensive service information extractor. Your task is to analyze HTML content and extract EVERY service, sub-service, offering, and product mentioned on the page.
 
-For each service, extract:
-- name: The service name or title
-- description: A comprehensive description (2-3 sentences)
-- pricing: Any pricing information mentioned (if available)
-- tags: Relevant tags or categories (max 5)
+CRITICAL REQUIREMENTS:
+1. Extract ALL services mentioned - main services, sub-services, nested offerings, and related products
+2. If a service has sub-services or variations, create separate entries for each
+3. Look for services in all sections: headers, cards, lists, descriptions, menus, pricing tables, feature lists, etc.
+4. Don't skip minor services or complementary offerings
+5. Extract services from navigation menus, sidebars, footer sections, and all content areas
+6. Include service categories, specializations, and industry-specific offerings
+7. Capture both parent services and their child services as separate entries
 
-Return a JSON object with a "services" array containing these fields. Only extract actual services/offerings, not blog posts or other content.
+For each service/sub-service, extract:
+- name: The exact service name or title (be specific, include parent context if it's a sub-service)
+- description: A detailed description (2-4 sentences) combining all information found about this service
+- pricing: Any pricing information, plans, or cost indicators mentioned
+- tags: Relevant tags including: category, type, technology, industry (max 7 tags)
+
+Format service names clearly:
+- Main service: "Web Development"
+- Sub-service: "Web Development - E-commerce Solutions"
+- Nested sub-service: "Web Development - E-commerce - Shopify Integration"
+
+Return a JSON object with a "services" array. Extract EVERYTHING - err on the side of including more rather than less.
 
 Example format:
 {
   "services": [
     {
       "name": "Web Development",
-      "description": "Custom web application development using modern frameworks and technologies. We build scalable, responsive websites tailored to your business needs.",
+      "description": "Custom web application development using modern frameworks and technologies. We build scalable, responsive websites tailored to your business needs with cutting-edge tools and best practices.",
       "pricing": "Starting at $5,000",
-      "tags": ["web", "development", "custom"]
+      "tags": ["web", "development", "custom", "full-stack", "responsive"]
+    },
+    {
+      "name": "Web Development - E-commerce Solutions",
+      "description": "Specialized e-commerce platform development including shopping cart integration, payment processing, and inventory management. We create secure and user-friendly online stores.",
+      "pricing": "Starting at $8,000",
+      "tags": ["web", "ecommerce", "shopify", "woocommerce", "online-store"]
+    },
+    {
+      "name": "Web Development - Custom CMS",
+      "description": "Build custom content management systems tailored to your workflow. Easy-to-use admin panels for managing your website content without technical knowledge.",
+      "pricing": "Custom quote",
+      "tags": ["web", "cms", "custom", "content-management"]
     }
   ]
 }`
           },
           {
             role: 'user',
-            content: `Extract services from this webpage HTML (limit to first 15000 chars):\n\n${html.substring(0, 15000)}`
+            content: `Extract ALL services and sub-services from this webpage HTML. Be thorough and comprehensive:\n\n${html.substring(0, 30000)}`
           }
         ],
-        temperature: 0.7,
-        max_tokens: 2000,
+        temperature: 0.3,
+        max_tokens: 4000,
       }),
     });
 
