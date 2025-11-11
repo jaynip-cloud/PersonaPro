@@ -19,7 +19,7 @@ const navigation = [
   { name: 'Pitch History', href: '/pitch-history', icon: History, comingSoon: false },
   { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen, comingSoon: false },
   { name: 'Projects', href: '/projects', icon: Briefcase, comingSoon: true },
-  { name: 'Growth Opportunities', href: '/growth-opportunities', icon: TrendingUp, comingSoon: true },
+  { name: 'Opportunities', href: '/growth-opportunities', icon: TrendingUp, comingSoon: true },
   { name: 'Settings', href: '/settings', icon: Settings, comingSoon: false },
 ];
 
