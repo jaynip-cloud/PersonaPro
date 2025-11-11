@@ -20,8 +20,7 @@ import {
   Plus,
   Trash2,
   ChevronDown,
-  ChevronUp,
-  LogIn
+  ChevronUp
 } from 'lucide-react';
 
 interface OnboardingWizardProps {
@@ -1636,26 +1635,14 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         </div>
 
         <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-200">
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/login')}
-              disabled={saving}
-            >
-              <LogIn className="h-4 w-4 mr-2" />
-              Back to Login
-            </Button>
-            {currentStep > 1 && (
-              <Button
-                variant="outline"
-                onClick={handleBack}
-                disabled={saving}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            )}
-          </div>
+          <Button
+            variant="outline"
+            onClick={handleBack}
+            disabled={currentStep === 1 || saving}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
 
           {currentStep < totalSteps ? (
             <Button
