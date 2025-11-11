@@ -816,6 +816,51 @@ export const KnowledgeBase: React.FC = () => {
 
           <Card>
             <CardHeader>
+              <CardTitle>Blog Articles</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {blogs.length > 0 ? (
+                <div className="space-y-4">
+                  {blogs.map((blog, index) => (
+                    <div key={index} className="border-l-4 border-primary pl-4">
+                      <h3 className="font-semibold text-foreground mb-1">
+                        {blog.url ? (
+                          <a href={blog.url} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                            {blog.title}
+                          </a>
+                        ) : (
+                          blog.title
+                        )}
+                      </h3>
+                      {blog.date && (
+                        <p className="text-xs text-muted-foreground mb-1">
+                          {blog.date}
+                          {blog.author && ` • by ${blog.author}`}
+                        </p>
+                      )}
+                      {blog.excerpt && (
+                        <p className="text-sm text-muted-foreground mb-2">{blog.excerpt}</p>
+                      )}
+                      {blog.tags && blog.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {blog.tags.map((tag: string, idx: number) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No blog articles added yet</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Technology Stack</CardTitle>
             </CardHeader>
             <CardContent>
