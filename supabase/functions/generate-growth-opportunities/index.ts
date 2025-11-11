@@ -162,7 +162,7 @@ Provide specific, actionable insights that could inform a growth opportunity pro
             'Authorization': `Bearer ${perplexityKey}`
           },
           body: JSON.stringify({
-            model: 'llama-3.1-sonar-small-128k-online',
+            model: 'sonar',
             messages: [
               {
                 role: 'system',
