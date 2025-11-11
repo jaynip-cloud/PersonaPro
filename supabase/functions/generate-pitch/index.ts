@@ -426,11 +426,28 @@ Generate the pitch now:`;
           tone,
           length,
           intelligenceLayers: {
-            clientIntelligence: !!client.ai_insights,
-            opportunityIntelligence: !!opportunity || !!project || !!customContext,
+            clientIntelligence: !!(
+              client && (
+                client.company ||
+                client.industry ||
+                client.short_term_goals ||
+                client.long_term_goals ||
+                client.pain_points ||
+                client.ai_insights ||
+                (contacts && contacts.length > 0) ||
+                (projects && projects.length > 0) ||
+                (meetings && meetings.length > 0)
+              )
+            ),
+            opportunityIntelligence: !!(opportunity || project || customContext),
             companyKnowledge: !!(
-              (companyProfile?.services && Array.isArray(companyProfile.services) && companyProfile.services.length > 0) ||
-              (companyProfile?.case_studies && Array.isArray(companyProfile.case_studies) && companyProfile.case_studies.length > 0) ||
+              companyProfile && (
+                (companyProfile.services && Array.isArray(companyProfile.services) && companyProfile.services.length > 0) ||
+                (companyProfile.case_studies && Array.isArray(companyProfile.case_studies) && companyProfile.case_studies.length > 0) ||
+                companyProfile.value_proposition ||
+                companyProfile.industries_served ||
+                companyProfile.company_description
+              ) ||
               (caseStudiesFromTable && caseStudiesFromTable.length > 0)
             )
           }
