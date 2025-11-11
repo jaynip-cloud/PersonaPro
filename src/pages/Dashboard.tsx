@@ -64,6 +64,7 @@ export const Dashboard: React.FC = () => {
     try {
       const [
         projectsRes,
+        opportunitiesRes,
         pitchesRes,
         contactsRes,
         documentsRes,
@@ -82,6 +83,18 @@ export const Dashboard: React.FC = () => {
           `)
           .eq('user_id', user.id)
           .order('updated_at', { ascending: false }),
+        supabase
+          .from('opportunities')
+          .select(`
+            *,
+            clients(
+              id,
+              company,
+              name
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
         supabase
           .from('saved_pitches')
           .select('*')
@@ -118,13 +131,15 @@ export const Dashboard: React.FC = () => {
         setProjects(projectsData);
       }
 
-      // Extract opportunities from projects (AI-generated opportunities)
-      const opportunityStatuses = ['opportunity_identified', 'quote', 'discussion'];
-      const opportunitiesFromProjects = projectsData.filter((p: any) =>
-        opportunityStatuses.includes(p.status) || p.ai_generated === true
-      );
-      console.log('Opportunities from projects:', opportunitiesFromProjects.length);
-      setOpportunities(opportunitiesFromProjects);
+      // Fetch opportunities from opportunities table
+      const opportunitiesData = opportunitiesRes.data || [];
+      if (opportunitiesRes.error) {
+        console.error('Error fetching opportunities:', opportunitiesRes.error);
+        setOpportunities([]);
+      } else {
+        console.log('Fetched opportunities:', opportunitiesData.length, 'opportunities');
+        setOpportunities(opportunitiesData);
+      }
 
       if (pitchesRes.error) {
         console.error('Error fetching pitches:', pitchesRes.error);
@@ -214,33 +229,20 @@ export const Dashboard: React.FC = () => {
     
     console.log('Active projects count:', activeProjects, 'out of', projects.length);
 
-    // Calculate active opportunities (projects with opportunity statuses)
+    // Calculate active opportunities (stage !== 'closed_won' and 'closed_lost')
     const activeOpportunities = opportunitiesData.filter(
-      opp => opp.status !== 'win' && opp.status !== 'loss' && opp.status !== 'cancelled'
+      opp => opp.stage !== 'closed_won' && opp.stage !== 'closed_lost'
     ).length;
 
-    // Calculate total pipeline value from opportunity projects
+    // Calculate total pipeline value from opportunities
     const totalPipelineValue = opportunitiesData.reduce((sum, opp) => {
-      // Extract budget value from budget_range string or use 0
-      const budgetStr = opp.budget_range || '';
-      let budgetValue = 0;
-
-      // Try to extract numeric value from budget_range (e.g., "$10K-$50K" -> use midpoint)
-      const match = budgetStr.match(/\$?(\d+\.?\d*)([KM]?)/i);
-      if (match) {
-        let value = parseFloat(match[1]);
-        const unit = match[2].toUpperCase();
-        if (unit === 'K') value *= 1000;
-        if (unit === 'M') value *= 1000000;
-        budgetValue = value;
-      }
-
-      return sum + budgetValue;
+      const oppValue = parseFloat(opp.value) || 0;
+      return sum + oppValue;
     }, 0);
 
-    // Calculate conversion rate (opportunities that became active projects)
+    // Calculate conversion rate (opportunities that became closed_won)
     const convertedOpportunities = opportunitiesData.filter(
-      opp => opp.status === 'active' || opp.status === 'in_progress' || opp.status === 'win'
+      opp => opp.stage === 'closed_won'
     ).length;
 
     const conversionRate = opportunitiesData.length > 0
@@ -399,35 +401,42 @@ export const Dashboard: React.FC = () => {
                 {opportunities.slice(0, 5).map((opportunity) => {
                   const client = opportunity.clients || (typeof opportunity.clients === 'object' ? opportunity.clients : null);
                   const clientName = client?.company || client?.name || 'Unknown Client';
-                  const oppDate = opportunity.updated_at || opportunity.created_at;
+                  const oppDate = opportunity.created_at;
 
-                  const getStatusVariant = (status: string) => {
-                    switch (status) {
-                      case 'win':
+                  const getStageVariant = (stage: string) => {
+                    switch (stage) {
+                      case 'closed_won':
                         return 'success';
-                      case 'loss':
+                      case 'closed_lost':
                         return 'destructive';
-                      case 'quote':
-                      case 'opportunity_identified':
+                      case 'proposal':
+                      case 'negotiation':
                         return 'warning';
-                      case 'discussion':
-                      case 'active':
+                      case 'qualified':
+                      case 'discovery':
                         return 'default';
+                      case 'lead':
+                        return 'secondary';
                       default:
                         return 'secondary';
                     }
                   };
 
-                  const formatStatus = (status: string) => {
-                    return status
+                  const formatStage = (stage: string) => {
+                    return stage
                       .split('_')
                       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
                       .join(' ');
                   };
 
-                  const formatValue = (budgetRange: string) => {
-                    if (!budgetRange) return 'N/A';
-                    return budgetRange;
+                  const formatValue = (value: number | null) => {
+                    if (!value) return 'N/A';
+                    return new Intl.NumberFormat('en-US', {
+                      style: 'currency',
+                      currency: 'USD',
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    }).format(value);
                   };
 
                   return (
@@ -437,9 +446,9 @@ export const Dashboard: React.FC = () => {
                       onClick={() => navigate(`/clients/${opportunity.client_id}`)}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{opportunity.name || 'Untitled Opportunity'}</p>
+                        <p className="font-medium text-sm truncate">{opportunity.title || 'Untitled Opportunity'}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {clientName} • {formatValue(opportunity.budget_range)}
+                          {clientName} • {formatValue(opportunity.value)}
                         </p>
                         {oppDate && (
                           <p className="text-xs text-muted-foreground mt-0.5">
@@ -452,10 +461,10 @@ export const Dashboard: React.FC = () => {
                         )}
                       </div>
                       <Badge
-                        variant={getStatusVariant(opportunity.status)}
+                        variant={getStageVariant(opportunity.stage)}
                         className="ml-2 flex-shrink-0"
                       >
-                        {formatStatus(opportunity.status || 'unknown')}
+                        {formatStage(opportunity.stage || 'lead')}
                       </Badge>
                     </div>
                   );
