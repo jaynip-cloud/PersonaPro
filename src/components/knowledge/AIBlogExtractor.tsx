@@ -23,6 +23,7 @@ export function AIBlogExtractor({ onBlogsExtracted }: AIBlogExtractorProps) {
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [extractedCount, setExtractedCount] = useState(0);
 
   const handleExtract = async () => {
     if (!url.trim()) {
@@ -64,19 +65,24 @@ export function AIBlogExtractor({ onBlogsExtracted }: AIBlogExtractorProps) {
 
       const data = await response.json();
 
+      console.log('Blog extraction response:', data);
+
       if (data.blogs && data.blogs.length > 0) {
-        const blogsWithIds = data.blogs.map((blog: any) => ({
+        const blogsWithIds = data.blogs.map((blog: any, index: number) => ({
           ...blog,
-          id: `blog_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: `blog_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`,
         }));
 
+        setExtractedCount(blogsWithIds.length);
         onBlogsExtracted(blogsWithIds);
         setSuccess(true);
         setUrl('');
 
-        setTimeout(() => setSuccess(false), 3000);
+        console.log(`Successfully extracted ${blogsWithIds.length} blog articles`);
+
+        setTimeout(() => setSuccess(false), 5000);
       } else {
-        setError('No blog articles found on the provided page');
+        setError('No blog articles found on this page. Try entering your blog homepage URL (e.g., example.com/blog).');
       }
     } catch (err: any) {
       console.error('Error extracting blogs:', err);
@@ -137,7 +143,9 @@ export function AIBlogExtractor({ onBlogsExtracted }: AIBlogExtractorProps) {
           <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-green-800">Success!</p>
-            <p className="text-sm text-green-700">Blog articles extracted and added successfully</p>
+            <p className="text-sm text-green-700">
+              Extracted and added {extractedCount} blog article{extractedCount !== 1 ? 's' : ''} from the page
+            </p>
           </div>
         </div>
       )}
@@ -147,23 +155,23 @@ export function AIBlogExtractor({ onBlogsExtracted }: AIBlogExtractorProps) {
         <ul className="text-sm text-muted-foreground space-y-1">
           <li className="flex items-start gap-2">
             <span className="text-primary">•</span>
-            <span>Enter the URL of your blog or articles page</span>
+            <span>Enter the URL of your blog homepage or articles listing page</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary">•</span>
-            <span>AI will comprehensively analyze the page and extract ALL blog articles, posts, and content</span>
+            <span>AI analyzes the page and extracts ONLY real blog articles that exist on the page</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary">•</span>
-            <span>Article titles, URLs, dates, authors, and excerpts will be captured</span>
+            <span>Captures exact article titles, URLs, dates, authors, and excerpts as they appear</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary">•</span>
-            <span>Blog articles will be automatically added to your list below</span>
+            <span>Articles are automatically added to your knowledge base</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary">•</span>
-            <span>You can edit or remove articles after extraction</span>
+            <span>Best results: Use a page that lists multiple blog posts (e.g., /blog, /articles, /news)</span>
           </li>
         </ul>
       </div>
