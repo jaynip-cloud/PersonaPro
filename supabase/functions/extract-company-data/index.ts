@@ -17,6 +17,7 @@ interface CrawlResult {
   content: string;
   links: string[];
   socialLinks: string[];
+  emails?: string[];
 }
 
 // ============================================
@@ -188,6 +189,14 @@ Deno.serve(async (req: Request) => {
         },
         challenges: extractedInfo.challenges || [],
         competitors: extractedInfo.competitors || [],
+        recentNews: extractedInfo.recentNews || [],
+        marketIntelligence: {
+          recentDevelopments: extractedInfo.marketIntelligence?.recentDevelopments || '',
+          fundingStatus: extractedInfo.marketIntelligence?.fundingStatus || '',
+          growthIndicators: extractedInfo.marketIntelligence?.growthIndicators || [],
+          marketPosition: extractedInfo.marketIntelligence?.marketPosition || '',
+          publicPerception: extractedInfo.marketIntelligence?.publicPerception || ''
+        },
         logo: findLogoUrl(crawledData),
       }
     };
@@ -297,6 +306,29 @@ function parseHtml(html: string, url: string): CrawlResult {
   const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
   const title = titleMatch ? titleMatch[1].trim() : '';
 
+  // Extract emails from HTML
+  const emailPattern = /([a-zA-Z0-9._+-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
+  const mailtoPattern = /mailto:([a-zA-Z0-9._+-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
+  const emails = new Set<string>();
+
+  // Extract from mailto links
+  let mailtoMatch;
+  while ((mailtoMatch = mailtoPattern.exec(html)) !== null) {
+    emails.add(mailtoMatch[1].toLowerCase());
+  }
+
+  // Extract from plain text email patterns
+  let emailMatch;
+  while ((emailMatch = emailPattern.exec(html)) !== null) {
+    const email = emailMatch[1].toLowerCase();
+    // Filter out common false positives
+    if (!email.includes('.png') && !email.includes('.jpg') &&
+        !email.includes('.jpeg') && !email.includes('.gif') &&
+        !email.includes('example.com') && !email.includes('domain.com')) {
+      emails.add(email);
+    }
+  }
+
   const socialPatterns = [
     /https?:\/\/(www\.)?(linkedin\.com\/company\/[^\s"'<>]+)/gi,
     /https?:\/\/(www\.)?(linkedin\.com\/in\/[^\s"'<>]+)/gi,
@@ -333,6 +365,7 @@ function parseHtml(html: string, url: string): CrawlResult {
     content,
     links,
     socialLinks: Array.from(socialLinks),
+    emails: Array.from(emails),
   };
 }
 
@@ -349,13 +382,17 @@ function extractTextFromHtml(html: string): string {
 
 async function extractCompanyInfo(crawlResults: CrawlResult[], perplexityKey: string, rootUrl: string) {
   const allSocialLinks = new Set<string>();
+  const allEmails = new Set<string>();
   crawlResults.forEach(result => {
     result.socialLinks.forEach(link => allSocialLinks.add(link));
+    result.emails?.forEach(email => allEmails.add(email));
   });
 
   const combinedContent = crawlResults
-    .map(r => `PAGE: ${r.title || r.url}\nURL: ${r.url}\nCONTENT: ${r.content.substring(0, 12000)}\n\n`)
+    .map(r => `PAGE: ${r.title || r.url}\nURL: ${r.url}\nEMAILS FOUND: ${r.emails?.join(', ') || 'None'}\nCONTENT: ${r.content.substring(0, 12000)}\n\n`)
     .join('\n---\n\n');
+
+  console.log(`Found ${allEmails.size} unique email addresses across all pages:`, Array.from(allEmails));
 
   const linkedinProfileUrls = Array.from(allSocialLinks).filter(link => link.includes('linkedin.com/in/'));
   const linkedinCompanyUrls = Array.from(allSocialLinks).filter(link => link.includes('linkedin.com/company/'));
@@ -403,6 +440,9 @@ STRICT ACCURACY RULES:
 ✅ DO leave fields empty if data is not found rather than guessing
 
 ROOT DOMAIN: ${rootUrl}
+
+DISCOVERED EMAIL ADDRESSES (from website crawl):
+${Array.from(allEmails).slice(0, 10).join(', ') || 'None found - search website and LinkedIn for contact emails'}
 
 DISCOVERED SOCIAL MEDIA PROFILES:
 - LinkedIn Company: ${linkedinCompanyUrls.join(', ') || 'Not found'}
@@ -554,6 +594,24 @@ REQUIRED JSON STRUCTURE (extract ALL available information):
       \"source\": \"Where found: 'website testimonials page', 'case study', 'review site', etc.\"
     }
   ],
+  \"recentNews\": [
+    {
+      \"title\": \"News article or press release title\",
+      \"date\": \"Publication date (any format)\",
+      \"source\": \"Source publication (e.g., 'TechCrunch', 'Company Blog', 'Press Release')\",
+      \"url\": \"Full URL to the article\",
+      \"summary\": \"2-3 sentence summary of the news\",
+      \"category\": \"Category: 'funding', 'product_launch', 'partnership', 'expansion', 'award', 'leadership_change', 'general'\",
+      \"impact\": \"Brief note on how this impacts the company's business or strategy\"
+    }
+  ],
+  \"marketIntelligence\": {
+    \"recentDevelopments\": \"Summary of recent company developments in last 6-12 months from news search\",
+    \"fundingStatus\": \"Funding information if available (e.g., 'Series B $20M', 'Bootstrapped', 'Public Company')\",
+    \"growthIndicators\": [\"Signs of growth: hiring announcements, office expansion, new markets, product launches\"],
+    \"marketPosition\": \"Brief assessment of market position based on news and company information\",
+    \"publicPerception\": \"Public perception and reputation based on news articles and media coverage\"
+  },
   \"socialProfiles\": {
     \"linkedin\": \"${linkedinCompanyUrls[0] || ''}\",
     \"twitter\": \"${twitterUrls[0] || ''}\",
@@ -654,25 +712,36 @@ DETAILED EXTRACTION GUIDELINES:
 4. **VALIDATE all contact information** before including it
 
 **EMAIL EXTRACTION (Priority Order):**
-1. **Contact Page** - Look for:
+DISCOVERED EMAILS TO VALIDATE: ${Array.from(allEmails).join(', ')}
+
+1. **Validate Discovered Emails** - First, verify the emails found above:
+   - Check if they match the company's domain (${new URL(rootUrl).hostname})
+   - Determine which are primary (general contact) vs alternate (department-specific)
+   - Prioritize: contact@, info@, hello@, support@, sales@
+
+2. **Contact Page** - Look for:
    - Explicitly displayed email addresses (e.g., "Email: info@company.com")
    - Contact forms with pre-filled or visible email addresses
    - "Contact us" sections with email listed
    - Email links (mailto: links) - extract the actual email address
-   
-2. **Footer** - Look for:
+
+3. **LinkedIn Company Page** - Search for:
+   - Email addresses shown on LinkedIn company page
+   - Contact information in LinkedIn About section
+
+4. **Footer** - Look for:
    - Email addresses in footer contact section
    - Footer links that show email addresses
-   
-3. **Header/Navigation** - Look for:
+
+5. **Header/Navigation** - Look for:
    - Contact links that reveal email addresses
    - Navigation menus with contact information
-   
-4. **About Page** - Look for:
+
+6. **About Page** - Look for:
    - Contact sections on about page
    - Team member emails if explicitly listed
-   
-5. **Team/Leadership Pages** - Look for:
+
+7. **Team/Leadership Pages** - Look for:
    - Individual team member emails if explicitly shown
    - Leadership contact information if displayed
 
@@ -719,27 +788,49 @@ DETAILED EXTRACTION GUIDELINES:
 ❌ DO NOT extract phone numbers from JavaScript code or hidden elements
 ❌ DO NOT include phone numbers that are clearly for different companies
 
-**ADDRESS EXTRACTION:**
+**ADDRESS EXTRACTION (FULL PHYSICAL ADDRESS WITH ZIP CODE):**
+CRITICAL: Extract complete physical address in this format:
+"Street Address, City, State/Province, Country, Postal/Zip Code"
+
 1. **Contact Page** - Look for:
    - Physical address sections
    - "Visit us" or "Location" sections
    - Maps with address labels
-   
+   - Complete address with street, city, state, country, zip
+
 2. **Footer** - Look for:
-   - Address in footer
+   - Address in footer (often shows full address with zip code)
    - Footer location information
-   
+
 3. **About Page** - Look for:
-   - Headquarters location
-   - Office locations
+   - Headquarters location with full address
+   - Office locations with complete addresses
+
+4. **LinkedIn Company Page** - Search for:
+   - Headquarters address in LinkedIn About section
+   - Address may include full street address and postal code
+
+5. **Web Search** - If no complete address found:
+   - Search: "[Company Name] headquarters address"
+   - Search: "[Company Name] office location postal code"
+   - Verify address matches the company's stated location
 
 **ADDRESS VALIDATION:**
-✅ MUST include street address, city, and country at minimum
-✅ SHOULD include state/province if applicable
-✅ SHOULD include postal/zip code if shown
-✅ MUST match the company's stated location
-❌ DO NOT guess addresses based on city name
-❌ DO NOT use incomplete or partial addresses
+✅ MUST include street name/number (e.g., "123 Main Street" not just "San Francisco")
+✅ MUST include city
+✅ SHOULD include state/province if applicable (especially for US addresses)
+✅ MUST include country
+✅ SHOULD include postal/zip code (REQUIRED for complete address)
+✅ Format example: "1600 Amphitheatre Parkway, Mountain View, CA 94043, USA"
+✅ Format example: "20 Cooper's Row, London EC3N 2BQ, United Kingdom"
+❌ DO NOT use incomplete addresses like "San Francisco, CA" without street address
+❌ DO NOT guess street addresses
+❌ DO NOT use PO Box unless it's the only address shown
+
+**ZIP/POSTAL CODE EXTRACTION:**
+- Look specifically for: zip code, postal code, postcode
+- Common patterns: US (12345 or 12345-6789), UK (SW1A 1AA), CA (A1A 1A1)
+- Extract from: contact page, footer, Google Maps embed, address labels
 
 **PRIMARY vs ALTERNATE CONTACT:**
 - **Primary Email/Phone**: The main contact method shown most prominently (usually on contact page)
@@ -781,22 +872,56 @@ DETAILED EXTRACTION GUIDELINES:
 - Use testimonials to infer client expectations met: quality, responsiveness, expertise, support, results
 - If case studies found, extract: problem solved, solution provided, results achieved, client satisfaction
 
-**Business Goals & Expectations (IMPORTANT):**
-- **Short-term Goals** - Look in: about page, investor relations, press releases, blog posts, annual reports
-  - Search for: \"goals for 2024\", \"this year we aim to\", \"current priorities\", \"our focus\", \"Q1/Q2/Q3/Q4 objectives\"
-  - Extract specific, measurable goals like revenue targets, expansion plans, product launches, hiring goals
-  - Examples: \"Launch mobile app in Q2 2024\", \"Grow customer base by 40%\", \"Expand to European market\"
+**NEWS & ARTICLES WEB SEARCH (CRITICAL - GATHER RECENT INFORMATION):**
+Use web search to find recent news, press releases, and articles about the company:
 
-- **Long-term Goals** - Look in: about page, mission/vision section, investor deck, CEO interviews, strategy pages
-  - Search for: \"vision for\", \"by 2025/2026/2027\", \"our long-term strategy\", \"5-year plan\", \"roadmap\"
+1. **Search Queries to Run:**
+   - "[Company Name] news"
+   - "[Company Name] press release"
+   - "[Company Name] recent announcements"
+   - "[Company Name] funding round"
+   - "[Company Name] product launch"
+   - "[Company Name] acquisition merger"
+   - "[Company Name] expansion growth"
+   - "[Company Name] CEO interview"
+   - "[Company Name] awards recognition"
+
+2. **Information to Extract from News:**
+   - Recent product launches or updates (last 6-12 months)
+   - Funding announcements (Series A, B, C, IPO plans)
+   - Partnerships or strategic alliances announced
+   - Company expansion (new markets, offices, hiring)
+   - Awards, recognition, or industry rankings
+   - Leadership changes or appointments
+   - Customer wins or major contracts
+   - Challenges or setbacks mentioned in media
+
+3. **Use News to Understand:**
+   - Current business priorities and focus areas
+   - Market position and competitive landscape
+   - Growth trajectory and momentum
+   - Industry trends affecting the company
+   - Public perception and reputation
+   - Strategic direction and future plans
+
+**Business Goals & Expectations (IMPORTANT):**
+- **Short-term Goals** - Look in: about page, investor relations, press releases, blog posts, annual reports, recent news articles
+  - Search for: "goals for 2024", "this year we aim to", "current priorities", "our focus", "Q1/Q2/Q3/Q4 objectives"
+  - Search news for: recent announcements, product roadmap mentions, expansion plans
+  - Extract specific, measurable goals like revenue targets, expansion plans, product launches, hiring goals
+  - Examples: "Launch mobile app in Q2 2024", "Grow customer base by 40%", "Expand to European market"
+
+- **Long-term Goals** - Look in: about page, mission/vision section, investor deck, CEO interviews, strategy pages, news articles
+  - Search for: "vision for", "by 2025/2026/2027", "our long-term strategy", "5-year plan", "roadmap"
+  - Search news for: CEO vision statements, strategic initiatives, market position goals
   - Extract strategic direction, market position goals, transformation objectives
-  - Examples: \"Become the leading SaaS platform in healthcare\", \"Achieve unicorn status\", \"Revolutionize the industry\"
+  - Examples: "Become the leading SaaS platform in healthcare", "Achieve unicorn status", "Revolutionize the industry"
 
 - **Client/Partnership Expectations** - Look in: partnerships page, client testimonials, case studies, service agreements
-  - Search for: \"we expect\", \"looking for partners who\", \"ideal client\", \"what we value\", \"our requirements\"
+  - Search for: "we expect", "looking for partners who", "ideal client", "what we value", "our requirements"
   - Extract what they need from vendors/partners/clients (response time, quality standards, communication style)
   - Also infer from testimonials: what clients valued (support quality, communication, expertise, results)
-  - Examples: \"24/7 support availability\", \"Transparent communication\", \"Scalability and flexibility\", \"Data security compliance\"
+  - Examples: "24/7 support availability", "Transparent communication", "Scalability and flexibility", "Data security compliance"
 
 - **Use web search extensively** to find recent press releases, CEO interviews, blog posts about company goals
 - If explicit goals not found, infer from company description, recent news, product roadmap, hiring patterns
@@ -1073,6 +1198,24 @@ Return ONLY valid JSON in this exact structure:
     \"expectations\": \"What company expects from partnerships (infer from culture, values)\"
   },
   \"testimonials\": [],
+  \"recentNews\": [
+    {
+      \"title\": \"News article or press release title from web search\",
+      \"date\": \"Publication date\",
+      \"source\": \"Source publication\",
+      \"url\": \"Full URL to the article\",
+      \"summary\": \"2-3 sentence summary\",
+      \"category\": \"Category type\",
+      \"impact\": \"Impact on company's business\"
+    }
+  ],
+  \"marketIntelligence\": {
+    \"recentDevelopments\": \"Summary of recent developments from web search about this company\",
+    \"fundingStatus\": \"Funding information if available from news\",
+    \"growthIndicators\": [\"Growth signs from news and LinkedIn activity\"],
+    \"marketPosition\": \"Market position assessment\",
+    \"publicPerception\": \"Public perception from news coverage\"
+  },
   \"socialProfiles\": {
     \"linkedin\": \"${linkedinUrl}\",
     \"twitter\": \"Twitter URL if shown on LinkedIn\",
@@ -1087,8 +1230,14 @@ CRITICAL FOCUS AREAS:
 3. Extract recent posts to understand short-term and long-term goals
 4. Ensure all names and titles are exact matches from LinkedIn
 5. Mark decision makers correctly based on title seniority
+6. **PERFORM WEB SEARCH** for recent news and articles about this company using queries:
+   - "[Company Name] news"
+   - "[Company Name] press release"
+   - "[Company Name] recent announcements"
+   - Extract at least 5-10 recent news articles with titles, dates, sources, URLs, summaries
+7. **EXTRACT MARKET INTELLIGENCE** from news search results
 
-Now extract the comprehensive company information from this LinkedIn page. Return ONLY the JSON object.`;
+Now extract the comprehensive company information from this LinkedIn page AND perform web search for recent news. Return ONLY the JSON object.`;
 
   try {
     console.log(`\n${'='.repeat(60)}`);
