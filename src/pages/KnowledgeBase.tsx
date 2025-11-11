@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard';
+import { AIServiceExtractor } from '../components/knowledge/AIServiceExtractor';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
@@ -1444,10 +1445,29 @@ export const KnowledgeBase: React.FC = () => {
 
       {isEditing && activeTab === 'services' && (
         <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                AI Service Extractor
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Extract service information automatically from your service page URL
+              </p>
+            </CardHeader>
+            <CardContent>
+              <AIServiceExtractor
+                onServicesExtracted={(extractedServices) => {
+                  setServices([...services, ...extractedServices]);
+                }}
+              />
+            </CardContent>
+          </Card>
+
           <div className="flex justify-end">
             <Button variant="primary" onClick={addService}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Service
+              Add Service Manually
             </Button>
           </div>
 
