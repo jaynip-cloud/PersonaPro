@@ -409,7 +409,15 @@ CRITICAL: ACCURACY IS PARAMOUNT - NEVER GUESS OR INFER DATA THAT IS NOT EXPLICIT
 2. shortTermGoals - REQUIRED (search press releases, blog, investor pages, CEO interviews)
 3. longTermGoals - REQUIRED (search about page, vision/mission, strategic direction, investor deck)
 4. expectations - REQUIRED (infer from testimonials, service pages, partnership requirements)
-5. budgetRange - OPTIONAL but highly valuable (look for pricing pages, case studies)
+5. **LEADERSHIP** - ABSOLUTELY REQUIRED (minimum CEO/Founder - search LinkedIn People, About page, team page)
+6. **TECHNOLOGY STACK** - REQUIRED if tech company (search job postings, about page, partners page, footer)
+7. **BLOGS/ARTICLES** - REQUIRED if blog exists (extract from /blog, /news, /insights pages)
+8. budgetRange - OPTIONAL but highly valuable (look for pricing pages, case studies)
+
+🔴 CRITICAL EXTRACTION PRIORITY:
+- If the company has a team/about/leadership page → MUST extract leadership
+- If the company has a blog/news section → MUST extract at least 5-10 blog posts
+- If the company is tech-related → MUST extract technology stack (languages, frameworks, platforms)
 
 DATA SOURCE PRIORITY (USE IN THIS EXACT ORDER):
 1. **PRIMARY SOURCE - LinkedIn Company Page**: ${linkedinCompanyUrls[0] || 'Not found - search for it'}
@@ -645,18 +653,100 @@ DETAILED EXTRACTION GUIDELINES:
 - For each service: extract name and comprehensive description (what it does, key features, benefits)
 - Example: {\"name\": \"Cloud Migration Service\", \"description\": \"End-to-end cloud migration services helping enterprises move legacy systems to AWS, Azure, or GCP with zero downtime, automated backups, and security compliance.\"}
 
-**Blog Articles:**
-- Look in: /blog, /news, /insights, /resources pages
-- Extract recent articles (at least 5-10 if available)
-- For each article: title, full URL, publication date, 1-2 sentence summary, author name
-- If blog listing page found, extract article previews and metadata
-- Example: {\"title\": \"How AI is Transforming Healthcare\", \"url\": \"https://example.com/blog/ai-healthcare\", \"date\": \"March 15, 2024\", \"summary\": \"Exploring the impact of artificial intelligence on patient care and medical diagnostics.\", \"author\": \"Dr. Jane Smith\"}
+**Blog Articles (MANDATORY IF BLOG EXISTS):**
+🚨 IF THE COMPANY HAS A BLOG/NEWS SECTION - THIS IS REQUIRED 🚨
 
-**Technology Stack:**
-- Look in: technology page, about page, partners page, integration pages, footer
-- Identify: programming languages, frameworks, platforms, tools they use or integrate with
-- Examples: [\"React\", \"Node.js\", \"AWS\", \"PostgreSQL\", \"Docker\", \"Kubernetes\"]
-- Also search their job postings for technology requirements
+STEP 1 - Check for Blog/News Section:
+- Look in website crawl results for pages with these URLs:
+  * /blog, /news, /insights, /resources, /articles
+  * /press, /updates, /posts, /content
+- Check page titles for: "Blog", "News", "Insights", "Resources", "Articles"
+
+STEP 2 - Extract from Website Content:
+- If blog page found in crawl results:
+  * Extract article titles from blog listing page
+  * Extract article URLs (full URLs starting with http/https)
+  * Extract publication dates (any format: "March 15, 2024", "2024-03-15", "3 days ago")
+  * Extract preview text or summaries
+  * Extract author names if shown
+- Look for article metadata: <h2>, <h3> tags often contain article titles
+- Look for date patterns in content: dates near article titles
+
+STEP 3 - Web Search for Blog (IF NOT FOUND):
+- Search: "[Company Name] blog"
+- Search: "[Company Name] articles"
+- Search: "[Company Name] news"
+- Search: "site:[company domain] blog"
+- Access the blog page and extract recent articles
+
+STEP 4 - Required Information Per Article:
+- ✅ Title (REQUIRED) - The article headline
+- ✅ URL (REQUIRED) - Complete URL (e.g., "https://company.com/blog/article-title")
+- ✅ Date (REQUIRED if available) - Publication date
+- ✅ Summary (REQUIRED) - 1-2 sentence summary of what the article is about
+- ✅ Author (OPTIONAL) - Author name if mentioned
+
+STEP 5 - Minimum Requirements:
+- ✅ If blog exists: Extract at least 5-10 recent articles
+- ✅ Each article must have: title, URL, summary
+- ✅ Prioritize most recent articles (last 6-12 months)
+- ❌ DO NOT leave empty if blog section exists on website
+- ✅ Extract from crawled content - check "PAGE:" sections for /blog or /news URLs
+
+STEP 6 - Example Format:
+{
+  "title": "How AI is Transforming Healthcare",
+  "url": "https://example.com/blog/ai-healthcare",
+  "date": "March 15, 2024",
+  "summary": "Exploring the impact of artificial intelligence on patient care and medical diagnostics. Discusses real-world applications and future trends.",
+  "author": "Dr. Jane Smith"
+}
+
+**Technology Stack (MANDATORY FOR TECH COMPANIES):**
+🚨 IF THIS IS A TECHNOLOGY COMPANY - THIS SECTION IS REQUIRED 🚨
+
+STEP 1 - Check if Tech Company:
+- Look at industry, description, services
+- If company builds software, provides SaaS, IT services, or tech solutions → THIS IS MANDATORY
+
+STEP 2 - Extract from Website:
+- Technology page (e.g., "/technology", "/stack", "/how-it-works")
+- About page (mentions of technologies used)
+- Partners page (technology partners like AWS, Microsoft, Google Cloud)
+- Integration pages (platforms they integrate with)
+- Footer (often shows "Powered by..." or partner logos)
+- Case studies (technologies used in implementations)
+
+STEP 3 - Web Search for Technology:
+- Search: "[Company Name] technology stack"
+- Search: "[Company Name] tech stack"
+- Search: "[Company Name] powered by"
+- Search: "[Company Name] built with"
+- Look for: GitHub repositories, tech blog posts, engineering blog
+
+STEP 4 - Job Postings Search:
+- Search: "[Company Name] jobs" or "[Company Name] careers"
+- Look at job requirements to identify technologies:
+  * Programming languages (JavaScript, Python, Java, Go, etc.)
+  * Frameworks (React, Vue, Angular, Django, Rails, etc.)
+  * Databases (PostgreSQL, MongoDB, MySQL, Redis, etc.)
+  * Cloud platforms (AWS, Azure, Google Cloud, Heroku, etc.)
+  * DevOps tools (Docker, Kubernetes, Jenkins, etc.)
+
+STEP 5 - Common Technology Categories:
+- **Frontend**: React, Vue, Angular, Next.js, HTML/CSS, TypeScript
+- **Backend**: Node.js, Python, Ruby, Java, .NET, PHP, Go
+- **Databases**: PostgreSQL, MySQL, MongoDB, Redis, Elasticsearch
+- **Cloud**: AWS, Azure, Google Cloud, DigitalOcean, Heroku
+- **DevOps**: Docker, Kubernetes, Jenkins, CircleCI, GitHub Actions
+- **Analytics**: Google Analytics, Mixpanel, Segment, Amplitude
+- **Monitoring**: Datadog, New Relic, Sentry, LogRocket
+
+STEP 6 - Minimum Requirements:
+- ✅ Tech companies MUST have at least 3-5 technologies listed
+- ✅ Include: programming languages, frameworks, cloud platforms
+- ❌ DO NOT leave empty for obvious tech companies
+- ✅ If can't find directly, infer from: job postings, industry standards, partner integrations
 
 **Partners:**
 - Look in: partners page, about page, integration pages
@@ -682,13 +772,58 @@ DETAILED EXTRACTION GUIDELINES:
 - Examples: [{"name": "Competitor ABC", "description": "Similar product but focuses more on enterprise"}, {"name": "Alternative XYZ", "description": "Offers basic features at lower price point"}]
 - If not explicitly mentioned, use web search to find industry competitors
 
-**Leadership (CRITICAL - USE WEB SEARCH):**
-- Use the discovered LinkedIn profile URLs: ${linkedinProfileUrls.slice(0, 5).join(', ')}
-- Search the web for these LinkedIn profiles to get names, titles, and bios
-- Also search: \"[Company Name] CEO\", \"[Company Name] Founder\" to find leadership
-- Extract from: team page, about page, leadership section, press releases
-- For each leader: full name, title, email (if found), LinkedIn URL, brief bio
-- Prioritize: CEO > Founder > Owner > Primary Contact
+**Leadership (CRITICAL - MANDATORY EXTRACTION WITH WEB SEARCH):**
+🚨 THIS IS ABSOLUTELY REQUIRED - DO NOT SKIP THIS SECTION 🚨
+
+STEP 1 - LinkedIn People Search (PRIMARY SOURCE):
+- LinkedIn Company URL: ${linkedinCompanyUrls[0] || 'SEARCH FOR IT'}
+- Go to the "People" section of the LinkedIn company page
+- Extract ALL executives and decision makers you find there:
+  * CEO, CTO, CFO, COO, President
+  * Founders and Co-Founders
+  * VPs and Vice Presidents
+  * Directors and Heads of departments
+- For EACH person extract: Full name, exact title, LinkedIn profile URL, brief headline
+
+STEP 2 - Discovered LinkedIn Profiles:
+- Found LinkedIn profile URLs: ${linkedinProfileUrls.slice(0, 10).join(', ') || 'None - search for them'}
+- If LinkedIn profile URLs found above, search each one to get:
+  * Full name
+  * Current job title at this company
+  * LinkedIn profile URL
+  * Brief bio/headline
+  * Email if visible
+
+STEP 3 - Website Team/About/Leadership Pages:
+- Look in the provided website content for:
+  * Team page (look for "team", "about", "leadership", "our team" in URLs/titles)
+  * About page leadership section
+  * Leadership/Management page
+- Extract EVERY person mentioned with a title
+- Include their name, title, email (if shown), phone (if shown)
+
+STEP 4 - Web Search (MANDATORY IF NOT FOUND):
+- If leadership not found in LinkedIn or website, perform these searches:
+  * "[Company Name] CEO"
+  * "[Company Name] founder"
+  * "[Company Name] leadership team"
+  * "[Company Name] executives"
+  * "[Company Name] management team"
+- Search news articles and press releases mentioning leadership
+- Extract: CEO name, Founder name(s), key executives
+
+STEP 5 - Minimum Requirements:
+- ✅ MUST have at least CEO OR Founder (minimum 1 leader)
+- ✅ PREFER to have 3-10 leadership/team members
+- ✅ Each leader MUST have: name, title
+- ✅ Each leader SHOULD have: LinkedIn URL if findable
+- ✅ Each leader OPTIONALLY have: email, phone, bio
+
+VALIDATION:
+- ❌ DO NOT return empty leadership section
+- ❌ DO NOT skip if you can't find on website - USE WEB SEARCH
+- ✅ Search "[Company Name] team" to find team members
+- ✅ Use LinkedIn company "People" section as primary source
 
 **Contacts (CRITICAL - EXTRACT ALL PEOPLE):**
 - Look in: team page, about page, leadership page, contact page, staff directory
@@ -943,16 +1078,59 @@ SEARCH STRATEGY:
 14. Search for: \"[Company Name] goals\", \"[Company Name] strategy\", \"[Company Name] roadmap\", \"[Company Name] future plans\"
 15. Search for: \"[Company Name] team\", \"[Company Name] testimonials\", \"[Company Name] reviews\"
 
-QUALITY REQUIREMENTS:
-- **Minimum 3-10 contacts** with names and titles (extract ALL people found on team/about/leadership pages)
-- Minimum 3-5 services/products (if available on website)
-- **Minimum 5-15 testimonials** (if testimonials/reviews/case studies page exists)
-- Minimum 5-10 blog articles (if blog exists)
-- Leadership must include at least CEO or Founder with LinkedIn URL if discoverable
-- Technology stack should have 5+ items if technology page exists
-- Contact info must have at least one email and one phone number
-- All URLs must be complete and valid
-- For each contact: determine isDecisionMaker and influenceLevel accurately based on title
+QUALITY REQUIREMENTS (MANDATORY MINIMUMS):
+
+🚨 ABSOLUTELY REQUIRED - NO EXCEPTIONS:
+1. **LEADERSHIP**:
+   - ✅ MUST have at least 1 leader (CEO, Founder, or President)
+   - ✅ PREFER 3-10 leadership/team members
+   - ✅ Search LinkedIn People section, team page, about page, web search
+   - ❌ NEVER return empty leadership - use web search to find CEO/Founder
+
+2. **BLOGS** (if blog exists):
+   - ✅ MUST extract 5-10 recent articles if blog/news section exists
+   - ✅ Each article needs: title, URL, date (if available), summary
+   - ✅ Check crawled pages for /blog, /news, /insights URLs
+   - ❌ DO NOT skip if blog exists on website
+
+3. **TECHNOLOGY STACK** (if tech company):
+   - ✅ MUST have 3-5+ technologies if company is tech-related
+   - ✅ Include: languages, frameworks, cloud platforms, tools
+   - ✅ Search job postings, partners page, about page, footer
+   - ❌ DO NOT leave empty for SaaS/software/IT companies
+
+4. **CONTACTS**:
+   - ✅ Minimum 3-10 contacts with names and titles
+   - ✅ Extract ALL people found on team/about/leadership pages
+   - ✅ For each: determine isDecisionMaker and influenceLevel accurately
+
+5. **SERVICES/PRODUCTS**:
+   - ✅ Minimum 3-5 services/products (if available on website)
+   - ✅ Each service needs name and comprehensive description
+
+6. **TESTIMONIALS** (if exists):
+   - ✅ Minimum 5-15 testimonials (if testimonials/reviews/case studies page exists)
+   - ✅ Extract ALL testimonials from testimonials page
+
+7. **CONTACT INFO**:
+   - ✅ Must have at least one email address (use discovered emails)
+   - ✅ Must have full physical address with street, city, country, postal code
+   - ✅ Should have at least one phone number
+
+8. **GENERAL**:
+   - ✅ All URLs must be complete and valid (start with http:// or https://)
+   - ✅ Company description must be 2-4 sentences minimum
+   - ✅ Short-term and long-term goals required (search news/press releases)
+
+VALIDATION CHECKLIST BEFORE RETURNING:
+□ Leadership section has at least 1 leader with name + title
+□ If blog exists → extracted 5-10 blog posts
+□ If tech company → extracted 3-5+ technologies
+□ Contacts has 3-10 people with titles
+□ Services has 3-5+ offerings
+□ At least one email address included
+□ Full address with street + postal code (if found)
+□ Company description is 2+ sentences
 
 WEBSITE CONTENT FROM MULTIPLE PAGES:
 ${combinedContent.substring(0, 75000)}
@@ -980,7 +1158,7 @@ Now extract the comprehensive company information including services, blogs, tec
         messages: [
           {
             role: "system",
-            content: "You are an expert business intelligence analyst who prioritizes ACCURACY over completeness. You NEVER guess, infer, or fabricate data. You follow a strict data source priority: 1) LinkedIn company page (most reliable), 2) Official website content, 3) Verified web search only for missing data. You validate all data: company names must match across sources, dates must be accurate. For contact information specifically: you ONLY extract emails, phone numbers, and addresses that are EXPLICITLY displayed on the website. You NEVER construct or guess contact information based on patterns. You NEVER use generic patterns like 'contact@domain.com' unless it's actually shown. You validate that emails match the company's domain and that phone numbers match the company's location. Email formats must be valid and explicitly displayed. Phone numbers must be real and explicitly shown. If you cannot verify contact information with 100% confidence, you leave that field empty. You understand that incorrect contact data is worse than missing contact data. You always return properly formatted JSON. When extracting contacts, you only include people explicitly listed on team/leadership pages with verifiable titles. When extracting testimonials, you only include those with clear attribution. You cross-reference all information and prioritize LinkedIn data for company basics (name, industry, size, location, founded year). You are meticulous, thorough, and refuse to extract unverified information.",
+            content: "You are an expert business intelligence analyst who AGGRESSIVELY extracts comprehensive company data while maintaining accuracy. You follow a strict data source priority: 1) LinkedIn company page (most reliable), 2) Official website content, 3) Web search for missing data. Your PRIMARY MISSION: Extract leadership, blogs, and technology stack - these are MANDATORY. For contact information: you ONLY extract emails, phone numbers, and addresses that are EXPLICITLY displayed. You validate emails match the company domain. CRITICAL EXTRACTION RULES: 1) LEADERSHIP IS MANDATORY - Always extract at least CEO/Founder using LinkedIn People section, team pages, or web search '[Company Name] CEO'. NEVER return empty leadership. 2) BLOGS ARE MANDATORY if blog exists - Extract 5-10 articles from /blog or /news pages found in crawl results. 3) TECHNOLOGY IS MANDATORY for tech companies - Extract from job postings, partners page, footer, or web search '[Company Name] tech stack'. 4) USE WEB SEARCH EXTENSIVELY - If data not on website/LinkedIn, search for it. You are aggressive about finding information through web search but accurate about what you report. You always return properly formatted JSON with comprehensive data.",
           },
           {
             role: "user",
@@ -1260,7 +1438,7 @@ Now extract the comprehensive company information from this LinkedIn page AND pe
         messages: [
           {
             role: "system",
-            content: "You are an expert LinkedIn data extraction specialist. You have direct access to LinkedIn company pages and can extract all visible information with 100% accuracy. You extract company information, employee lists with their titles, recent company posts, and all available contact details. For contact information specifically: you ONLY extract emails, phone numbers, and addresses that are EXPLICITLY displayed on the LinkedIn company page. You NEVER guess, infer, or construct contact information. You NEVER use generic patterns unless actually shown. If contact information is not visible on LinkedIn, you leave those fields empty. You understand that incorrect contact data is worse than missing contact data. You follow LinkedIn's exact formatting for company size, industry, and other fields. You always return properly formatted JSON. You prioritize extracting comprehensive employee/people data from the LinkedIn People section, focusing on decision makers and leadership.",
+            content: "You are an expert LinkedIn data extraction specialist who AGGRESSIVELY extracts comprehensive company and people data. You have direct access to LinkedIn company pages. Your PRIMARY MISSION: Extract ALL employees from LinkedIn People section - this is MANDATORY (minimum 10-20 people, focusing on executives, VPs, directors, managers). CRITICAL RULES: 1) PEOPLE/LEADERSHIP IS MANDATORY - Navigate to 'People' tab and extract every executive, VP, director, manager with their exact title and LinkedIn URL. NEVER return empty contacts array. 2) USE WEB SEARCH - Search '[Company Name] CEO', '[Company Name] leadership team', '[Company Name] news' to supplement LinkedIn data. 3) EXTRACT RECENT NEWS - Search for news about this company and include 5-10 recent articles. For contact info: ONLY extract emails/phones/addresses EXPLICITLY shown on LinkedIn. You follow LinkedIn's exact formatting. You AGGRESSIVELY search for leadership and team data but remain accurate. You always return properly formatted JSON with comprehensive employee lists and recent news.",
           },
           {
             role: "user",
