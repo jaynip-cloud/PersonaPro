@@ -6,6 +6,7 @@ import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard';
 import { AIServiceExtractor } from '../components/knowledge/AIServiceExtractor';
+import { AIBlogExtractor } from '../components/knowledge/AIBlogExtractor';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
@@ -1729,10 +1730,29 @@ export const KnowledgeBase: React.FC = () => {
 
       {isEditing && activeTab === 'blogs' && (
         <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                AI Blog Extractor
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Extract blog articles automatically from your blog page URL
+              </p>
+            </CardHeader>
+            <CardContent>
+              <AIBlogExtractor
+                onBlogsExtracted={(extractedBlogs) => {
+                  setBlogs([...blogs, ...extractedBlogs]);
+                }}
+              />
+            </CardContent>
+          </Card>
+
           <div className="flex justify-end">
             <Button variant="primary" onClick={addBlog}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Blog Article
+              Add Blog Article Manually
             </Button>
           </div>
 
