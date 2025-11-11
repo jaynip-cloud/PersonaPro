@@ -68,10 +68,10 @@ export const KnowledgeBase: React.FC = () => {
   }, [isKnowledgeBaseComplete, loading, user]);
 
   useEffect(() => {
-    if (user && isKnowledgeBaseComplete) {
+    if (user) {
       loadExistingData();
     }
-  }, [user, isKnowledgeBaseComplete]);
+  }, [user]);
 
   const loadExistingData = async () => {
     if (!user) return;
@@ -119,7 +119,7 @@ export const KnowledgeBase: React.FC = () => {
             const servicesData = typeof profile.services === 'string' ? JSON.parse(profile.services) : profile.services;
             console.log('Raw servicesData from DB:', servicesData);
             if (Array.isArray(servicesData) && servicesData.length > 0) {
-              setServices(servicesData.map((s: any, index: number) => {
+              const mappedServices = servicesData.map((s: any, index: number) => {
                 let serviceName = '';
                 let serviceDesc = '';
                 let serviceId = `service-${index}`;
@@ -143,7 +143,9 @@ export const KnowledgeBase: React.FC = () => {
                   tags: serviceTags,
                   pricing: servicePricing
                 };
-              }));
+              });
+              console.log('Setting services in Knowledge Base:', mappedServices);
+              setServices(mappedServices);
             }
           } catch (e) {
             console.error('Error parsing services:', e);
@@ -153,7 +155,9 @@ export const KnowledgeBase: React.FC = () => {
         if (profile.leadership) {
           try {
             const leadershipData = typeof profile.leadership === 'string' ? JSON.parse(profile.leadership) : profile.leadership;
-            if (Array.isArray(leadershipData)) {
+            console.log('Raw leadershipData from DB:', leadershipData);
+            if (Array.isArray(leadershipData) && leadershipData.length > 0) {
+              console.log('Setting leadership in Knowledge Base:', leadershipData);
               setLeadership(leadershipData);
             }
           } catch (e) {
@@ -164,7 +168,9 @@ export const KnowledgeBase: React.FC = () => {
         if (profile.blogs) {
           try {
             const blogsData = typeof profile.blogs === 'string' ? JSON.parse(profile.blogs) : profile.blogs;
-            if (Array.isArray(blogsData)) {
+            console.log('Raw blogsData from DB:', blogsData);
+            if (Array.isArray(blogsData) && blogsData.length > 0) {
+              console.log('Setting blogs in Knowledge Base:', blogsData);
               setBlogs(blogsData);
             }
           } catch (e) {
