@@ -18,6 +18,7 @@ interface AIInsightsOverviewProps {
     documents: number;
     marketIntelligence: boolean;
     marketIntelligenceStatus?: string;
+    marketIntelligenceError?: string;
   };
   onRefresh: () => void;
   isLoading: boolean;
@@ -223,7 +224,11 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
                         )}
                         {dataGathered.marketIntelligenceStatus === 'api_error' && (
                           <span className="block mb-1">
-                            <strong>⚠️ Market Intelligence Error:</strong> Perplexity API returned an error. Check your API key in Settings or try again later.
+                            <strong>⚠️ Market Intelligence Error:</strong> Perplexity API returned an error.
+                            {dataGathered.marketIntelligenceError && (
+                              <span className="block mt-1 text-xs font-mono bg-red-100 p-1 rounded">{dataGathered.marketIntelligenceError}</span>
+                            )}
+                            <span className="block mt-1">Check your API key in Settings or try again later.</span>
                           </span>
                         )}
                         {dataGathered.marketIntelligenceStatus === 'fetch_error' && (

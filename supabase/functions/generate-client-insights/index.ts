@@ -120,6 +120,7 @@ Deno.serve(async (req: Request) => {
 
     let marketIntelligence = '';
     let marketIntelligenceStatus = 'not_attempted';
+    let marketIntelligenceError = '';
 
     if (!perplexityKey) {
       console.log('Perplexity API key not configured - skipping market intelligence');
@@ -161,7 +162,9 @@ Focus on factual, recent information from reliable sources.`;
               }
             ],
             temperature: 0.2,
-            max_tokens: 2000
+            max_tokens: 2000,
+            return_citations: false,
+            return_related_questions: false
           })
         });
 
@@ -169,22 +172,35 @@ Focus on factual, recent information from reliable sources.`;
 
         if (perplexityResponse.ok) {
           const perplexityData = await perplexityResponse.json();
-          marketIntelligence = perplexityData.choices[0]?.message?.content || '';
+          console.log('Perplexity response structure:', JSON.stringify(perplexityData).substring(0, 200));
+          marketIntelligence = perplexityData.choices?.[0]?.message?.content || '';
           if (marketIntelligence) {
             marketIntelligenceStatus = 'success';
             console.log(`Market intelligence retrieved: ${marketIntelligence.length} characters`);
           } else {
             marketIntelligenceStatus = 'empty_response';
             console.log('Perplexity returned empty response');
+            console.log('Full response:', JSON.stringify(perplexityData));
           }
         } else {
           const errorText = await perplexityResponse.text();
           console.error(`Perplexity API error: ${perplexityResponse.status} - ${errorText}`);
           marketIntelligenceStatus = 'api_error';
+          marketIntelligenceError = errorText;
+
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (errorJson.error) {
+              marketIntelligenceError = typeof errorJson.error === 'string' ? errorJson.error : errorJson.error.message || errorText;
+            }
+          } catch (e) {
+            marketIntelligenceError = errorText.substring(0, 200);
+          }
         }
       } catch (e) {
         console.error('Web search failed:', e);
         marketIntelligenceStatus = 'fetch_error';
+        marketIntelligenceError = e.message || String(e);
         marketIntelligence = '';
       }
     }
@@ -452,6 +468,7 @@ Analyze comprehensively and provide strategic, actionable intelligence.`;
           documents: documentsList.length,
           marketIntelligence: !!marketIntelligence && marketIntelligenceStatus === 'success',
           marketIntelligenceStatus,
+          marketIntelligenceError: marketIntelligenceError || undefined,
         },
       }),
       {
