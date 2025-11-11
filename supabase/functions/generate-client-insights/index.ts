@@ -115,10 +115,21 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log('Data gathered. Performing web search for market intelligence...');
+    console.log(`Perplexity API key configured: ${!!perplexityKey}`);
+    console.log(`Client name: ${client.name}`);
 
     let marketIntelligence = '';
-    if (client.name && perplexityKey) {
+    let marketIntelligenceStatus = 'not_attempted';
+
+    if (!perplexityKey) {
+      console.log('Perplexity API key not configured - skipping market intelligence');
+      marketIntelligenceStatus = 'no_api_key';
+    } else if (!client.name) {
+      console.log('Client name missing - skipping market intelligence');
+      marketIntelligenceStatus = 'no_client_name';
+    } else {
       try {
+        console.log(`Performing web search for: ${client.name}`);
         const searchQuery = `Research ${client.name} in the ${client.industry || 'business'} industry. Provide:
 1. Recent news, press releases, and announcements (last 6 months)
 2. Market position and competitive landscape
@@ -154,13 +165,27 @@ Focus on factual, recent information from reliable sources.`;
           })
         });
 
+        console.log(`Perplexity API response status: ${perplexityResponse.status}`);
+
         if (perplexityResponse.ok) {
           const perplexityData = await perplexityResponse.json();
           marketIntelligence = perplexityData.choices[0]?.message?.content || '';
+          if (marketIntelligence) {
+            marketIntelligenceStatus = 'success';
+            console.log(`Market intelligence retrieved: ${marketIntelligence.length} characters`);
+          } else {
+            marketIntelligenceStatus = 'empty_response';
+            console.log('Perplexity returned empty response');
+          }
+        } else {
+          const errorText = await perplexityResponse.text();
+          console.error(`Perplexity API error: ${perplexityResponse.status} - ${errorText}`);
+          marketIntelligenceStatus = 'api_error';
         }
       } catch (e) {
-        console.log('Web search not available:', e);
-        marketIntelligence = 'Web search unavailable - analysis based on stored data only.';
+        console.error('Web search failed:', e);
+        marketIntelligenceStatus = 'fetch_error';
+        marketIntelligence = '';
       }
     }
 
@@ -425,7 +450,8 @@ Analyze comprehensively and provide strategic, actionable intelligence.`;
           projects: projects?.length || 0,
           pitches: pitches?.length || 0,
           documents: documentsList.length,
-          marketIntelligence: !!marketIntelligence,
+          marketIntelligence: !!marketIntelligence && marketIntelligenceStatus === 'success',
+          marketIntelligenceStatus,
         },
       }),
       {

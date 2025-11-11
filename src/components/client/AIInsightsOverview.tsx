@@ -17,6 +17,7 @@ interface AIInsightsOverviewProps {
     pitches: number;
     documents: number;
     marketIntelligence: boolean;
+    marketIntelligenceStatus?: string;
   };
   onRefresh: () => void;
   isLoading: boolean;
@@ -196,7 +197,13 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
                     <Globe className="h-4 w-4 text-teal-600" />
                     <div>
                       <p className="text-xs font-medium">Market Intel</p>
-                      <p className="text-xs text-muted-foreground">{dataGathered.marketIntelligence ? 'Available' : 'N/A'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {dataGathered.marketIntelligence ? 'Available' :
+                         dataGathered.marketIntelligenceStatus === 'no_api_key' ? 'No API Key' :
+                         dataGathered.marketIntelligenceStatus === 'api_error' ? 'API Error' :
+                         dataGathered.marketIntelligenceStatus === 'fetch_error' ? 'Fetch Error' :
+                         'N/A'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -205,16 +212,34 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
                     All insights are evidence-based and sourced from the data listed above. Recommendations reflect patterns
                     identified across meetings, projects, and market research.
                   </p>
-                  {(dataGathered.contacts < 2 || dataGathered.meetings < 3 || dataGathered.projects < 1 || dataGathered.documents < 1) && (
+                  {(dataGathered.contacts < 2 || dataGathered.meetings < 3 || dataGathered.projects < 1 || dataGathered.documents < 1 || !dataGathered.marketIntelligence) && (
                     <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
                       <p className="text-xs font-medium text-yellow-900 mb-1">💡 Get More Comprehensive Insights</p>
                       <p className="text-xs text-yellow-800">
-                        Add more data for deeper analysis:
-                        {dataGathered.contacts < 2 && ' • Add more contacts (decision makers, influencers)'}
-                        {dataGathered.meetings < 3 && ' • Upload meeting transcripts'}
-                        {dataGathered.projects < 1 && ' • Create projects/opportunities'}
-                        {dataGathered.documents < 1 && ' • Upload relevant documents'}
-                        {!dataGathered.marketIntelligence && ' • Configure Perplexity API key in Settings for market intelligence'}
+                        {dataGathered.marketIntelligenceStatus === 'no_api_key' && (
+                          <span className="block mb-1">
+                            <strong>⚠️ Market Intelligence Unavailable:</strong> Add Perplexity API key in Settings → API Keys to enable real-time web search for company news, market trends, and competitive intelligence.
+                          </span>
+                        )}
+                        {dataGathered.marketIntelligenceStatus === 'api_error' && (
+                          <span className="block mb-1">
+                            <strong>⚠️ Market Intelligence Error:</strong> Perplexity API returned an error. Check your API key in Settings or try again later.
+                          </span>
+                        )}
+                        {dataGathered.marketIntelligenceStatus === 'fetch_error' && (
+                          <span className="block mb-1">
+                            <strong>⚠️ Market Intelligence Error:</strong> Network error connecting to Perplexity API. Check your connection and try again.
+                          </span>
+                        )}
+                        {(dataGathered.contacts < 2 || dataGathered.meetings < 3 || dataGathered.projects < 1 || dataGathered.documents < 1) && (
+                          <span>
+                            Add more data for deeper analysis:
+                            {dataGathered.contacts < 2 && ' • Add more contacts (decision makers, influencers)'}
+                            {dataGathered.meetings < 3 && ' • Upload meeting transcripts'}
+                            {dataGathered.projects < 1 && ' • Create projects/opportunities'}
+                            {dataGathered.documents < 1 && ' • Upload relevant documents'}
+                          </span>
+                        )}
                       </p>
                     </div>
                   )}
