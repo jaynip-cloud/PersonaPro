@@ -53,6 +53,7 @@ export const KnowledgeBase: React.FC = () => {
   const [completing, setCompleting] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [viewMode, setViewMode] = useState<'ai-overview' | 'view-details'>('ai-overview');
   const { user, isKnowledgeBaseComplete, checkKnowledgeBaseStatus, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -646,6 +647,33 @@ export const KnowledgeBase: React.FC = () => {
           </div>
         </div>
 
+      {!isEditing && (
+        <div className="flex gap-2 border-b border-border">
+          <button
+            onClick={() => setViewMode('ai-overview')}
+            className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
+              viewMode === 'ai-overview'
+                ? 'border-primary text-primary font-medium'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Sparkles className="h-4 w-4" />
+            AI Overview
+          </button>
+          <button
+            onClick={() => setViewMode('view-details')}
+            className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
+              viewMode === 'view-details'
+                ? 'border-primary text-primary font-medium'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            View Details
+          </button>
+        </div>
+      )}
+
       {isEditing && (
       <div className="flex gap-2 border-b border-border overflow-x-auto">
         {tabs.map((tab) => {
@@ -668,7 +696,7 @@ export const KnowledgeBase: React.FC = () => {
       </div>
       )}
 
-      {!isEditing && (
+      {!isEditing && viewMode === 'view-details' && (
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -826,8 +854,11 @@ export const KnowledgeBase: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
 
-          <Card>
+      {!isEditing && viewMode === 'ai-overview' && (
+        <Card>
             <CardContent className="pt-7 px-6 pb-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -1160,7 +1191,6 @@ export const KnowledgeBase: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        </div>
       )}
 
       {isEditing && activeTab === 'company' && (
