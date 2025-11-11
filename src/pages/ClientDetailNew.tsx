@@ -82,6 +82,7 @@ export const ClientDetailNew: React.FC = () => {
   const [deletingOpportunityId, setDeletingOpportunityId] = useState<string | null>(null);
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [dataGathered, setDataGathered] = useState<any>(null);
   const [newProjectForm, setNewProjectForm] = useState({
     name: '',
     description: '',
@@ -584,7 +585,7 @@ export const ClientDetailNew: React.FC = () => {
         throw new Error(errorData.error || 'Failed to generate insights');
       }
 
-      const { insights, dataGathered } = await response.json();
+      const { insights, dataGathered: dataGatheredResult } = await response.json();
 
       setClient({
         ...client,
@@ -592,7 +593,9 @@ export const ClientDetailNew: React.FC = () => {
         aiInsightsGeneratedAt: new Date().toISOString(),
       });
 
-      showToast('success', `Insights generated! Analyzed ${dataGathered.contacts} contacts, ${dataGathered.meetings} meetings, ${dataGathered.projects} projects`);
+      setDataGathered(dataGatheredResult);
+
+      showToast('success', `Insights generated! Analyzed ${dataGatheredResult.contacts} contacts, ${dataGatheredResult.meetings} meetings, ${dataGatheredResult.projects} projects`);
     } catch (error: any) {
       console.error('Error generating insights:', error);
       showToast('error', error.message || 'Failed to generate insights');
@@ -1243,6 +1246,7 @@ export const ClientDetailNew: React.FC = () => {
               clientName={client.name}
               insights={client.aiInsights}
               insightsGeneratedAt={client.aiInsightsGeneratedAt}
+              dataGathered={dataGathered}
               onRefresh={handleGenerateInsights}
               isLoading={isGeneratingInsights}
             />

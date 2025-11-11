@@ -1,14 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { Sparkles, Loader2, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Target, Users, Brain, BarChart3, Lightbulb, Calendar, ArrowRight, RefreshCw } from 'lucide-react';
+import { Sparkles, Loader2, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Target, Users, Brain, BarChart3, Lightbulb, Calendar, ArrowRight, RefreshCw, Globe, FileText, MessageSquare, Briefcase, ChevronDown, ChevronUp, DollarSign, Zap } from 'lucide-react';
 
 interface AIInsightsOverviewProps {
   clientId: string;
   clientName: string;
   insights?: any;
   insightsGeneratedAt?: string;
+  dataGathered?: {
+    client: boolean;
+    contacts: number;
+    meetings: number;
+    projects: number;
+    pitches: number;
+    documents: number;
+    marketIntelligence: boolean;
+  };
   onRefresh: () => void;
   isLoading: boolean;
 }
@@ -18,9 +27,11 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
   clientName,
   insights,
   insightsGeneratedAt,
+  dataGathered,
   onRefresh,
   isLoading,
 }) => {
+  const [showDataSources, setShowDataSources] = useState(false);
   const getSentimentColor = (sentiment: string) => {
     const sentimentMap: Record<string, string> = {
       'very positive': 'text-green-600',
@@ -126,6 +137,77 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
             </div>
           </div>
         </CardHeader>
+        {dataGathered && (
+          <div className="px-6 pb-4">
+            <button
+              onClick={() => setShowDataSources(!showDataSources)}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showDataSources ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              <span>Data Sources Analyzed</span>
+            </button>
+            {showDataSources && (
+              <div className="mt-3 p-4 bg-muted/30 rounded-lg border border-border">
+                <p className="text-xs text-muted-foreground mb-3">This analysis is based on the following verified data sources:</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-blue-600" />
+                    <div>
+                      <p className="text-xs font-medium">Company Profile</p>
+                      <p className="text-xs text-muted-foreground">{dataGathered.client ? 'Complete' : 'Limited'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-purple-600" />
+                    <div>
+                      <p className="text-xs font-medium">Contacts</p>
+                      <p className="text-xs text-muted-foreground">{dataGathered.contacts} contacts</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-green-600" />
+                    <div>
+                      <p className="text-xs font-medium">Meetings</p>
+                      <p className="text-xs text-muted-foreground">{dataGathered.meetings} transcripts</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-orange-600" />
+                    <div>
+                      <p className="text-xs font-medium">Projects</p>
+                      <p className="text-xs text-muted-foreground">{dataGathered.projects} projects</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-indigo-600" />
+                    <div>
+                      <p className="text-xs font-medium">Documents</p>
+                      <p className="text-xs text-muted-foreground">{dataGathered.documents} files</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-pink-600" />
+                    <div>
+                      <p className="text-xs font-medium">Pitches</p>
+                      <p className="text-xs text-muted-foreground">{dataGathered.pitches} saved</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-teal-600" />
+                    <div>
+                      <p className="text-xs font-medium">Market Intel</p>
+                      <p className="text-xs text-muted-foreground">{dataGathered.marketIntelligence ? 'Available' : 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
+                  All insights are evidence-based and sourced from the data listed above. Recommendations reflect patterns
+                  identified across meetings, projects, and market research.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
         <CardContent>
           <div className="space-y-4">
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -416,6 +498,232 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Psychographic Profile
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {insights.psychographicProfile?.priorities && insights.psychographicProfile.priorities.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Top Priorities</p>
+              <div className="space-y-2">
+                {insights.psychographicProfile.priorities.map((priority: string, idx: number) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <span className="text-primary font-bold text-sm">{idx + 1}.</span>
+                    <p className="text-sm">{priority}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {insights.psychographicProfile?.painPoints && insights.psychographicProfile.painPoints.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Pain Points</p>
+              <div className="space-y-2">
+                {insights.psychographicProfile.painPoints.map((pain: string, idx: number) => (
+                  <div key={idx} className="flex items-start gap-2 p-2 bg-red-50 border border-red-200 rounded">
+                    <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-red-900">{pain}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {insights.psychographicProfile?.motivations && insights.psychographicProfile.motivations.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Key Motivations</p>
+              <div className="space-y-2">
+                {insights.psychographicProfile.motivations.map((motivation: string, idx: number) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <Zap className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">{motivation}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-4 pt-2">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Risk Tolerance</p>
+              <Badge variant="secondary" className="capitalize">{insights.psychographicProfile?.riskTolerance}</Badge>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Innovation</p>
+              <Badge variant="secondary" className="capitalize">{insights.psychographicProfile?.innovationAppetite}</Badge>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Value Focus</p>
+              <Badge variant="secondary" className="capitalize">{insights.psychographicProfile?.valueOrientation}</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            Market Context & Intelligence
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {insights.marketContext?.industryPosition && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Industry Position</p>
+              <p className="text-sm">{insights.marketContext.industryPosition}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Competitive Pressure</p>
+              <Badge variant={insights.marketContext?.competitivePressure === 'high' ? 'destructive' : 'secondary'}>
+                {insights.marketContext?.competitivePressure}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Growth Trajectory</p>
+              <Badge variant="secondary" className="capitalize">{insights.marketContext?.growthTrajectory}</Badge>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Reputation</p>
+              <Badge variant="secondary">Analyzed</Badge>
+            </div>
+          </div>
+
+          {insights.marketContext?.marketChallenges && insights.marketContext.marketChallenges.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Market Challenges</p>
+              <ul className="space-y-1">
+                {insights.marketContext.marketChallenges.map((challenge: string, idx: number) => (
+                  <li key={idx} className="text-sm flex items-start gap-2">
+                    <span className="text-orange-500 mt-0.5">•</span>
+                    {challenge}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {insights.marketContext?.marketOpportunities && insights.marketContext.marketOpportunities.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Market Opportunities</p>
+              <ul className="space-y-1">
+                {insights.marketContext.marketOpportunities.map((opp: string, idx: number) => (
+                  <li key={idx} className="text-sm flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">•</span>
+                    {opp}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Opportunity Analysis
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {insights.opportunityAnalysis?.upsellOpportunities && insights.opportunityAnalysis.upsellOpportunities.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Upsell Opportunities</p>
+              <div className="space-y-2">
+                {insights.opportunityAnalysis.upsellOpportunities.map((opp: string, idx: number) => (
+                  <div key={idx} className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded">
+                    <TrendingUp className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-green-900">{opp}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {insights.opportunityAnalysis?.crossSellOpportunities && insights.opportunityAnalysis.crossSellOpportunities.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Cross-Sell Opportunities</p>
+              <div className="space-y-2">
+                {insights.opportunityAnalysis.crossSellOpportunities.map((opp: string, idx: number) => (
+                  <div key={idx} className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <Sparkles className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-blue-900">{opp}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {insights.opportunityAnalysis?.budgetIndicators && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Budget Indicators</p>
+              <p className="text-sm">{insights.opportunityAnalysis.budgetIndicators}</p>
+            </div>
+          )}
+
+          {insights.opportunityAnalysis?.decisionTimeframe && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Decision Timeframe</p>
+              <Badge variant="secondary" className="capitalize">{insights.opportunityAnalysis.decisionTimeframe}</Badge>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Lightbulb className="h-4 w-4" />
+            Strategic Recommendations
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {insights.actionableInsights?.strategicRecommendations && insights.actionableInsights.strategicRecommendations.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Long-term Strategy</p>
+              <div className="space-y-2">
+                {insights.actionableInsights.strategicRecommendations.map((rec: string, idx: number) => (
+                  <div key={idx} className="flex items-start gap-3 p-3 border rounded-lg">
+                    <Target className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">{rec}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {insights.actionableInsights?.communicationStrategy && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Communication Strategy</p>
+              <p className="text-sm">{insights.actionableInsights.communicationStrategy}</p>
+            </div>
+          )}
+
+          {insights.actionableInsights?.engagementTactics && insights.actionableInsights.engagementTactics.length > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-muted-foreground">Engagement Tactics</p>
+              <ul className="space-y-1">
+                {insights.actionableInsights.engagementTactics.map((tactic: string, idx: number) => (
+                  <li key={idx} className="text-sm flex items-start gap-2">
+                    <ArrowRight className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    {tactic}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {(insights.redFlags?.length > 0 || insights.greenFlags?.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
