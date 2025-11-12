@@ -27,13 +27,7 @@ export const Dashboard: React.FC = () => {
   const { clients } = useApp();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<any[]>([]);
   const [opportunities, setOpportunities] = useState<any[]>([]);
-  const [pitches, setPitches] = useState<any[]>([]);
-  const [contacts, setContacts] = useState<any[]>([]);
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [transcripts, setTranscripts] = useState<any[]>([]);
-  const [financialData, setFinancialData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [kpis, setKpis] = useState<DashboardKPIs>({
     totalClients: 0,
@@ -64,7 +58,6 @@ export const Dashboard: React.FC = () => {
     try {
       const [
         clientsRes,
-        projectsRes,
         opportunitiesRes,
         pitchesRes,
         contactsRes,
@@ -74,20 +67,8 @@ export const Dashboard: React.FC = () => {
       ] = await Promise.all([
         supabase
           .from('clients')
-          .select('id')
+          .select('id, status, budget_range, annual_revenue, projects')
           .eq('user_id', user.id),
-        supabase
-          .from('projects')
-          .select(`
-            *,
-            clients(
-              id,
-              company,
-              name
-            )
-          `)
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false }),
         supabase
           .from('opportunities')
           .select(`
@@ -123,19 +104,6 @@ export const Dashboard: React.FC = () => {
           .eq('user_id', user.id)
       ]);
 
-      // Handle errors and set data
-      const projectsData = projectsRes.data || [];
-      if (projectsRes.error) {
-        console.error('Error fetching projects:', projectsRes.error);
-        setProjects([]);
-      } else {
-        console.log('Fetched projects:', projectsData.length, 'projects');
-        if (projectsData.length > 0) {
-          console.log('Projects with status:', projectsData.map((p: any) => ({ name: p.name, status: p.status })));
-        }
-        setProjects(projectsData);
-      }
-
       // Fetch opportunities from opportunities table
       const opportunitiesData = opportunitiesRes.data || [];
       if (opportunitiesRes.error) {
@@ -146,45 +114,10 @@ export const Dashboard: React.FC = () => {
         setOpportunities(opportunitiesData);
       }
 
-      if (pitchesRes.error) {
-        console.error('Error fetching pitches:', pitchesRes.error);
-        setPitches([]);
-      } else {
-        setPitches(pitchesRes.data || []);
-      }
-
-      if (contactsRes.error) {
-        console.error('Error fetching contacts:', contactsRes.error);
-        setContacts([]);
-      } else {
-        setContacts(contactsRes.data || []);
-      }
-
-      if (documentsRes.error) {
-        console.error('Error fetching documents:', documentsRes.error);
-        setDocuments([]);
-      } else {
-        setDocuments(documentsRes.data || []);
-      }
-
-      if (transcriptsRes.error) {
-        console.error('Error fetching transcripts:', transcriptsRes.error);
-        setTranscripts([]);
-      } else {
-        setTranscripts(transcriptsRes.data || []);
-      }
-
-      if (financialRes.error) {
-        console.error('Error fetching financial data:', financialRes.error);
-        setFinancialData([]);
-      } else {
-        setFinancialData(financialRes.data || []);
-      }
 
       // Calculate KPIs
       calculateKPIs(
         clientsRes.data || [],
-        projectsRes.data || [],
         opportunitiesRes.data || [],
         pitchesRes.data || [],
         contactsRes.data || [],
@@ -201,7 +134,6 @@ export const Dashboard: React.FC = () => {
 
   const calculateKPIs = (
     clientsData: any[],
-    projectsData: any[],
     opportunitiesData: any[],
     pitchesData: any[],
     contactsData: any[],
@@ -209,31 +141,35 @@ export const Dashboard: React.FC = () => {
     transcriptsData: any[],
     financialData: any[]
   ) => {
-    const projects = Array.isArray(projectsData) ? projectsData : [];
-    const clientsCount = Array.isArray(clientsData) ? clientsData.length : 0;
+    const clients = Array.isArray(clientsData) ? clientsData : [];
+    const clientsCount = clients.length;
 
     console.log('Clients count for KPI:', clientsCount);
-    console.log('Projects data for KPI calculation:', projects.length, 'projects');
-    if (projects.length > 0) {
-      console.log('Project statuses:', projects.map((p: any) => ({ id: p.id, name: p.name, status: p.status })));
-    }
 
-    const activeProjects = projects.filter(
-      (p: any) => {
-        if (!p || !p.status) {
-          console.log('Project missing status:', p);
+    // Count active projects from clients
+    // Active statuses: active, onboarding, at_risk (not churned, prospect, or lead)
+    const activeProjects = clients.filter(
+      (c: any) => {
+        if (!c || !c.status) {
           return false;
         }
-        const status = String(p.status).toLowerCase();
-        const isActive = status !== 'loss' && status !== 'cancelled';
-        if (!isActive) {
-          console.log('Inactive project:', p.name, 'status:', status);
-        }
+        const status = String(c.status).toLowerCase();
+        const isActive = status === 'active' || status === 'onboarding' || status === 'at_risk';
         return isActive;
       }
     ).length;
 
-    console.log('Active projects count:', activeProjects, 'out of', projects.length);
+    // Count total projects (clients with projects jsonb data or active/onboarding/at_risk status)
+    const totalProjects = clients.filter(
+      (c: any) => {
+        if (!c) return false;
+        const hasProjects = c.projects && Array.isArray(c.projects) && c.projects.length > 0;
+        const isProjectClient = c.status && ['active', 'onboarding', 'at_risk', 'churned'].includes(String(c.status).toLowerCase());
+        return hasProjects || isProjectClient;
+      }
+    ).length;
+
+    console.log('Active projects count:', activeProjects, 'Total projects:', totalProjects);
 
     // Calculate active opportunities (stage !== 'closed_won' and 'closed_lost')
     const activeOpportunities = opportunitiesData.filter(
@@ -255,42 +191,59 @@ export const Dashboard: React.FC = () => {
       ? (convertedOpportunities / opportunitiesData.length) * 100
       : 0;
 
-    // Calculate average deal size from projects (not opportunities)
-    const projectsWithValue = projects.filter((p: any) => {
-      if (!p) return false;
-      const budget = parseFloat(p.budget) || 0;
-      const revenue = parseFloat(p.revenue) || 0;
-      const valueAmount = parseFloat(p.value_amount) || 0;
-      return budget > 0 || revenue > 0 || valueAmount > 0;
+    // Helper function to parse budget range (e.g., "$10,000 - $50,000" or "50000")
+    const parseBudgetRange = (budgetRange: string): number => {
+      if (!budgetRange) return 0;
+
+      // Remove currency symbols and whitespace
+      const cleaned = budgetRange.replace(/[$,\s]/g, '');
+
+      // If it contains a dash, take the average of the range
+      if (cleaned.includes('-')) {
+        const [min, max] = cleaned.split('-').map(val => parseFloat(val) || 0);
+        return (min + max) / 2;
+      }
+
+      // Otherwise, parse as a single number
+      return parseFloat(cleaned) || 0;
+    };
+
+    // Calculate revenue from clients with budget_range or annual_revenue
+    const clientsWithValue = clients.filter((c: any) => {
+      if (!c) return false;
+      const budgetValue = parseBudgetRange(c.budget_range || '');
+      const revenueValue = parseFloat(c.annual_revenue) || 0;
+      return budgetValue > 0 || revenueValue > 0;
     });
 
-    const averageDealSize = projectsWithValue.length > 0
-      ? projectsWithValue.reduce((sum, p: any) => {
-          // Priority: budget > revenue > value_amount
-          const projectValue = parseFloat(p.budget) || 
-                              parseFloat(p.revenue) || 
-                              parseFloat(p.value_amount) || 
-                              0;
-          return sum + projectValue;
-        }, 0) / projectsWithValue.length
+    const averageDealSize = clientsWithValue.length > 0
+      ? clientsWithValue.reduce((sum, c: any) => {
+          const budgetValue = parseBudgetRange(c.budget_range || '');
+          const revenueValue = parseFloat(c.annual_revenue) || 0;
+          // Use budget_range if available, otherwise annual_revenue
+          const clientValue = budgetValue > 0 ? budgetValue : revenueValue;
+          return sum + clientValue;
+        }, 0) / clientsWithValue.length
       : 0;
 
-    // Calculate total revenue from all projects
-    // Use budget, revenue, or value_amount - whichever is available
-    const totalRevenue = projects.reduce((sum, p: any) => {
-      if (!p) return sum;
-      
-      // Priority: budget > revenue > value_amount
-      const projectValue = parseFloat(p.budget) || 
-                          parseFloat(p.revenue) || 
-                          parseFloat(p.value_amount) || 
-                          0;
-      return sum + projectValue;
-    }, 0);
+    // Calculate total revenue from all active project clients
+    const totalRevenue = clients
+      .filter((c: any) => {
+        if (!c || !c.status) return false;
+        const status = String(c.status).toLowerCase();
+        return status === 'active' || status === 'onboarding' || status === 'at_risk';
+      })
+      .reduce((sum, c: any) => {
+        const budgetValue = parseBudgetRange(c.budget_range || '');
+        const revenueValue = parseFloat(c.annual_revenue) || 0;
+        const clientValue = budgetValue > 0 ? budgetValue : revenueValue;
+        return sum + clientValue;
+      }, 0);
 
     console.log('Revenue calculation:', {
-      totalProjects: projects.length,
-      projectsWithValue: projectsWithValue.length,
+      totalClients: clients.length,
+      clientsWithValue: clientsWithValue.length,
+      activeProjects,
       averageDealSize,
       totalRevenue
     });
@@ -298,7 +251,7 @@ export const Dashboard: React.FC = () => {
     setKpis({
       totalClients: clientsCount,
       activeProjects,
-      totalProjects: projects.length,
+      totalProjects: totalProjects,
       totalOpportunities: opportunitiesData.length,
       activeOpportunities,
       totalPipelineValue,
