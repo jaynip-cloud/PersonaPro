@@ -179,7 +179,7 @@ export const Dashboard: React.FC = () => {
       // Calculate KPIs
       calculateKPIs(
         projectsRes.data || [],
-        opportunitiesFromProjects,
+        opportunitiesRes.data || [],
         pitchesRes.data || [],
         contactsRes.data || [],
         documentsRes.data || [],
