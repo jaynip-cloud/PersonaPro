@@ -63,6 +63,7 @@ export const Dashboard: React.FC = () => {
 
     try {
       const [
+        clientsRes,
         projectsRes,
         opportunitiesRes,
         pitchesRes,
@@ -71,6 +72,10 @@ export const Dashboard: React.FC = () => {
         transcriptsRes,
         financialRes
       ] = await Promise.all([
+        supabase
+          .from('clients')
+          .select('id')
+          .eq('user_id', user.id),
         supabase
           .from('projects')
           .select(`
@@ -178,6 +183,7 @@ export const Dashboard: React.FC = () => {
 
       // Calculate KPIs
       calculateKPIs(
+        clientsRes.data || [],
         projectsRes.data || [],
         opportunitiesRes.data || [],
         pitchesRes.data || [],
@@ -194,6 +200,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const calculateKPIs = (
+    clientsData: any[],
     projectsData: any[],
     opportunitiesData: any[],
     pitchesData: any[],
@@ -202,15 +209,15 @@ export const Dashboard: React.FC = () => {
     transcriptsData: any[],
     financialData: any[]
   ) => {
-    // Ensure projectsData is an array
     const projects = Array.isArray(projectsData) ? projectsData : [];
-    
-    // Debug: Log projects to see what we're working with
+    const clientsCount = Array.isArray(clientsData) ? clientsData.length : 0;
+
+    console.log('Clients count for KPI:', clientsCount);
     console.log('Projects data for KPI calculation:', projects.length, 'projects');
     if (projects.length > 0) {
       console.log('Project statuses:', projects.map((p: any) => ({ id: p.id, name: p.name, status: p.status })));
     }
-    
+
     const activeProjects = projects.filter(
       (p: any) => {
         if (!p || !p.status) {
@@ -218,7 +225,6 @@ export const Dashboard: React.FC = () => {
           return false;
         }
         const status = String(p.status).toLowerCase();
-        // Count all projects except 'loss' and 'cancelled' as active
         const isActive = status !== 'loss' && status !== 'cancelled';
         if (!isActive) {
           console.log('Inactive project:', p.name, 'status:', status);
@@ -226,7 +232,7 @@ export const Dashboard: React.FC = () => {
         return isActive;
       }
     ).length;
-    
+
     console.log('Active projects count:', activeProjects, 'out of', projects.length);
 
     // Calculate active opportunities (stage !== 'closed_won' and 'closed_lost')
@@ -290,7 +296,7 @@ export const Dashboard: React.FC = () => {
     });
 
     setKpis({
-      totalClients: clients.length,
+      totalClients: clientsCount,
       activeProjects,
       totalProjects: projects.length,
       totalOpportunities: opportunitiesData.length,
