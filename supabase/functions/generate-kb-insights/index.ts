@@ -43,7 +43,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unauthorized');
     }
 
-    // Get user's API keys from database
     const { data: apiKeys, error: keysError } = await supabase
       .from('api_keys')
       .select('openai_api_key, perplexity_api_key')
@@ -75,7 +74,6 @@ Deno.serve(async (req: Request) => {
 
     let additionalContext = '';
 
-    // Fetch documents from storage if available
     try {
       const { data: documents } = await supabase.storage
         .from('client-documents')
@@ -91,7 +89,6 @@ Deno.serve(async (req: Request) => {
       console.log('No documents found');
     }
 
-    // Perform web search for company information using Perplexity API
     let webSearchContext = '';
     if (companyData.company_name) {
       try {
@@ -130,7 +127,6 @@ Deno.serve(async (req: Request) => {
             }
           }
         } else {
-          // Fallback to OpenAI for web information (using existing openaiKey)
           const searchQuery = `Based on your knowledge, provide a brief overview of ${companyData.company_name} in the ${companyData.industry || 'technology'} industry. Include any known information about their market presence, reputation, and notable characteristics. If you don't have specific information, indicate that.`;
 
           const fallbackResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -240,133 +236,52 @@ For EVERY insight, analysis, score, and recommendation, you MUST provide:
 3. **Context** - Compare to industry standards and best practices
 4. **Actionable depth** - Provide executive-level detail, not surface observations
 
-Provide comprehensive insights in the following JSON format:
+Provide comprehensive insights in the following JSON format. CRITICAL: Respond with ONLY valid JSON, no markdown, no explanations:
+
 {
-  "executiveSummary": "A comprehensive 4-6 paragraph executive summary that covers: 1) Company overview and core business model, 2) Key strengths and market positioning, 3) Current challenges and risk factors, 4) Strategic opportunities and growth potential, 5) Technology and innovation capabilities, 6) Overall assessment and outlook. This should be detailed enough for a C-level executive to understand the complete picture.",
-  "summary": "Brief 2-3 sentence high-level overview",
-  "strengths": [
-    {
-      "title": "Strength name",
-      "description": "Detailed explanation of this strength (2-3 sentences)",
-      "reasoning": "Why this is a strength and what evidence supports it",
-      "impact": "How this strength benefits the company and its market position"
-    }
-  ],
-  "opportunities": [
-    {
-      "title": "Opportunity name",
-      "description": "Detailed explanation of this opportunity (2-3 sentences)",
-      "reasoning": "Why this opportunity exists and how we identified it",
-      "potential": "Expected impact and strategic value of pursuing this opportunity"
-    }
-  ],
-  "marketPosition": {
-    "overview": "Comprehensive analysis of market position (3-4 sentences)",
-    "competitiveAdvantage": "Detailed explanation of competitive advantages",
-    "marketFit": "Assessment of product-market fit and positioning",
-    "reasoning": "Why we assess the market position this way, with supporting evidence"
-  },
-  "recommendations": [
-    {
-      "title": "Recommendation name",
-      "description": "Detailed strategic recommendation (2-3 sentences)",
-      "reasoning": "Why this recommendation is important and what problem it solves",
-      "expectedOutcome": "What results this recommendation should achieve",
-      "priority": "high" | "medium" | "low"
-    }
-  ],
-  "contentStrategy": {
-    "assessment": "Detailed analysis of content strategy and thought leadership (3-4 sentences)",
-    "strengths": "What they do well in content",
-    "gaps": "What's missing or could be improved",
-    "reasoning": "Evidence from blog analysis and industry comparison"
-  },
-  "techStack": {
-    "assessment": "Comprehensive technology analysis (3-4 sentences)",
-    "modernityLevel": "Assessment of technology modernity",
-    "capabilities": "What their tech stack enables them to do",
-    "limitations": "Technology gaps or constraints",
-    "reasoning": "Why this tech stack assessment is accurate"
-  },
+  "executiveSummary": "A comprehensive 4-6 paragraph executive summary covering company overview, strengths, challenges, opportunities, technology capabilities, and overall outlook.",
+  "summary": "Brief 2-3 sentence overview",
+  "strengths": ["3-5 detailed strength descriptions with reasoning and evidence"],
+  "opportunities": ["3-5 detailed opportunity descriptions with reasoning and potential impact"],
+  "marketPosition": "Comprehensive 3-4 sentence analysis of market position, competitive advantage, and product-market fit with supporting reasoning",
+  "recommendations": ["3-5 detailed strategic recommendations with reasoning, expected outcomes, and priority indicators"],
+  "contentStrategy": "Detailed 3-4 sentence analysis of content strategy including strengths, gaps, and evidence-based reasoning",
+  "techStack": "Comprehensive 3-4 sentence technology analysis including modernity assessment, capabilities, limitations, and reasoning",
   "kpis": {
-    "contentScore": {
-      "score": number (0-100),
-      "reasoning": "Detailed explanation of why this score was assigned, referencing specific data points",
-      "evidence": "Specific examples from the data that support this score"
-    },
-    "teamStrength": {
-      "score": number (0-100),
-      "reasoning": "Detailed explanation of team assessment with evidence",
-      "evidence": "Specific leadership qualities, experience, or team composition that justify the score"
-    },
-    "techModernity": {
-      "score": number (0-100),
-      "reasoning": "Detailed explanation of technology assessment",
-      "evidence": "Specific technologies and tools that support this score"
-    },
-    "marketReadiness": {
-      "score": number (0-100),
-      "reasoning": "Detailed explanation of market readiness assessment",
-      "evidence": "Service portfolio, positioning, and differentiation factors"
-    },
-    "brandPresence": {
-      "score": number (0-100),
-      "reasoning": "Detailed explanation of brand presence assessment",
-      "evidence": "Online presence, engagement, and visibility indicators"
-    },
-    "growthPotential": {
-      "score": number (0-100),
-      "reasoning": "Detailed explanation of growth potential assessment",
-      "evidence": "Market opportunities, scalability factors, and expansion paths"
-    }
+    "contentScore": 0-100,
+    "contentScoreReasoning": "Detailed explanation with specific evidence",
+    "teamStrength": 0-100,
+    "teamStrengthReasoning": "Detailed explanation with specific evidence",
+    "techModernity": 0-100,
+    "techModernityReasoning": "Detailed explanation with specific evidence",
+    "marketReadiness": 0-100,
+    "marketReadinessReasoning": "Detailed explanation with specific evidence",
+    "brandPresence": 0-100,
+    "brandPresenceReasoning": "Detailed explanation with specific evidence",
+    "growthPotential": 0-100,
+    "growthPotentialReasoning": "Detailed explanation with specific evidence"
   },
   "sentiment": {
-    "overall": "positive" | "neutral" | "negative",
-    "score": number (0-100),
-    "brandTone": "professional" | "casual" | "technical" | "innovative" | "traditional",
-    "marketPerception": "Detailed analysis of market perception (3-4 sentences)",
-    "confidenceLevel": "high" | "medium" | "low",
-    "reasoning": "Why we assess sentiment this way with supporting evidence"
+    "overall": "positive",
+    "score": 0-100,
+    "brandTone": "professional",
+    "marketPerception": "Detailed 3-4 sentence analysis",
+    "confidenceLevel": "high",
+    "reasoning": "Evidence-based explanation"
   },
   "behaviorAnalysis": {
-    "contentBehavior": {
-      "assessment": "Detailed analysis of content patterns (2-3 sentences)",
-      "reasoning": "Evidence and patterns observed in their content strategy"
-    },
-    "marketApproach": {
-      "assessment": "Detailed analysis of market strategy (2-3 sentences)",
-      "reasoning": "How their approach reflects in their positioning and messaging"
-    },
-    "innovationLevel": "conservative" | "moderate" | "aggressive",
-    "innovationReasoning": "Why we classify their innovation level this way",
-    "customerFocus": {
-      "assessment": "Detailed analysis of customer-centricity (2-3 sentences)",
-      "reasoning": "Evidence from services, messaging, and approach"
-    },
-    "growthOrientation": {
-      "assessment": "Detailed analysis of growth mindset (2-3 sentences)",
-      "reasoning": "Indicators of growth readiness and expansion capability"
-    }
+    "contentBehavior": "Detailed 2-3 sentence assessment with reasoning",
+    "marketApproach": "Detailed 2-3 sentence assessment with reasoning",
+    "innovationLevel": "moderate",
+    "innovationReasoning": "Explanation of classification",
+    "customerFocus": "Detailed 2-3 sentence assessment with evidence",
+    "growthOrientation": "Detailed 2-3 sentence assessment with indicators"
   },
-  "riskFactors": [
-    {
-      "risk": "Risk description",
-      "severity": "high" | "medium" | "low",
-      "reasoning": "Why this is a risk and what evidence supports it",
-      "mitigation": "Suggested approach to address this risk"
-    }
-  ],
-  "competitiveEdge": [
-    {
-      "differentiator": "Unique differentiator",
-      "description": "Detailed explanation of this competitive advantage",
-      "reasoning": "Why this creates a competitive advantage",
-      "sustainability": "How sustainable this advantage is"
-    }
-  ]
+  "riskFactors": ["2-4 detailed risk descriptions including severity, reasoning, and mitigation strategies"],
+  "competitiveEdge": ["2-3 detailed differentiator descriptions with reasoning and sustainability assessment"]
 }
 
-Respond ONLY with valid JSON. Every assessment must include detailed reasoning with specific evidence from the data. Think like a senior consultant preparing an executive briefing - be thorough, analytical, and actionable.`;
+CRITICAL: Your response must be ONLY the JSON object above with actual data filled in. No markdown formatting, no code blocks, no explanations outside the JSON. Start with { and end with }. Be thorough and detailed in every field.`;
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -386,6 +301,7 @@ Respond ONLY with valid JSON. Every assessment must include detailed reasoning w
             content: prompt,
           },
         ],
+        response_format: { type: 'json_object' },
         temperature: 0.7,
         max_tokens: 8000,
       }),
@@ -398,14 +314,17 @@ Respond ONLY with valid JSON. Every assessment must include detailed reasoning w
     }
 
     const openaiData = await openaiResponse.json();
-    const insightsText = openaiData.choices[0].message.content;
-    
+    let insightsText = openaiData.choices[0].message.content;
+
+    insightsText = insightsText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+
     let insights;
     try {
       insights = JSON.parse(insightsText);
     } catch (e) {
       console.error('Failed to parse OpenAI response:', insightsText);
-      throw new Error('Failed to parse AI insights');
+      console.error('Parse error:', e);
+      throw new Error('Failed to parse AI insights: ' + e.message);
     }
 
     const { error: updateError } = await supabase
