@@ -958,6 +958,23 @@ export const KnowledgeBase: React.FC = () => {
 
               {aiInsights && (
                 <div className="space-y-6 mt-8">
+                  {aiInsights.executiveSummary && (
+                    <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg p-8 border-2 border-blue-200">
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="p-3 bg-blue-600 rounded-lg">
+                          <FileText className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-bold text-slate-900">Executive Summary</h3>
+                          <p className="text-sm text-slate-600 mt-1">Comprehensive overview of your company intelligence</p>
+                        </div>
+                      </div>
+                      <div className="prose prose-slate max-w-none">
+                        <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">{aiInsights.executiveSummary}</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-6 border border-blue-100">
                     <div className="flex items-start gap-3">
                       <Lightbulb className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
@@ -1058,9 +1075,10 @@ export const KnowledgeBase: React.FC = () => {
                           <Gauge className="h-5 w-5 text-blue-600" />
                           <h3 className="text-lg font-semibold text-foreground">Key Performance Indicators</h3>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          {Object.entries(aiInsights.kpis).map(([key, value]: [string, any]) => {
-                            const score = typeof value === 'number' ? value : 0;
+                        <div className="space-y-6">
+                          {['contentScore', 'teamStrength', 'techModernity', 'marketReadiness', 'brandPresence', 'growthPotential'].map((key) => {
+                            const score = aiInsights.kpis[key] || 0;
+                            const reasoning = aiInsights.kpis[`${key}Reasoning`] || '';
                             const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
                             const getColor = (score: number) => {
                               if (score >= 75) return 'text-green-600 bg-green-50 border-green-200';
@@ -1069,18 +1087,27 @@ export const KnowledgeBase: React.FC = () => {
                               return 'text-red-600 bg-red-50 border-red-200';
                             };
                             return (
-                              <div key={key} className={`p-4 rounded-lg border-2 ${getColor(score)}`}>
-                                <div className="text-xs font-medium mb-2">{label}</div>
-                                <div className="flex items-end gap-2">
-                                  <span className="text-3xl font-bold">{score}</span>
-                                  <span className="text-sm pb-1">/100</span>
+                              <div key={key} className="border-2 border-slate-200 rounded-lg overflow-hidden">
+                                <div className={`p-4 ${getColor(score)} border-b-2 border-current/20`}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-sm font-semibold mb-2">{label}</div>
+                                    <div className="flex items-end gap-1">
+                                      <span className="text-3xl font-bold">{score}</span>
+                                      <span className="text-sm pb-1">/100</span>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 h-2 bg-white rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-current transition-all"
+                                      style={{ width: `${score}%` }}
+                                    />
+                                  </div>
                                 </div>
-                                <div className="mt-2 h-2 bg-white rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-current transition-all"
-                                    style={{ width: `${score}%` }}
-                                  />
-                                </div>
+                                {reasoning && (
+                                  <div className="p-4 bg-white">
+                                    <p className="text-sm text-slate-700 leading-relaxed">{reasoning}</p>
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -1096,46 +1123,56 @@ export const KnowledgeBase: React.FC = () => {
                           <Activity className="h-5 w-5 text-purple-600" />
                           <h3 className="text-lg font-semibold text-foreground">Sentiment Analysis</h3>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                              <div className="flex items-center gap-3">
-                                {aiInsights.sentiment.overall === 'positive' && <Smile className="h-8 w-8 text-green-600" />}
-                                {aiInsights.sentiment.overall === 'neutral' && <Meh className="h-8 w-8 text-yellow-600" />}
-                                {aiInsights.sentiment.overall === 'negative' && <Frown className="h-8 w-8 text-red-600" />}
-                                <div>
-                                  <div className="text-sm text-muted-foreground">Overall Sentiment</div>
-                                  <div className="text-lg font-semibold text-foreground capitalize">
-                                    {aiInsights.sentiment.overall}
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                  {aiInsights.sentiment.overall === 'positive' && <Smile className="h-8 w-8 text-green-600" />}
+                                  {aiInsights.sentiment.overall === 'neutral' && <Meh className="h-8 w-8 text-yellow-600" />}
+                                  {aiInsights.sentiment.overall === 'negative' && <Frown className="h-8 w-8 text-red-600" />}
+                                  <div>
+                                    <div className="text-sm text-muted-foreground">Overall Sentiment</div>
+                                    <div className="text-lg font-semibold text-foreground capitalize">
+                                      {aiInsights.sentiment.overall}
+                                    </div>
                                   </div>
                                 </div>
+                                <div className="text-right">
+                                  <div className="text-2xl font-bold text-foreground">{aiInsights.sentiment.score}</div>
+                                  <div className="text-xs text-muted-foreground">Score</div>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                <div className="text-2xl font-bold text-foreground">{aiInsights.sentiment.score}</div>
-                                <div className="text-xs text-muted-foreground">Score</div>
+                              <div className="p-4 bg-slate-50 rounded-lg">
+                                <div className="text-sm text-muted-foreground mb-1">Brand Tone</div>
+                                <div className="text-base font-semibold text-foreground capitalize">
+                                  {aiInsights.sentiment.brandTone}
+                                </div>
+                              </div>
+                              <div className="p-4 bg-slate-50 rounded-lg">
+                                <div className="text-sm text-muted-foreground mb-1">Confidence Level</div>
+                                <div className="text-base font-semibold text-foreground capitalize">
+                                  {aiInsights.sentiment.confidenceLevel}
+                                </div>
                               </div>
                             </div>
-                            <div className="p-4 bg-slate-50 rounded-lg">
-                              <div className="text-sm text-muted-foreground mb-1">Brand Tone</div>
-                              <div className="text-base font-semibold text-foreground capitalize">
-                                {aiInsights.sentiment.brandTone}
-                              </div>
-                            </div>
-                            <div className="p-4 bg-slate-50 rounded-lg">
-                              <div className="text-sm text-muted-foreground mb-1">Confidence Level</div>
-                              <div className="text-base font-semibold text-foreground capitalize">
-                                {aiInsights.sentiment.confidenceLevel}
+                            <div className="flex items-center">
+                              <div className="w-full">
+                                <div className="text-sm font-medium text-foreground mb-2">Market Perception</div>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                  {aiInsights.sentiment.marketPerception}
+                                </p>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center">
-                            <div className="w-full">
-                              <div className="text-sm font-medium text-foreground mb-2">Market Perception</div>
-                              <p className="text-sm text-muted-foreground leading-relaxed">
-                                {aiInsights.sentiment.marketPerception}
+                          {aiInsights.sentiment.reasoning && (
+                            <div className="border-t pt-4">
+                              <div className="text-sm font-medium text-foreground mb-2">Reasoning</div>
+                              <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-lg">
+                                {aiInsights.sentiment.reasoning}
                               </p>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -1165,27 +1202,34 @@ export const KnowledgeBase: React.FC = () => {
                               </p>
                             </div>
                           )}
-                          <div className="grid grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 gap-4">
                             {aiInsights.behaviorAnalysis.innovationLevel && (
-                              <div className="p-4 bg-slate-50 rounded-lg text-center">
-                                <div className="text-xs text-muted-foreground mb-1">Innovation</div>
-                                <div className="text-sm font-semibold text-foreground capitalize">
-                                  {aiInsights.behaviorAnalysis.innovationLevel}
+                              <div className="p-4 bg-slate-50 rounded-lg">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="text-sm font-medium text-foreground">Innovation Level</div>
+                                  <Badge variant="default" className="capitalize">
+                                    {aiInsights.behaviorAnalysis.innovationLevel}
+                                  </Badge>
                                 </div>
+                                {aiInsights.behaviorAnalysis.innovationReasoning && (
+                                  <p className="text-sm text-muted-foreground leading-relaxed">
+                                    {aiInsights.behaviorAnalysis.innovationReasoning}
+                                  </p>
+                                )}
                               </div>
                             )}
                             {aiInsights.behaviorAnalysis.customerFocus && (
                               <div className="p-4 bg-slate-50 rounded-lg">
-                                <div className="text-xs text-muted-foreground mb-2">Customer Focus</div>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                <div className="text-sm font-medium text-foreground mb-2">Customer Focus</div>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
                                   {aiInsights.behaviorAnalysis.customerFocus}
                                 </p>
                               </div>
                             )}
                             {aiInsights.behaviorAnalysis.growthOrientation && (
                               <div className="p-4 bg-slate-50 rounded-lg">
-                                <div className="text-xs text-muted-foreground mb-2">Growth Orientation</div>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                <div className="text-sm font-medium text-foreground mb-2">Growth Orientation</div>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
                                   {aiInsights.behaviorAnalysis.growthOrientation}
                                 </p>
                               </div>
