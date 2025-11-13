@@ -170,7 +170,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const prompt = `You are a business intelligence analyst specializing in behavioral analysis, sentiment analysis, and KPI assessment. Analyze the following company data comprehensively using both internal knowledge base data and external information.
+    const prompt = `You are a senior business intelligence analyst specializing in comprehensive company analysis, behavioral insights, sentiment analysis, and strategic KPI assessment. Analyze the following company data in depth, providing detailed executive-level insights with clear reasoning for every assessment.
 
 Company: ${companyData.company_name || 'Not specified'}
 Industry: ${companyData.industry || 'Not specified'}
@@ -232,44 +232,141 @@ Score each KPI from 0-100 using the following criteria:
 - 61-80: Strong growth potential, multiple expansion opportunities, scalable model
 - 81-100: Explosive growth potential, massive market, innovative approach, viral potential
 
-Use both the internal knowledge base data AND external web search results to provide accurate, realistic scores.
+## CRITICAL INSTRUCTIONS
+
+For EVERY insight, analysis, score, and recommendation, you MUST provide:
+1. **Clear reasoning** - Explain WHY you reached this conclusion
+2. **Supporting evidence** - Reference specific data points from the company profile
+3. **Context** - Compare to industry standards and best practices
+4. **Actionable depth** - Provide executive-level detail, not surface observations
 
 Provide comprehensive insights in the following JSON format:
 {
-  "summary": "Brief 2-3 sentence overview of the company",
-  "strengths": ["List of 3-5 key strengths"],
-  "opportunities": ["List of 3-5 growth opportunities"],
-  "marketPosition": "Analysis of market position and competitive advantage",
-  "recommendations": ["List of 3-5 strategic recommendations"],
-  "contentStrategy": "Insights based on blog content and thought leadership",
-  "techStack": "Analysis of technology choices and capabilities",
+  "executiveSummary": "A comprehensive 4-6 paragraph executive summary that covers: 1) Company overview and core business model, 2) Key strengths and market positioning, 3) Current challenges and risk factors, 4) Strategic opportunities and growth potential, 5) Technology and innovation capabilities, 6) Overall assessment and outlook. This should be detailed enough for a C-level executive to understand the complete picture.",
+  "summary": "Brief 2-3 sentence high-level overview",
+  "strengths": [
+    {
+      "title": "Strength name",
+      "description": "Detailed explanation of this strength (2-3 sentences)",
+      "reasoning": "Why this is a strength and what evidence supports it",
+      "impact": "How this strength benefits the company and its market position"
+    }
+  ],
+  "opportunities": [
+    {
+      "title": "Opportunity name",
+      "description": "Detailed explanation of this opportunity (2-3 sentences)",
+      "reasoning": "Why this opportunity exists and how we identified it",
+      "potential": "Expected impact and strategic value of pursuing this opportunity"
+    }
+  ],
+  "marketPosition": {
+    "overview": "Comprehensive analysis of market position (3-4 sentences)",
+    "competitiveAdvantage": "Detailed explanation of competitive advantages",
+    "marketFit": "Assessment of product-market fit and positioning",
+    "reasoning": "Why we assess the market position this way, with supporting evidence"
+  },
+  "recommendations": [
+    {
+      "title": "Recommendation name",
+      "description": "Detailed strategic recommendation (2-3 sentences)",
+      "reasoning": "Why this recommendation is important and what problem it solves",
+      "expectedOutcome": "What results this recommendation should achieve",
+      "priority": "high" | "medium" | "low"
+    }
+  ],
+  "contentStrategy": {
+    "assessment": "Detailed analysis of content strategy and thought leadership (3-4 sentences)",
+    "strengths": "What they do well in content",
+    "gaps": "What's missing or could be improved",
+    "reasoning": "Evidence from blog analysis and industry comparison"
+  },
+  "techStack": {
+    "assessment": "Comprehensive technology analysis (3-4 sentences)",
+    "modernityLevel": "Assessment of technology modernity",
+    "capabilities": "What their tech stack enables them to do",
+    "limitations": "Technology gaps or constraints",
+    "reasoning": "Why this tech stack assessment is accurate"
+  },
   "kpis": {
-    "contentScore": number (0-100, based on blog quality and quantity),
-    "teamStrength": number (0-100, based on leadership experience and size),
-    "techModernity": number (0-100, based on technology stack modernity),
-    "marketReadiness": number (0-100, based on services and positioning),
-    "brandPresence": number (0-100, based on overall online presence),
-    "growthPotential": number (0-100, based on opportunities and capabilities)
+    "contentScore": {
+      "score": number (0-100),
+      "reasoning": "Detailed explanation of why this score was assigned, referencing specific data points",
+      "evidence": "Specific examples from the data that support this score"
+    },
+    "teamStrength": {
+      "score": number (0-100),
+      "reasoning": "Detailed explanation of team assessment with evidence",
+      "evidence": "Specific leadership qualities, experience, or team composition that justify the score"
+    },
+    "techModernity": {
+      "score": number (0-100),
+      "reasoning": "Detailed explanation of technology assessment",
+      "evidence": "Specific technologies and tools that support this score"
+    },
+    "marketReadiness": {
+      "score": number (0-100),
+      "reasoning": "Detailed explanation of market readiness assessment",
+      "evidence": "Service portfolio, positioning, and differentiation factors"
+    },
+    "brandPresence": {
+      "score": number (0-100),
+      "reasoning": "Detailed explanation of brand presence assessment",
+      "evidence": "Online presence, engagement, and visibility indicators"
+    },
+    "growthPotential": {
+      "score": number (0-100),
+      "reasoning": "Detailed explanation of growth potential assessment",
+      "evidence": "Market opportunities, scalability factors, and expansion paths"
+    }
   },
   "sentiment": {
     "overall": "positive" | "neutral" | "negative",
-    "score": number (0-100, overall sentiment score),
+    "score": number (0-100),
     "brandTone": "professional" | "casual" | "technical" | "innovative" | "traditional",
-    "marketPerception": "Analysis of how the company is likely perceived in the market",
-    "confidenceLevel": "high" | "medium" | "low"
+    "marketPerception": "Detailed analysis of market perception (3-4 sentences)",
+    "confidenceLevel": "high" | "medium" | "low",
+    "reasoning": "Why we assess sentiment this way with supporting evidence"
   },
   "behaviorAnalysis": {
-    "contentBehavior": "Analysis of content creation patterns and thought leadership approach",
-    "marketApproach": "Analysis of market positioning and targeting strategy",
+    "contentBehavior": {
+      "assessment": "Detailed analysis of content patterns (2-3 sentences)",
+      "reasoning": "Evidence and patterns observed in their content strategy"
+    },
+    "marketApproach": {
+      "assessment": "Detailed analysis of market strategy (2-3 sentences)",
+      "reasoning": "How their approach reflects in their positioning and messaging"
+    },
     "innovationLevel": "conservative" | "moderate" | "aggressive",
-    "customerFocus": "Analysis of customer-centric approach based on services and messaging",
-    "growthOrientation": "Analysis of growth mindset and expansion readiness"
+    "innovationReasoning": "Why we classify their innovation level this way",
+    "customerFocus": {
+      "assessment": "Detailed analysis of customer-centricity (2-3 sentences)",
+      "reasoning": "Evidence from services, messaging, and approach"
+    },
+    "growthOrientation": {
+      "assessment": "Detailed analysis of growth mindset (2-3 sentences)",
+      "reasoning": "Indicators of growth readiness and expansion capability"
+    }
   },
-  "riskFactors": ["List of 2-4 potential risks or challenges"],
-  "competitiveEdge": ["List of 2-3 unique differentiators"]
+  "riskFactors": [
+    {
+      "risk": "Risk description",
+      "severity": "high" | "medium" | "low",
+      "reasoning": "Why this is a risk and what evidence supports it",
+      "mitigation": "Suggested approach to address this risk"
+    }
+  ],
+  "competitiveEdge": [
+    {
+      "differentiator": "Unique differentiator",
+      "description": "Detailed explanation of this competitive advantage",
+      "reasoning": "Why this creates a competitive advantage",
+      "sustainability": "How sustainable this advantage is"
+    }
+  ]
 }
 
-Respond ONLY with valid JSON. Ensure all scores are realistic and based on the actual data provided.`;
+Respond ONLY with valid JSON. Every assessment must include detailed reasoning with specific evidence from the data. Think like a senior consultant preparing an executive briefing - be thorough, analytical, and actionable.`;
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -278,11 +375,11 @@ Respond ONLY with valid JSON. Ensure all scores are realistic and based on the a
         'Authorization': `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: 'You are a business intelligence analyst providing actionable insights with behavioral and sentiment analysis. Always respond with valid JSON only.',
+            content: 'You are a senior business intelligence analyst providing comprehensive, executive-level insights with detailed reasoning and evidence for every assessment. Always respond with valid JSON only.',
           },
           {
             role: 'user',
@@ -290,7 +387,7 @@ Respond ONLY with valid JSON. Ensure all scores are realistic and based on the a
           },
         ],
         temperature: 0.7,
-        max_tokens: 3000,
+        max_tokens: 8000,
       }),
     });
 
