@@ -187,7 +187,7 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
                 type="text"
                 value={folderLink}
                 onChange={(e) => setFolderLink(e.target.value)}
-                placeholder="Paste folder or recording link (e.g., app.fathom.video/folders/xxx or /recordings/xxx)"
+                placeholder="Paste recording link (e.g., app.fathom.video/recordings/xxx)"
                 disabled={syncing}
                 className="pl-10"
               />
@@ -202,7 +202,7 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
             </Button>
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Paste a Fathom folder link to sync all recordings in that folder
+            Paste individual recording links (folder links are not supported by Fathom API)
           </p>
         </div>
 
@@ -319,8 +319,8 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <p className="text-sm text-blue-800 font-medium mb-1">How it works:</p>
         <ul className="text-xs text-blue-700 space-y-1 ml-4 list-disc">
-          <li>Paste a Fathom folder link to sync all recordings in that folder</li>
-          <li>Apply team and meeting type filters to sync only relevant recordings</li>
+          <li>Copy individual recording links from Fathom (e.g., fathom.video/recordings/xxx)</li>
+          <li>Note: Folder links are not supported - Fathom API doesn't provide folder endpoints</li>
           <li>Transcripts are automatically processed and chunked for AI analysis</li>
           <li>Vector embeddings enable semantic search across all meeting content</li>
           <li>AI insights are generated using meeting context for better pitch generation</li>
