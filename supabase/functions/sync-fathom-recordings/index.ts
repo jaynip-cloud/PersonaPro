@@ -60,6 +60,7 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log('Syncing Fathom recordings for client:', client_id);
+    console.log('Folder link:', folder_link);
     console.log('Team filter:', team_filter);
     console.log('Meeting type filter:', meeting_type_filter);
 
@@ -78,37 +79,50 @@ Deno.serve(async (req: Request) => {
         const folderId = folderIdMatch[1];
         console.log('Fetching recordings from folder:', folderId);
 
-      console.log(`Fetching meetings from Fathom API...`);
-      const listResponse = await fetch('https://api.fathom.ai/external/v1/meetings', {
-        method: 'GET',
-        headers: {
-          'X-Api-Key': apiKeys.fathom_api_key,
-          'Content-Type': 'application/json',
-        },
-      });
+        console.log(`Fetching meetings from Fathom API...`);
+        const listResponse = await fetch('https://api.fathom.ai/external/v1/meetings', {
+          method: 'GET',
+          headers: {
+            'X-Api-Key': apiKeys.fathom_api_key,
+            'Content-Type': 'application/json',
+          },
+        });
 
-      if (!listResponse.ok) {
-        const errorText = await listResponse.text();
-        console.error(`Fathom API error (${listResponse.status}):`, errorText);
-        throw new Error(`Unable to list meetings. Status: ${listResponse.status}. Please check your API key permissions.`);
-      }
+        if (!listResponse.ok) {
+          const errorText = await listResponse.text();
+          console.error(`Fathom API error (${listResponse.status}):`, errorText);
+          throw new Error(`Unable to list meetings. Status: ${listResponse.status}. Error: ${errorText}`);
+        }
 
-      const listData = await listResponse.json();
+        const listData = await listResponse.json();
+        console.log('List data structure:', JSON.stringify(listData).substring(0, 500));
 
-      const allMeetings = Array.isArray(listData) ? listData : (listData.meetings || listData.data || []);
+        const allMeetings = Array.isArray(listData) ? listData : (listData.meetings || listData.data || []);
 
-      console.log(`Total meetings retrieved: ${allMeetings.length}`);
+        console.log(`Total meetings retrieved: ${allMeetings.length}`);
 
-      const folderMeetings = allMeetings.filter((item: any) => {
-        const itemFolderId = item.folder_id || item.folderId || item.folder;
-        return itemFolderId === folderId;
-      });
+        if (allMeetings.length > 0) {
+          console.log('Sample meeting structure:', JSON.stringify(allMeetings[0]));
+        }
+
+        const folderMeetings = allMeetings.filter((item: any) => {
+          const itemFolderId = item.folder_id || item.folderId || item.folder;
+          console.log(`Checking meeting ${item.id || item.recording_id}: folder=${itemFolderId} vs target=${folderId}`);
+          return itemFolderId === folderId;
+        });
 
         recordingIdsToSync = folderMeetings.map((item: any) => item.recording_id || item.recordingId || item.id || item.call_id);
 
         console.log(`Found ${recordingIdsToSync.length} meetings in folder ${folderId} (out of ${allMeetings.length} total)`);
+        
+        if (recordingIdsToSync.length === 0 && allMeetings.length > 0) {
+          console.warn('No meetings matched the folder ID. This could mean:');
+          console.warn('1. The folder is empty');
+          console.warn('2. The folder_id field name is different than expected');
+          console.warn('3. The folder_id format is different');
+        }
       } else {
-        throw new Error('Invalid Fathom link format. Please provide a folder link (e.g., app.fathom.video/folders/xxx) or recording link (e.g., app.fathom.video/recordings/xxx)');
+        throw new Error('Invalid Fathom link format. Please provide a folder link (e.g., fathom.video/folders/xxx) or recording link (e.g., fathom.video/recordings/xxx)');
       }
     } else if (recording_ids && recording_ids.length > 0) {
       recordingIdsToSync = recording_ids;
@@ -119,7 +133,12 @@ Deno.serve(async (req: Request) => {
 
     if (recordingIdsToSync.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, message: 'No recordings found to sync', recordings_synced: 0 }),
+        JSON.stringify({ 
+          success: true, 
+          message: 'No recordings found to sync. The folder may be empty or the API may not return folder information.', 
+          recordings_synced: 0,
+          suggestion: 'Try syncing individual recording links instead of folder links.'
+        }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
