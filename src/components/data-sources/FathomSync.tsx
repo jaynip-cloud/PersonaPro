@@ -35,7 +35,7 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
 
   const handleSync = async () => {
     if (!folderLink.trim()) {
-      alert('Please enter a Fathom folder link or recording IDs');
+      alert('Please enter a Fathom folder or recording link');
       return;
     }
 
@@ -178,7 +178,7 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
       <div className="flex items-start gap-3">
         <div className="flex-1">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Fathom Folder Link or Recording IDs
+            Fathom Link
           </label>
           <div className="flex gap-2">
             <div className="relative flex-1">
@@ -187,7 +187,7 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
                 type="text"
                 value={folderLink}
                 onChange={(e) => setFolderLink(e.target.value)}
-                placeholder="https://app.fathom.video/folders/... or recording IDs"
+                placeholder="Paste folder or recording link (e.g., app.fathom.video/folders/xxx or /recordings/xxx)"
                 disabled={syncing}
                 className="pl-10"
               />

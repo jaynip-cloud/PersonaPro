@@ -67,12 +67,16 @@ Deno.serve(async (req: Request) => {
 
     if (folder_link) {
       const folderIdMatch = folder_link.match(/folders\/([a-zA-Z0-9_-]+)/);
-      if (!folderIdMatch) {
-        throw new Error('Invalid Fathom folder link format');
-      }
-      const folderId = folderIdMatch[1];
+      const recordingIdMatch = folder_link.match(/recordings\/([a-zA-Z0-9_-]+)/);
+      const callIdMatch = folder_link.match(/calls\/([a-zA-Z0-9_-]+)/);
 
-      console.log('Fetching recordings from folder:', folderId);
+      if (recordingIdMatch || callIdMatch) {
+        const recordingId = recordingIdMatch?.[1] || callIdMatch?.[1];
+        console.log('Single recording link detected:', recordingId);
+        recordingIdsToSync = [recordingId!];
+      } else if (folderIdMatch) {
+        const folderId = folderIdMatch[1];
+        console.log('Fetching recordings from folder:', folderId);
 
       const endpoints = [
         `https://api.fathom.ai/external/v1/calls`,
@@ -118,9 +122,12 @@ Deno.serve(async (req: Request) => {
         return itemFolderId === folderId;
       });
 
-      recordingIdsToSync = folderRecordings.map((item: any) => item.recording_id || item.recordingId || item.id || item.call_id);
+        recordingIdsToSync = folderRecordings.map((item: any) => item.recording_id || item.recordingId || item.id || item.call_id);
 
-      console.log(`Found ${recordingIdsToSync.length} recordings in folder (out of ${allRecordings.length} total) using endpoint: ${successEndpoint}`);
+        console.log(`Found ${recordingIdsToSync.length} recordings in folder (out of ${allRecordings.length} total) using endpoint: ${successEndpoint}`);
+      } else {
+        throw new Error('Invalid Fathom link format. Please provide a folder link (e.g., app.fathom.video/folders/xxx) or recording link (e.g., app.fathom.video/recordings/xxx)');
+      }
     } else if (recording_ids && recording_ids.length > 0) {
       recordingIdsToSync = recording_ids;
       console.log(`Syncing ${recordingIdsToSync.length} specific recording IDs`);
