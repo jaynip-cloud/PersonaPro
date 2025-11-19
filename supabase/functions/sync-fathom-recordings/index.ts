@@ -74,10 +74,8 @@ Deno.serve(async (req: Request) => {
 
       console.log('Fetching recordings from folder:', folderId);
 
-      const fathomListUrl = new URL('https://api.fathom.ai/external/v1/meetings');
-      fathomListUrl.searchParams.append('folder_id', folderId);
-
-      const listResponse = await fetch(fathomListUrl.toString(), {
+      const listUrl = `https://api.fathom.ai/external/v1/folders/${folderId}/recordings`;
+      const listResponse = await fetch(listUrl, {
         method: 'GET',
         headers: {
           'X-Api-Key': apiKeys.fathom_api_key,
@@ -107,10 +105,8 @@ Deno.serve(async (req: Request) => {
         throw new Error('Invalid response from Fathom API. The API format may have changed.');
       }
 
-      console.log('Fathom API list response structure:', JSON.stringify(Object.keys(listData), null, 2));
-      console.log('Sample data:', JSON.stringify(listData, null, 2).substring(0, 500));
-
-      recordingIdsToSync = (listData.items || listData.meetings || listData.calls || []).map((item: any) => item.id || item.meeting_id || item.call_id);
+      const recordings = Array.isArray(listData) ? listData : (listData.recordings || listData.data || []);
+      recordingIdsToSync = recordings.map((item: any) => item.recording_id || item.id);
 
       console.log(`Found ${recordingIdsToSync.length} recordings in folder`);
     } else if (recording_ids && recording_ids.length > 0) {
@@ -133,7 +129,7 @@ Deno.serve(async (req: Request) => {
 
     for (const recordingId of recordingIdsToSync) {
       try {
-        console.log(`Fetching recording ${recordingId}...`);
+        console.log(`Processing recording ${recordingId}...`);
 
         const { data: existingRecording } = await supabaseClient
           .from('fathom_recordings')
@@ -147,45 +143,14 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const recordingUrl = `https://api.fathom.ai/external/v1/meetings/${recordingId}`;
-        const recordingResponse = await fetch(recordingUrl, {
-          method: 'GET',
-          headers: {
-            'X-Api-Key': apiKeys.fathom_api_key,
-            'Content-Type': 'application/json',
-          },
-        });
+        const recording = await fetchRecordingDetails(recordingId, apiKeys.fathom_api_key);
+        const transcript = await fetchTranscript(recordingId, apiKeys.fathom_api_key);
+        const summary = await fetchSummary(recordingId, apiKeys.fathom_api_key);
+        const highlights = await fetchHighlights(recordingId, apiKeys.fathom_api_key);
+        const actions = await fetchActions(recordingId, apiKeys.fathom_api_key);
 
-        if (!recordingResponse.ok) {
-          const errorText = await recordingResponse.text();
-          const statusCode = recordingResponse.status;
-          let errorMessage = `HTTP ${statusCode}: ${errorText}`;
-
-          if (statusCode === 401 || statusCode === 403) {
-            errorMessage = 'Invalid or unauthorized API key. Check your Fathom API key in Settings.';
-          } else if (statusCode === 404) {
-            errorMessage = 'Recording not found. It may have been deleted from Fathom.';
-          } else if (statusCode === 429) {
-            errorMessage = 'Rate limit exceeded. Wait a minute and try again.';
-          }
-
-          console.error(`Failed to fetch recording ${recordingId}: ${errorMessage}`);
-          errors.push({ recording_id: recordingId, error: errorMessage, status: statusCode });
-          continue;
-        }
-
-        let recording: any;
-        try {
-          recording = await recordingResponse.json();
-          console.log(`Recording ${recordingId} structure:`, JSON.stringify(Object.keys(recording), null, 2));
-        } catch (parseError) {
-          console.error(`Failed to parse recording ${recordingId}:`, parseError);
-          errors.push({ recording_id: recordingId, error: 'Invalid JSON response from Fathom API' });
-          continue;
-        }
-
-        const teamName = recording.team || recording.metadata?.team || null;
-        const meetingType = recording.meeting_type || recording.metadata?.meeting_type || null;
+        const teamName = recording.team || null;
+        const meetingType = recording.meeting_type || null;
 
         if (team_filter && team_filter.length > 0 && teamName && !team_filter.includes(teamName)) {
           console.log(`Recording ${recordingId} filtered out by team: ${teamName}`);
@@ -200,9 +165,9 @@ Deno.serve(async (req: Request) => {
         }
 
         let fullTranscript = '';
-        if (recording.transcript && recording.transcript.segments) {
-          fullTranscript = recording.transcript.segments
-            .map((seg: any) => `${seg.speaker}: ${seg.text}`)
+        if (transcript && transcript.segments) {
+          fullTranscript = transcript.segments
+            .map((seg: any) => `${seg.speaker || 'Unknown'}: ${seg.text}`)
             .join('\n\n');
         }
 
@@ -214,8 +179,8 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const startTime = new Date(recording.start).getTime();
-        const endTime = new Date(recording.end).getTime();
+        const startTime = new Date(recording.start_time).getTime();
+        const endTime = new Date(recording.end_time).getTime();
         const durationMinutes = Math.round((endTime - startTime) / 60000);
 
         const participants = (recording.participants || []).map((p: any) => ({
@@ -224,25 +189,26 @@ Deno.serve(async (req: Request) => {
           role: p.role || '',
         }));
 
-        const actionItems = (recording.summary?.action_items || []).map((item: any) => ({
+        const actionItems = (actions || []).map((item: any) => ({
           text: item.text || '',
           assignee: item.assignee || '',
+          due_date: item.due_date || null,
+          timestamp: item.timestamp || 0,
           completed: false,
         }));
 
-        const highlights = (recording.highlights || []).map((h: any) => ({
+        const highlightsList = (highlights || []).map((h: any) => ({
           text: h.text || '',
           timestamp: h.timestamp || 0,
           speaker: h.speaker || '',
-          flagged_by: h.flagged_by || '',
+          tag: h.tag || '',
+          selected_by: h.selected_by || '',
         }));
 
-        const topics = (recording.summary?.keywords || recording.topics || []).map((t: any) => ({
+        const topics = (summary?.topics || []).map((t: any) => ({
           name: typeof t === 'string' ? t : t.name || t.topic || '',
           confidence: typeof t === 'object' ? t.confidence : null,
         }));
-
-        const decisions: any[] = [];
 
         const { data: insertedRecording, error: insertError } = await supabaseClient
           .from('fathom_recordings')
@@ -252,10 +218,10 @@ Deno.serve(async (req: Request) => {
             recording_id: recordingId,
             folder_id: recording.folder_id || null,
             title: recording.title || 'Untitled Meeting',
-            meeting_url: recording.call_url || '',
-            playback_url: recording.share_url || '',
-            start_time: recording.start,
-            end_time: recording.end,
+            meeting_url: recording.meeting_url || '',
+            playback_url: recording.playback_url || '',
+            start_time: recording.start_time,
+            end_time: recording.end_time,
             duration_minutes: durationMinutes,
             meeting_platform: recording.platform || '',
             host_name: recording.host?.name || '',
@@ -264,16 +230,16 @@ Deno.serve(async (req: Request) => {
             team_name: teamName,
             meeting_type: meetingType,
             transcript: fullTranscript,
-            transcript_language: recording.transcript?.language || 'en',
-            summary: recording.summary?.overview || '',
-            summary_sections: recording.summary?.sections || [],
-            highlights: highlights,
+            transcript_language: transcript?.language || 'en',
+            summary: summary?.summary_text || '',
+            summary_sections: summary?.summary_sections || [],
+            highlights: highlightsList,
             action_items: actionItems,
-            decisions: decisions,
+            decisions: [],
             topics: topics,
-            sentiment_score: recording.sentiment?.score || null,
-            tone_tags: recording.sentiment?.tags || [],
-            raw_response: recording,
+            sentiment_score: null,
+            tone_tags: [],
+            raw_response: { recording, transcript, summary, highlights, actions },
             embeddings_generated: false,
             insights_processed: false,
           })
@@ -358,6 +324,96 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+async function fetchRecordingDetails(recordingId: string, apiKey: string): Promise<any> {
+  const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch recording details: ${response.status} ${errorText}`);
+  }
+
+  return await response.json();
+}
+
+async function fetchTranscript(recordingId: string, apiKey: string): Promise<any> {
+  const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}/transcript`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    console.warn(`Failed to fetch transcript for ${recordingId}: ${response.status}`);
+    return null;
+  }
+
+  return await response.json();
+}
+
+async function fetchSummary(recordingId: string, apiKey: string): Promise<any> {
+  const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}/summary`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    console.warn(`Failed to fetch summary for ${recordingId}: ${response.status}`);
+    return null;
+  }
+
+  return await response.json();
+}
+
+async function fetchHighlights(recordingId: string, apiKey: string): Promise<any> {
+  const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}/highlights`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    console.warn(`Failed to fetch highlights for ${recordingId}: ${response.status}`);
+    return null;
+  }
+
+  return await response.json();
+}
+
+async function fetchActions(recordingId: string, apiKey: string): Promise<any> {
+  const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}/actions`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    console.warn(`Failed to fetch actions for ${recordingId}: ${response.status}`);
+    return null;
+  }
+
+  return await response.json();
+}
 
 function cleanTranscript(transcript: string): string {
   let cleaned = transcript;
