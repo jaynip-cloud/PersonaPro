@@ -70,12 +70,54 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
         throw new Error(result.error || 'Failed to sync Fathom recordings');
       }
 
-      // Show detailed message
-      let message = `Successfully synced ${result.recordings_synced || 0} recordings`;
-      if (result.recordings_synced === 0) {
-        message = result.message || 'No new recordings found to sync. They may already be synced or filtered out.';
-      } else if (result.errors && result.errors.length > 0) {
-        message += ` (${result.errors.length} errors occurred)`;
+      // Show detailed message with diagnostics
+      let message = '';
+
+      if (result.recordings_synced > 0) {
+        message = `✓ Successfully synced ${result.recordings_synced} recording${result.recordings_synced > 1 ? 's' : ''} from Fathom`;
+        if (result.skipped && result.skipped.length > 0) {
+          message += `\n${result.skipped.length} recording${result.skipped.length > 1 ? 's' : ''} skipped (already synced or filtered)`;
+        }
+      } else {
+        // 0 recordings synced - provide diagnostic info
+        message = result.message || '⚠️ No recordings synced';
+
+        if (result.skipped && result.skipped.length > 0) {
+          message += '\n\nDiagnostics:';
+
+          // Count reasons
+          const reasons: { [key: string]: number } = {};
+          result.skipped.forEach((skip: any) => {
+            reasons[skip.reason] = (reasons[skip.reason] || 0) + 1;
+          });
+
+          // Show breakdown
+          if (reasons.already_synced) {
+            message += `\n• ${reasons.already_synced} already synced (duplicates prevented)`;
+          }
+          if (reasons.no_transcript) {
+            message += `\n• ${reasons.no_transcript} missing transcript (may still be processing in Fathom)`;
+          }
+          if (reasons.team_filter) {
+            message += `\n• ${reasons.team_filter} filtered out by team filter`;
+          }
+          if (reasons.meeting_type_filter) {
+            message += `\n• ${reasons.meeting_type_filter} filtered out by meeting type`;
+          }
+
+          // Add suggestions
+          if (reasons.already_synced && !reasons.no_transcript && !reasons.team_filter && !reasons.meeting_type_filter) {
+            message += '\n\n💡 All recordings were already synced. Click "View" to see them.';
+          } else if (reasons.no_transcript) {
+            message += '\n\n💡 Wait a few minutes for Fathom to process transcripts, then try again.';
+          } else if (reasons.team_filter || reasons.meeting_type_filter) {
+            message += '\n\n💡 Try removing filters (⚙️ icon) to sync all recordings.';
+          }
+        }
+      }
+
+      if (result.errors && result.errors.length > 0) {
+        message += `\n\n⚠️ ${result.errors.length} error${result.errors.length > 1 ? 's' : ''} occurred`;
       }
 
       setSyncResult({
@@ -232,30 +274,32 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
       {syncResult && (
         <div
           className={`p-4 rounded-lg ${
-            syncResult.success
+            syncResult.success && syncResult.count > 0
               ? 'bg-green-50 border border-green-200'
+              : syncResult.success && syncResult.count === 0
+              ? 'bg-yellow-50 border border-yellow-200'
               : 'bg-red-50 border border-red-200'
           }`}
         >
-          <p
-            className={`text-sm font-medium ${
-              syncResult.success ? 'text-green-800' : 'text-red-800'
-            }`}
-          >
-            {syncResult.success ? (
-              <>
-                ✓ Successfully synced {syncResult.count} recording
-                {syncResult.count !== 1 ? 's' : ''} from Fathom
-              </>
-            ) : (
-              <>✗ {syncResult.message || 'Sync failed'}</>
-            )}
-          </p>
-          {syncResult.success && syncResult.count > 0 && (
-            <p className="text-xs text-green-600 mt-1">
-              Embeddings are being generated in the background for semantic search and AI insights.
+          <div className="whitespace-pre-wrap">
+            <p
+              className={`text-sm font-medium ${
+                syncResult.success && syncResult.count > 0 ? 'text-green-800' :
+                syncResult.success && syncResult.count === 0 ? 'text-yellow-800' :
+                'text-red-800'
+              }`}
+            >
+              {syncResult.message || (syncResult.success ?
+                `✓ Successfully synced ${syncResult.count} recording${syncResult.count !== 1 ? 's' : ''} from Fathom` :
+                '✗ Sync failed'
+              )}
             </p>
-          )}
+            {syncResult.success && syncResult.count > 0 && (
+              <p className="text-xs text-green-600 mt-2">
+                Embeddings are being generated in the background for semantic search and AI insights.
+              </p>
+            )}
+          </div>
         </div>
       )}
 

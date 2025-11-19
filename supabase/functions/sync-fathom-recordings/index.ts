@@ -11,45 +11,8 @@ interface SyncRequest {
   client_id: string;
   folder_link?: string;
   recording_ids?: string[];
-  team_filter?: string[]; // ['customer_success', 'executive', 'sales']
-  meeting_type_filter?: string[]; // ['client_engagement', 'sales_initial_call', 'client_call']
-}
-
-interface FathomRecording {
-  id: string;
-  title: string;
-  start: string;
-  end: string;
-  duration: number;
-  call_url: string;
-  share_url: string;
-  team?: string;
-  meeting_type?: string;
-  transcript?: {
-    segments: Array<{
-      speaker: string;
-      text: string;
-      start: number;
-      end: number;
-    }>;
-  };
-  summary?: {
-    overview: string;
-    keywords: string[];
-    action_items: Array<{
-      text: string;
-      assignee?: string;
-    }>;
-  };
-  participants?: Array<{
-    name: string;
-    email?: string;
-  }>;
-  host?: {
-    name: string;
-    email: string;
-  };
-  platform?: string;
+  team_filter?: string[];
+  meeting_type_filter?: string[];
 }
 
 Deno.serve(async (req: Request) => {
@@ -76,7 +39,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unauthorized');
     }
 
-    // Get user's Fathom API key
     const { data: apiKeys, error: keysError } = await supabaseClient
       .from('api_keys')
       .select('fathom_api_key')
@@ -103,9 +65,7 @@ Deno.serve(async (req: Request) => {
 
     let recordingIdsToSync: string[] = [];
 
-    // Step 1: Resolve folder link to recording IDs
     if (folder_link) {
-      // Extract folder ID from link (format: https://app.fathom.video/folders/folder_id)
       const folderIdMatch = folder_link.match(/folders\/([a-zA-Z0-9_-]+)/);
       if (!folderIdMatch) {
         throw new Error('Invalid Fathom folder link format');
@@ -114,7 +74,6 @@ Deno.serve(async (req: Request) => {
 
       console.log('Fetching recordings from folder:', folderId);
 
-      // Call Fathom API to list meetings in folder
       const fathomListUrl = new URL('https://api.fathom.ai/external/v1/meetings');
       fathomListUrl.searchParams.append('folder_id', folderId);
 
@@ -149,27 +108,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Step 2: Fetch detailed data for each recording
     const processedRecordings = [];
+    const skippedRecordings = [];
     const errors = [];
 
     for (const recordingId of recordingIdsToSync) {
       try {
         console.log(`Fetching recording ${recordingId}...`);
 
-        // Check if recording already exists
         const { data: existingRecording } = await supabaseClient
           .from('fathom_recordings')
-          .select('id')
+          .select('id, title')
           .eq('recording_id', recordingId)
           .maybeSingle();
 
         if (existingRecording) {
           console.log(`Recording ${recordingId} already exists, skipping`);
+          skippedRecordings.push({ id: recordingId, title: existingRecording.title, reason: 'already_synced' });
           continue;
         }
 
-        // Fetch full recording data from Fathom
         const recordingUrl = `https://api.fathom.ai/external/v1/meetings/${recordingId}`;
         const recordingResponse = await fetch(recordingUrl, {
           method: 'GET',
@@ -188,22 +146,21 @@ Deno.serve(async (req: Request) => {
 
         const recording: any = await recordingResponse.json();
 
-        // Extract team and meeting_type from recording metadata or tags
         const teamName = recording.team || recording.metadata?.team || null;
         const meetingType = recording.meeting_type || recording.metadata?.meeting_type || null;
 
-        // Apply filters
         if (team_filter && team_filter.length > 0 && teamName && !team_filter.includes(teamName)) {
           console.log(`Recording ${recordingId} filtered out by team: ${teamName}`);
+          skippedRecordings.push({ id: recordingId, title: recording.title, reason: 'team_filter', team: teamName });
           continue;
         }
 
         if (meeting_type_filter && meeting_type_filter.length > 0 && meetingType && !meeting_type_filter.includes(meetingType)) {
           console.log(`Recording ${recordingId} filtered out by meeting type: ${meetingType}`);
+          skippedRecordings.push({ id: recordingId, title: recording.title, reason: 'meeting_type_filter', meeting_type: meetingType });
           continue;
         }
 
-        // Process transcript
         let fullTranscript = '';
         if (recording.transcript && recording.transcript.segments) {
           fullTranscript = recording.transcript.segments
@@ -211,34 +168,30 @@ Deno.serve(async (req: Request) => {
             .join('\n\n');
         }
 
-        // Clean transcript (remove filler, fix punctuation)
         fullTranscript = cleanTranscript(fullTranscript);
 
         if (!fullTranscript) {
           console.log(`Recording ${recordingId} has no transcript, skipping`);
+          skippedRecordings.push({ id: recordingId, title: recording.title, reason: 'no_transcript' });
           continue;
         }
 
-        // Calculate duration
         const startTime = new Date(recording.start).getTime();
         const endTime = new Date(recording.end).getTime();
         const durationMinutes = Math.round((endTime - startTime) / 60000);
 
-        // Process participants
         const participants = (recording.participants || []).map((p: any) => ({
           name: p.name || '',
           email: p.email || '',
           role: p.role || '',
         }));
 
-        // Process action items
         const actionItems = (recording.summary?.action_items || []).map((item: any) => ({
           text: item.text || '',
           assignee: item.assignee || '',
           completed: false,
         }));
 
-        // Process highlights
         const highlights = (recording.highlights || []).map((h: any) => ({
           text: h.text || '',
           timestamp: h.timestamp || 0,
@@ -246,16 +199,13 @@ Deno.serve(async (req: Request) => {
           flagged_by: h.flagged_by || '',
         }));
 
-        // Process topics/keywords
         const topics = (recording.summary?.keywords || recording.topics || []).map((t: any) => ({
           name: typeof t === 'string' ? t : t.name || t.topic || '',
           confidence: typeof t === 'object' ? t.confidence : null,
         }));
 
-        // Extract decisions from highlights or summary
         const decisions: any[] = [];
 
-        // Insert recording into database
         const { data: insertedRecording, error: insertError } = await supabaseClient
           .from('fathom_recordings')
           .insert({
@@ -300,7 +250,6 @@ Deno.serve(async (req: Request) => {
 
         processedRecordings.push(insertedRecording);
 
-        // Trigger embeddings generation (async, don't wait)
         fetch(
           `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-fathom-embeddings`,
           {
@@ -321,13 +270,36 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    console.log(`Sync complete: ${processedRecordings.length} recordings synced`);
+    console.log(`Sync complete: ${processedRecordings.length} recordings synced, ${skippedRecordings.length} skipped`);
+
+    let message = '';
+    if (processedRecordings.length === 0 && skippedRecordings.length > 0) {
+      const skipReasons = skippedRecordings.reduce((acc: any, r: any) => {
+        acc[r.reason] = (acc[r.reason] || 0) + 1;
+        return acc;
+      }, {});
+
+      const reasonText = Object.entries(skipReasons)
+        .map(([reason, count]) => {
+          if (reason === 'already_synced') return `${count} already synced`;
+          if (reason === 'no_transcript') return `${count} missing transcript`;
+          if (reason === 'team_filter') return `${count} filtered by team`;
+          if (reason === 'meeting_type_filter') return `${count} filtered by type`;
+          return `${count} ${reason}`;
+        })
+        .join(', ');
+
+      message = `No new recordings synced. ${recordingIdsToSync.length} found: ${reasonText}.`;
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         recordings_synced: processedRecordings.length,
         recordings: processedRecordings.map(r => ({ id: r.id, title: r.title })),
+        skipped: skippedRecordings,
+        total_found: recordingIdsToSync.length,
+        message: message || undefined,
         errors: errors.length > 0 ? errors : undefined,
       }),
       {
@@ -349,23 +321,12 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-// Helper function to clean transcript
 function cleanTranscript(transcript: string): string {
   let cleaned = transcript;
-
-  // Remove excessive [inaudible] blocks
   cleaned = cleaned.replace(/\[inaudible\](?:\s*\[inaudible\])*/gi, '[inaudible]');
-
-  // Remove filler words (optional, can be aggressive)
-  // cleaned = cleaned.replace(/\b(um|uh|like|you know)\b/gi, '');
-
-  // Fix punctuation spacing
   cleaned = cleaned.replace(/\s+([.,!?])/g, '$1');
   cleaned = cleaned.replace(/([.,!?])([A-Za-z])/g, '$1 $2');
-
-  // Remove excessive whitespace
   cleaned = cleaned.replace(/\s+/g, ' ');
   cleaned = cleaned.trim();
-
   return cleaned;
 }
