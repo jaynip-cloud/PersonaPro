@@ -79,48 +79,65 @@ Deno.serve(async (req: Request) => {
         const folderId = folderIdMatch[1];
         console.log('Fetching recordings from folder:', folderId);
 
-        console.log(`Fetching meetings from Fathom API...`);
-        const listResponse = await fetch('https://api.fathom.ai/external/v1/meetings', {
+        const webAppUrl = `https://fathom.video/folders/${folderId}/calls`;
+        console.log(`Trying web app endpoint: ${webAppUrl}`);
+        
+        const webResponse = await fetch(webAppUrl, {
           method: 'GET',
           headers: {
+            'accept': 'application/json',
             'X-Api-Key': apiKeys.fathom_api_key,
-            'Content-Type': 'application/json',
           },
         });
 
-        if (!listResponse.ok) {
-          const errorText = await listResponse.text();
-          console.error(`Fathom API error (${listResponse.status}):`, errorText);
-          throw new Error(`Unable to list meetings. Status: ${listResponse.status}. Error: ${errorText}`);
+        if (webResponse.ok) {
+          try {
+            const webData = await webResponse.json();
+            console.log('Web app data structure:', JSON.stringify(webData).substring(0, 500));
+            
+            const calls = webData.calls || webData.data || webData;
+            if (Array.isArray(calls)) {
+              recordingIdsToSync = calls.map((call: any) => call.recording_id || call.recordingId || call.id || call.call_id).filter(Boolean);
+              console.log(`Found ${recordingIdsToSync.length} recordings from web app endpoint`);
+            }
+          } catch (e) {
+            console.error('Failed to parse web app response:', e);
+          }
+        } else {
+          console.log(`Web app endpoint returned ${webResponse.status}, falling back to API endpoint`);
         }
 
-        const listData = await listResponse.json();
-        console.log('List data structure:', JSON.stringify(listData).substring(0, 500));
+        if (recordingIdsToSync.length === 0) {
+          console.log(`Fetching all meetings from API and filtering by folder...`);
+          const listResponse = await fetch('https://api.fathom.ai/external/v1/meetings', {
+            method: 'GET',
+            headers: {
+              'X-Api-Key': apiKeys.fathom_api_key,
+              'Content-Type': 'application/json',
+            },
+          });
 
-        const allMeetings = Array.isArray(listData) ? listData : (listData.meetings || listData.data || []);
+          if (!listResponse.ok) {
+            const errorText = await listResponse.text();
+            console.error(`Fathom API error (${listResponse.status}):`, errorText);
+            throw new Error(`Unable to list meetings. Status: ${listResponse.status}. Error: ${errorText}`);
+          }
 
-        console.log(`Total meetings retrieved: ${allMeetings.length}`);
+          const listData = await listResponse.json();
+          console.log('API data structure:', JSON.stringify(listData).substring(0, 500));
 
-        if (allMeetings.length > 0) {
-          console.log('Sample meeting structure:', JSON.stringify(allMeetings[0]));
+          const allMeetings = Array.isArray(listData) ? listData : (listData.items || listData.meetings || listData.data || []);
+
+          console.log(`Total meetings retrieved from API: ${allMeetings.length}`);
+
+          if (allMeetings.length > 0) {
+            console.log('Sample meeting structure:', JSON.stringify(allMeetings[0]));
+            recordingIdsToSync = allMeetings.map((item: any) => item.recording_id || item.recordingId || item.id).filter(Boolean);
+            console.log(`Extracted ${recordingIdsToSync.length} recording IDs from API`);
+          }
         }
 
-        const folderMeetings = allMeetings.filter((item: any) => {
-          const itemFolderId = item.folder_id || item.folderId || item.folder;
-          console.log(`Checking meeting ${item.id || item.recording_id}: folder=${itemFolderId} vs target=${folderId}`);
-          return itemFolderId === folderId;
-        });
-
-        recordingIdsToSync = folderMeetings.map((item: any) => item.recording_id || item.recordingId || item.id || item.call_id);
-
-        console.log(`Found ${recordingIdsToSync.length} meetings in folder ${folderId} (out of ${allMeetings.length} total)`);
-        
-        if (recordingIdsToSync.length === 0 && allMeetings.length > 0) {
-          console.warn('No meetings matched the folder ID. This could mean:');
-          console.warn('1. The folder is empty');
-          console.warn('2. The folder_id field name is different than expected');
-          console.warn('3. The folder_id format is different');
-        }
+        console.log(`Total recordings to sync from folder ${folderId}: ${recordingIdsToSync.length}`);
       } else {
         throw new Error('Invalid Fathom link format. Please provide a folder link (e.g., fathom.video/folders/xxx) or recording link (e.g., fathom.video/recordings/xxx)');
       }
@@ -135,9 +152,9 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: 'No recordings found to sync. The folder may be empty or the API may not return folder information.', 
+          message: 'No recordings found to sync. The folder may be empty or require authentication.', 
           recordings_synced: 0,
-          suggestion: 'Try syncing individual recording links instead of folder links.'
+          suggestion: 'Try syncing individual recording links instead.'
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
