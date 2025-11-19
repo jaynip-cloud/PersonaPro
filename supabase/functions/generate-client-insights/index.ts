@@ -97,6 +97,16 @@ Deno.serve(async (req: Request) => {
       .order('created_at', { ascending: false })
       .limit(5);
 
+    // Fetch Fathom recordings with recent context
+    const { data: fathomRecordings } = await supabase
+      .rpc('get_recent_fathom_context', {
+        match_client_id: clientId,
+        days_back: 90,
+        limit_count: 10
+      });
+
+    console.log(`Found ${fathomRecordings?.length || 0} Fathom recordings for client`);
+
     let documentsList: any[] = [];
     try {
       const { data: documents } = await supabase.storage
@@ -265,6 +275,16 @@ ${pitches?.map(p => `
 
 # DOCUMENTS (${documentsList.length} files)
 ${documentsList.map(d => `- ${d.name} (${d.type || 'unknown type'})`).join('\n') || 'No documents uploaded'}
+
+# FATHOM MEETING RECORDINGS (${fathomRecordings?.length || 0} recent meetings)
+${fathomRecordings?.map(r => `
+## ${r.title} (${new Date(r.start_time).toLocaleDateString()})
+Summary: ${r.summary || 'No summary available'}
+Topics: ${r.key_topics?.map((t: any) => t.name).join(', ') || 'None'}
+Action Items: ${r.action_items?.length || 0} items
+Sentiment Score: ${r.sentiment_score ? `${(r.sentiment_score * 100).toFixed(0)}%` : 'Not analyzed'}
+---
+`).join('\n') || 'No Fathom recordings available'}
 
 # SOCIAL MEDIA PRESENCE
 LinkedIn: ${client.linkedin_url || 'Not provided'}

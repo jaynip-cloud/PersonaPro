@@ -1,0 +1,267 @@
+import { useState } from 'react';
+import { RefreshCw, FolderOpen, Settings } from 'lucide-react';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { supabase } from '../../lib/supabase';
+
+interface FathomSyncProps {
+  clientId: string;
+  onSyncComplete?: () => void;
+}
+
+const TEAM_OPTIONS = [
+  { value: 'customer_success', label: 'Customer Success' },
+  { value: 'executive', label: 'Executive' },
+  { value: 'sales', label: 'Sales' },
+];
+
+const MEETING_TYPE_OPTIONS = [
+  { value: 'client_engagement', label: 'Client Engagement' },
+  { value: 'sales_initial_call', label: 'Sales Initial Call' },
+  { value: 'client_call', label: 'Client Call' },
+];
+
+export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
+  const [folderLink, setFolderLink] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [teamFilters, setTeamFilters] = useState<string[]>([]);
+  const [meetingTypeFilters, setMeetingTypeFilters] = useState<string[]>([]);
+  const [syncResult, setSyncResult] = useState<{
+    success: boolean;
+    count: number;
+    message?: string;
+  } | null>(null);
+
+  const handleSync = async () => {
+    if (!folderLink.trim()) {
+      alert('Please enter a Fathom folder link or recording IDs');
+      return;
+    }
+
+    setSyncing(true);
+    setSyncResult(null);
+
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-fathom-recordings`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          folder_link: folderLink,
+          team_filter: teamFilters.length > 0 ? teamFilters : undefined,
+          meeting_type_filter: meetingTypeFilters.length > 0 ? meetingTypeFilters : undefined,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to sync Fathom recordings');
+      }
+
+      setSyncResult({
+        success: true,
+        count: result.recordings_synced || 0,
+        message: result.message,
+      });
+
+      // Clear input on success
+      setFolderLink('');
+
+      // Notify parent component
+      if (onSyncComplete) {
+        onSyncComplete();
+      }
+    } catch (error) {
+      console.error('Error syncing Fathom recordings:', error);
+      setSyncResult({
+        success: false,
+        count: 0,
+        message: error instanceof Error ? error.message : 'Failed to sync recordings',
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const toggleTeamFilter = (team: string) => {
+    setTeamFilters(prev =>
+      prev.includes(team)
+        ? prev.filter(t => t !== team)
+        : [...prev, team]
+    );
+  };
+
+  const toggleMeetingTypeFilter = (type: string) => {
+    setMeetingTypeFilters(prev =>
+      prev.includes(type)
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Fathom Folder Link or Recording IDs
+          </label>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <FolderOpen className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <Input
+                type="text"
+                value={folderLink}
+                onChange={(e) => setFolderLink(e.target.value)}
+                placeholder="https://app.fathom.video/folders/... or recording IDs"
+                disabled={syncing}
+                className="pl-10"
+              />
+            </div>
+            <Button
+              onClick={() => setShowFilters(!showFilters)}
+              variant="outline"
+              disabled={syncing}
+              title="Configure filters"
+            >
+              <Settings size={18} />
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Paste a Fathom folder link to sync all recordings in that folder
+          </p>
+        </div>
+
+        <Button
+          onClick={handleSync}
+          disabled={syncing || !folderLink.trim()}
+          className="mt-7"
+        >
+          {syncing ? (
+            <>
+              <RefreshCw className="animate-spin" size={18} />
+              Syncing...
+            </>
+          ) : (
+            <>
+              <RefreshCw size={18} />
+              Sync Fathom
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Filters Section */}
+      {showFilters && (
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Filter by Team
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {TEAM_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => toggleTeamFilter(option.value)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    teamFilters.includes(option.value)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {teamFilters.length === 0
+                ? 'No filter - will sync all teams'
+                : `Syncing only: ${teamFilters.join(', ')}`}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Filter by Meeting Type
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {MEETING_TYPE_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  onClick={() => toggleMeetingTypeFilter(option.value)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    meetingTypeFilters.includes(option.value)
+                      ? 'bg-green-600 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {meetingTypeFilters.length === 0
+                ? 'No filter - will sync all meeting types'
+                : `Syncing only: ${meetingTypeFilters.join(', ')}`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Sync Result */}
+      {syncResult && (
+        <div
+          className={`p-4 rounded-lg ${
+            syncResult.success
+              ? 'bg-green-50 border border-green-200'
+              : 'bg-red-50 border border-red-200'
+          }`}
+        >
+          <p
+            className={`text-sm font-medium ${
+              syncResult.success ? 'text-green-800' : 'text-red-800'
+            }`}
+          >
+            {syncResult.success ? (
+              <>
+                ✓ Successfully synced {syncResult.count} recording
+                {syncResult.count !== 1 ? 's' : ''} from Fathom
+              </>
+            ) : (
+              <>✗ {syncResult.message || 'Sync failed'}</>
+            )}
+          </p>
+          {syncResult.success && syncResult.count > 0 && (
+            <p className="text-xs text-green-600 mt-1">
+              Embeddings are being generated in the background for semantic search and AI insights.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <p className="text-sm text-blue-800 font-medium mb-1">How it works:</p>
+        <ul className="text-xs text-blue-700 space-y-1 ml-4 list-disc">
+          <li>Paste a Fathom folder link to sync all recordings in that folder</li>
+          <li>Apply team and meeting type filters to sync only relevant recordings</li>
+          <li>Transcripts are automatically processed and chunked for AI analysis</li>
+          <li>Vector embeddings enable semantic search across all meeting content</li>
+          <li>AI insights are generated using meeting context for better pitch generation</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
