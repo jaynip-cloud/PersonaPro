@@ -28,8 +28,10 @@ export const Settings: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [openaiKey, setOpenaiKey] = useState('');
   const [perplexityKey, setPerplexityKey] = useState('');
+  const [fathomKey, setFathomKey] = useState('');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showPerplexityKey, setShowPerplexityKey] = useState(false);
+  const [showFathomKey, setShowFathomKey] = useState(false);
   const [isLoadingKeys, setIsLoadingKeys] = useState(false);
   const [isSavingKeys, setIsSavingKeys] = useState(false);
   const [keysLoaded, setKeysLoaded] = useState(false);
@@ -50,14 +52,14 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     if (!user || activeTab !== 'api' || !keysLoaded) return;
-    if (!openaiKey && !perplexityKey) return;
+    if (!openaiKey && !perplexityKey && !fathomKey) return;
 
     const timeoutId = setTimeout(() => {
       saveApiKeys();
     }, 1500);
 
     return () => clearTimeout(timeoutId);
-  }, [openaiKey, perplexityKey, keysLoaded]);
+  }, [openaiKey, perplexityKey, fathomKey, keysLoaded]);
 
   const loadApiKeys = async () => {
     if (!user) return;
@@ -67,7 +69,7 @@ export const Settings: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('api_keys')
-        .select('openai_api_key, perplexity_api_key')
+        .select('openai_api_key, perplexity_api_key, fathom_api_key')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -76,6 +78,7 @@ export const Settings: React.FC = () => {
       if (data) {
         setOpenaiKey(data.openai_api_key || '');
         setPerplexityKey(data.perplexity_api_key || '');
+        setFathomKey(data.fathom_api_key || '');
       }
     } catch (error) {
       console.error('Error loading API keys:', error);
@@ -102,6 +105,7 @@ export const Settings: React.FC = () => {
           .update({
             openai_api_key: openaiKey || null,
             perplexity_api_key: perplexityKey || null,
+            fathom_api_key: fathomKey || null,
           })
           .eq('user_id', user.id);
 
@@ -113,6 +117,7 @@ export const Settings: React.FC = () => {
             user_id: user.id,
             openai_api_key: openaiKey || null,
             perplexity_api_key: perplexityKey || null,
+            fathom_api_key: fathomKey || null,
           });
 
         if (error) throw error;
@@ -563,15 +568,69 @@ export const Settings: React.FC = () => {
                           </div>
                         </div>
                       </div>
+
+                      <div className="border-t border-border pt-6">
+                        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                          <span className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">3</span>
+                          Fathom API Key (Optional)
+                        </h3>
+                        <div className="pl-10 space-y-3">
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <p className="text-sm text-slate-700 mb-2">
+                              <strong>Used for:</strong> Syncing meeting recordings, transcripts, and insights
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              Connect Fathom to automatically sync meeting recordings and transcripts to your client intelligence hub
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Fathom API Key
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={showFathomKey ? 'text' : 'password'}
+                                value={fathomKey}
+                                onChange={(e) => setFathomKey(e.target.value)}
+                                placeholder="fathom_..."
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() => setShowFathomKey(!showFathomKey)}
+                              >
+                                {showFathomKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              Get your API key from{' '}
+                              <a
+                                href="https://app.fathom.video/settings/integrations"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-medium"
+                              >
+                                Fathom Settings →
+                              </a>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-4 border-t border-border">
                       <div className="flex items-center gap-4">
                         <div className="text-sm text-muted-foreground">
-                          {openaiKey && perplexityKey ? (
+                          {openaiKey && perplexityKey && fathomKey ? (
                             <span className="text-green-600 flex items-center gap-1">
                               <CheckCircle className="h-4 w-4" />
-                              Both keys configured (Full features)
+                              All keys configured (Full features)
+                            </span>
+                          ) : openaiKey && (perplexityKey || fathomKey) ? (
+                            <span className="text-green-600 flex items-center gap-1">
+                              <CheckCircle className="h-4 w-4" />
+                              {openaiKey && perplexityKey ? 'OpenAI + Perplexity' : 'OpenAI + Fathom'} configured
                             </span>
                           ) : openaiKey ? (
                             <span className="text-blue-600 flex items-center gap-1">
@@ -596,7 +655,7 @@ export const Settings: React.FC = () => {
                               <CheckCircle className="h-3 w-3 text-green-600" />
                               <span className="text-green-600">Saved automatically</span>
                             </>
-                          ) : keysLoaded && (openaiKey || perplexityKey) ? (
+                          ) : keysLoaded && (openaiKey || perplexityKey || fathomKey) ? (
                             <span className="text-slate-400">Changes save automatically</span>
                           ) : null}
                         </div>
@@ -604,7 +663,7 @@ export const Settings: React.FC = () => {
                       <Button
                         variant="outline"
                         onClick={handleSave}
-                        disabled={isSavingKeys || (!openaiKey && !perplexityKey)}
+                        disabled={isSavingKeys || (!openaiKey && !perplexityKey && !fathomKey)}
                         className="text-sm"
                       >
                         {isSavingKeys ? (

@@ -96,9 +96,12 @@ Each recording shows:
 ### First-Time Setup
 
 **Step 1: Configure API Key**
-1. Navigate to Settings → API Keys
-2. Add your Fathom API key
-3. Get key from: https://app.fathom.video/settings/integrations
+1. Navigate to **Settings** (from sidebar)
+2. Click on **"API Keys & Integrations"** tab
+3. Scroll down to **"3. Fathom API Key (Optional)"** section
+4. Paste your Fathom API key in the input field
+5. Get your key from: https://app.fathom.video/settings/integrations
+6. The key will auto-save after you type it
 
 **Step 2: Sync First Recordings**
 1. Go to Client → Intelligence & Assets
