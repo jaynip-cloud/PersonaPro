@@ -74,7 +74,7 @@ Deno.serve(async (req: Request) => {
 
       console.log('Fetching recordings from folder:', folderId);
 
-      const listUrl = `https://api.fathom.ai/external/v1/folders/${folderId}/recordings`;
+      const listUrl = `https://api.fathom.ai/external/v1/recordings`;
       const listResponse = await fetch(listUrl, {
         method: 'GET',
         headers: {
@@ -90,7 +90,7 @@ Deno.serve(async (req: Request) => {
         if (statusCode === 401 || statusCode === 403) {
           throw new Error('Invalid Fathom API key. Please check your API key in Settings → API Keys.');
         } else if (statusCode === 404) {
-          throw new Error(`Folder not found. Check that the folder ID "${folderId}" exists and you have access to it.`);
+          throw new Error(`Recordings endpoint not found. This might be an API version issue.`);
         } else if (statusCode === 429) {
           throw new Error('Fathom API rate limit exceeded. Please wait a minute and try again.');
         } else {
@@ -105,10 +105,16 @@ Deno.serve(async (req: Request) => {
         throw new Error('Invalid response from Fathom API. The API format may have changed.');
       }
 
-      const recordings = Array.isArray(listData) ? listData : (listData.recordings || listData.data || []);
-      recordingIdsToSync = recordings.map((item: any) => item.recording_id || item.id);
+      const allRecordings = Array.isArray(listData) ? listData : (listData.recordings || listData.data || []);
 
-      console.log(`Found ${recordingIdsToSync.length} recordings in folder`);
+      const folderRecordings = allRecordings.filter((item: any) => {
+        const itemFolderId = item.folder_id || item.folderId;
+        return itemFolderId === folderId;
+      });
+
+      recordingIdsToSync = folderRecordings.map((item: any) => item.recording_id || item.id);
+
+      console.log(`Found ${recordingIdsToSync.length} recordings in folder (out of ${allRecordings.length} total)`);
     } else if (recording_ids && recording_ids.length > 0) {
       recordingIdsToSync = recording_ids;
       console.log(`Syncing ${recordingIdsToSync.length} specific recording IDs`);
