@@ -29,9 +29,13 @@ export const Settings: React.FC = () => {
   const [openaiKey, setOpenaiKey] = useState('');
   const [perplexityKey, setPerplexityKey] = useState('');
   const [fathomKey, setFathomKey] = useState('');
+  const [firecrawlKey, setFirecrawlKey] = useState('');
+  const [apolloKey, setApolloKey] = useState('');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showPerplexityKey, setShowPerplexityKey] = useState(false);
   const [showFathomKey, setShowFathomKey] = useState(false);
+  const [showFirecrawlKey, setShowFirecrawlKey] = useState(false);
+  const [showApolloKey, setShowApolloKey] = useState(false);
   const [isLoadingKeys, setIsLoadingKeys] = useState(false);
   const [isSavingKeys, setIsSavingKeys] = useState(false);
   const [keysLoaded, setKeysLoaded] = useState(false);
@@ -52,14 +56,14 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     if (!user || activeTab !== 'api' || !keysLoaded) return;
-    if (!openaiKey && !perplexityKey && !fathomKey) return;
+    if (!openaiKey && !perplexityKey && !fathomKey && !firecrawlKey && !apolloKey) return;
 
     const timeoutId = setTimeout(() => {
       saveApiKeys();
     }, 1500);
 
     return () => clearTimeout(timeoutId);
-  }, [openaiKey, perplexityKey, fathomKey, keysLoaded]);
+  }, [openaiKey, perplexityKey, fathomKey, firecrawlKey, apolloKey, keysLoaded]);
 
   const loadApiKeys = async () => {
     if (!user) return;
@@ -69,7 +73,7 @@ export const Settings: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('api_keys')
-        .select('openai_api_key, perplexity_api_key, fathom_api_key')
+        .select('openai_api_key, perplexity_api_key, fathom_api_key, firecrawl_api_key, apollo_api_key')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -79,6 +83,8 @@ export const Settings: React.FC = () => {
         setOpenaiKey(data.openai_api_key || '');
         setPerplexityKey(data.perplexity_api_key || '');
         setFathomKey(data.fathom_api_key || '');
+        setFirecrawlKey(data.firecrawl_api_key || '');
+        setApolloKey(data.apollo_api_key || '');
       }
     } catch (error) {
       console.error('Error loading API keys:', error);
@@ -106,6 +112,8 @@ export const Settings: React.FC = () => {
             openai_api_key: openaiKey || null,
             perplexity_api_key: perplexityKey || null,
             fathom_api_key: fathomKey || null,
+            firecrawl_api_key: firecrawlKey || null,
+            apollo_api_key: apolloKey || null,
           })
           .eq('user_id', user.id);
 
@@ -118,6 +126,8 @@ export const Settings: React.FC = () => {
             openai_api_key: openaiKey || null,
             perplexity_api_key: perplexityKey || null,
             fathom_api_key: fathomKey || null,
+            firecrawl_api_key: firecrawlKey || null,
+            apollo_api_key: apolloKey || null,
           });
 
         if (error) throw error;
@@ -617,25 +627,118 @@ export const Settings: React.FC = () => {
                           </div>
                         </div>
                       </div>
+
+                      <div className="border-t border-border pt-6">
+                        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                          <span className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center text-sm">4</span>
+                          Firecrawl API Key (Optional)
+                        </h3>
+                        <div className="pl-10 space-y-3">
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <p className="text-sm text-slate-700 mb-2">
+                              <strong>Used for:</strong> Web scraping, content extraction from company websites
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              Extract structured data from company websites to enrich your knowledge base
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Firecrawl API Key
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={showFirecrawlKey ? 'text' : 'password'}
+                                value={firecrawlKey}
+                                onChange={(e) => setFirecrawlKey(e.target.value)}
+                                placeholder="fc-..."
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() => setShowFirecrawlKey(!showFirecrawlKey)}
+                              >
+                                {showFirecrawlKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              Get your API key from{' '}
+                              <a
+                                href="https://www.firecrawl.dev"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-medium"
+                              >
+                                Firecrawl →
+                              </a>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-border pt-6">
+                        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                          <span className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-sm">5</span>
+                          Apollo API Key (Optional)
+                        </h3>
+                        <div className="pl-10 space-y-3">
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <p className="text-sm text-slate-700 mb-2">
+                              <strong>Used for:</strong> Company and contact data enrichment
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              Automatically enrich client data with company information, contacts, and firmographics
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Apollo API Key
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={showApolloKey ? 'text' : 'password'}
+                                value={apolloKey}
+                                onChange={(e) => setApolloKey(e.target.value)}
+                                placeholder="apollo_..."
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() => setShowApolloKey(!showApolloKey)}
+                              >
+                                {showApolloKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              Get your API key from{' '}
+                              <a
+                                href="https://app.apollo.io/#/settings/integrations/api"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-medium"
+                              >
+                                Apollo Settings →
+                              </a>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-4 border-t border-border">
                       <div className="flex items-center gap-4">
                         <div className="text-sm text-muted-foreground">
-                          {openaiKey && perplexityKey && fathomKey ? (
+                          {openaiKey && perplexityKey && fathomKey && firecrawlKey && apolloKey ? (
                             <span className="text-green-600 flex items-center gap-1">
                               <CheckCircle className="h-4 w-4" />
                               All keys configured (Full features)
                             </span>
-                          ) : openaiKey && (perplexityKey || fathomKey) ? (
+                          ) : openaiKey ? (
                             <span className="text-green-600 flex items-center gap-1">
                               <CheckCircle className="h-4 w-4" />
-                              {openaiKey && perplexityKey ? 'OpenAI + Perplexity' : 'OpenAI + Fathom'} configured
-                            </span>
-                          ) : openaiKey ? (
-                            <span className="text-blue-600 flex items-center gap-1">
-                              <CheckCircle className="h-4 w-4" />
-                              OpenAI configured (Basic features)
+                              OpenAI configured + {[perplexityKey && 'Perplexity', fathomKey && 'Fathom', firecrawlKey && 'Firecrawl', apolloKey && 'Apollo'].filter(Boolean).join(', ')}
                             </span>
                           ) : (
                             <span className="text-orange-600 flex items-center gap-1">

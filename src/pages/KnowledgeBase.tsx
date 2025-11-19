@@ -8,6 +8,8 @@ import { OnboardingWizard } from '../components/onboarding/OnboardingWizard';
 import { AIServiceExtractor } from '../components/knowledge/AIServiceExtractor';
 import { AIBlogExtractor } from '../components/knowledge/AIBlogExtractor';
 import { AITechnologyExtractor } from '../components/knowledge/AITechnologyExtractor';
+import { FirecrawlScraper } from '../components/knowledge/FirecrawlScraper';
+import { ApolloEnricher } from '../components/knowledge/ApolloEnricher';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
@@ -47,7 +49,7 @@ import {
   Gauge
 } from 'lucide-react';
 
-type TabType = 'overview' | 'company' | 'contact' | 'social' | 'services' | 'team' | 'blogs' | 'technology';
+type TabType = 'overview' | 'company' | 'contact' | 'social' | 'services' | 'team' | 'blogs' | 'technology' | 'data-enrichment';
 
 export const KnowledgeBase: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -596,7 +598,8 @@ export const KnowledgeBase: React.FC = () => {
     { id: 'services', label: 'Services', icon: Briefcase },
     { id: 'team', label: 'Leadership', icon: Users },
     { id: 'blogs', label: 'Blogs', icon: FileText },
-    { id: 'technology', label: 'Technology', icon: Code }
+    { id: 'technology', label: 'Technology', icon: Code },
+    { id: 'data-enrichment', label: 'Data Enrichment', icon: Zap }
   ];
 
   const handleWizardComplete = async () => {
@@ -2126,6 +2129,62 @@ export const KnowledgeBase: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+        </div>
+      )}
+
+      {activeTab === 'data-enrichment' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-primary" />
+                Firecrawl Web Scraper
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Extract content and structured data from company websites automatically
+              </p>
+            </CardHeader>
+            <CardContent>
+              <FirecrawlScraper
+                onDataExtracted={(data) => {
+                  console.log('Firecrawl data:', data);
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                Apollo Data Enrichment
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Enrich company data with firmographics, contacts, and employee information
+              </p>
+            </CardHeader>
+            <CardContent>
+              <ApolloEnricher
+                onDataEnriched={(data, type) => {
+                  console.log(`Apollo ${type} data:`, data);
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Zap className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-blue-900 mb-1">
+                  API Keys Required
+                </p>
+                <p className="text-xs text-blue-800">
+                  Configure your Firecrawl and Apollo API keys in Settings to use these enrichment features.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
