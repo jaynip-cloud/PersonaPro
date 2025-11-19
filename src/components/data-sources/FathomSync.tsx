@@ -118,6 +118,18 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
 
       if (result.errors && result.errors.length > 0) {
         message += `\n\n⚠️ ${result.errors.length} error${result.errors.length > 1 ? 's' : ''} occurred`;
+
+        // Show first error for debugging
+        if (result.errors[0]) {
+          const firstError = result.errors[0];
+          message += `\n\nFirst error: ${firstError.error}`;
+          if (firstError.recording_id) {
+            message += `\n(Recording ID: ${firstError.recording_id})`;
+          }
+        }
+
+        message += '\n\n💡 Check browser console (F12) for full details.';
+        console.error('Sync errors:', result.errors);
       }
 
       setSyncResult({

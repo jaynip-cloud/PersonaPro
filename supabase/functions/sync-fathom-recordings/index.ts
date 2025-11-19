@@ -87,11 +87,27 @@ Deno.serve(async (req: Request) => {
 
       if (!listResponse.ok) {
         const errorText = await listResponse.text();
-        throw new Error(`Fathom API error: ${errorText}`);
+        const statusCode = listResponse.status;
+
+        if (statusCode === 401 || statusCode === 403) {
+          throw new Error('Invalid Fathom API key. Please check your API key in Settings → API Keys.');
+        } else if (statusCode === 404) {
+          throw new Error(`Folder not found. Check that the folder ID "${folderId}" exists and you have access to it.`);
+        } else if (statusCode === 429) {
+          throw new Error('Fathom API rate limit exceeded. Please wait a minute and try again.');
+        } else {
+          throw new Error(`Fathom API error (${statusCode}): ${errorText}`);
+        }
       }
 
-      const listData = await listResponse.json();
-      recordingIdsToSync = (listData.items || []).map((item: any) => item.id);
+      let listData: any;
+      try {
+        listData = await listResponse.json();
+      } catch (parseError) {
+        throw new Error('Invalid response from Fathom API. The API format may have changed.');
+      }
+
+      recordingIdsToSync = (listData.items || listData.meetings || []).map((item: any) => item.id || item.meeting_id);
 
       console.log(`Found ${recordingIdsToSync.length} recordings in folder`);
     } else if (recording_ids && recording_ids.length > 0) {
@@ -139,12 +155,30 @@ Deno.serve(async (req: Request) => {
 
         if (!recordingResponse.ok) {
           const errorText = await recordingResponse.text();
-          console.error(`Failed to fetch recording ${recordingId}: ${errorText}`);
-          errors.push({ recording_id: recordingId, error: errorText });
+          const statusCode = recordingResponse.status;
+          let errorMessage = `HTTP ${statusCode}: ${errorText}`;
+
+          if (statusCode === 401 || statusCode === 403) {
+            errorMessage = 'Invalid or unauthorized API key. Check your Fathom API key in Settings.';
+          } else if (statusCode === 404) {
+            errorMessage = 'Recording not found. It may have been deleted from Fathom.';
+          } else if (statusCode === 429) {
+            errorMessage = 'Rate limit exceeded. Wait a minute and try again.';
+          }
+
+          console.error(`Failed to fetch recording ${recordingId}: ${errorMessage}`);
+          errors.push({ recording_id: recordingId, error: errorMessage, status: statusCode });
           continue;
         }
 
-        const recording: any = await recordingResponse.json();
+        let recording: any;
+        try {
+          recording = await recordingResponse.json();
+        } catch (parseError) {
+          console.error(`Failed to parse recording ${recordingId}:`, parseError);
+          errors.push({ recording_id: recordingId, error: 'Invalid JSON response from Fathom API' });
+          continue;
+        }
 
         const teamName = recording.team || recording.metadata?.team || null;
         const meetingType = recording.meeting_type || recording.metadata?.meeting_type || null;
