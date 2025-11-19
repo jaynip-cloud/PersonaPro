@@ -74,47 +74,53 @@ Deno.serve(async (req: Request) => {
 
       console.log('Fetching recordings from folder:', folderId);
 
-      const listUrl = `https://api.fathom.ai/external/v1/recordings`;
-      const listResponse = await fetch(listUrl, {
-        method: 'GET',
-        headers: {
-          'X-Api-Key': apiKeys.fathom_api_key,
-          'Content-Type': 'application/json',
-        },
-      });
+      const endpoints = [
+        `https://api.fathom.ai/external/v1/calls`,
+        `https://api.fathom.ai/external/v1/meetings`,
+        `https://api.fathom.ai/external/v1/recordings`,
+      ];
 
-      if (!listResponse.ok) {
-        const errorText = await listResponse.text();
-        const statusCode = listResponse.status;
+      let listData: any = null;
+      let successEndpoint = '';
 
-        if (statusCode === 401 || statusCode === 403) {
-          throw new Error('Invalid Fathom API key. Please check your API key in Settings → API Keys.');
-        } else if (statusCode === 404) {
-          throw new Error(`Recordings endpoint not found. This might be an API version issue.`);
-        } else if (statusCode === 429) {
-          throw new Error('Fathom API rate limit exceeded. Please wait a minute and try again.');
+      for (const endpoint of endpoints) {
+        console.log(`Trying endpoint: ${endpoint}`);
+        const listResponse = await fetch(endpoint, {
+          method: 'GET',
+          headers: {
+            'X-Api-Key': apiKeys.fathom_api_key,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (listResponse.ok) {
+          try {
+            listData = await listResponse.json();
+            successEndpoint = endpoint;
+            console.log(`Success with endpoint: ${endpoint}`);
+            break;
+          } catch (e) {
+            console.log(`Endpoint ${endpoint} returned OK but invalid JSON`);
+          }
         } else {
-          throw new Error(`Fathom API error (${statusCode}): ${errorText}`);
+          console.log(`Endpoint ${endpoint} returned ${listResponse.status}`);
         }
       }
 
-      let listData: any;
-      try {
-        listData = await listResponse.json();
-      } catch (parseError) {
-        throw new Error('Invalid response from Fathom API. The API format may have changed.');
+      if (!listData) {
+        throw new Error(`Unable to list recordings. Fathom API may not support listing, or your API key may not have the required permissions. Please try syncing by specific recording IDs instead.`);
       }
 
-      const allRecordings = Array.isArray(listData) ? listData : (listData.recordings || listData.data || []);
+      const allRecordings = Array.isArray(listData) ? listData : (listData.recordings || listData.calls || listData.meetings || listData.data || []);
 
       const folderRecordings = allRecordings.filter((item: any) => {
-        const itemFolderId = item.folder_id || item.folderId;
+        const itemFolderId = item.folder_id || item.folderId || item.folder;
         return itemFolderId === folderId;
       });
 
-      recordingIdsToSync = folderRecordings.map((item: any) => item.recording_id || item.id);
+      recordingIdsToSync = folderRecordings.map((item: any) => item.recording_id || item.recordingId || item.id || item.call_id);
 
-      console.log(`Found ${recordingIdsToSync.length} recordings in folder (out of ${allRecordings.length} total)`);
+      console.log(`Found ${recordingIdsToSync.length} recordings in folder (out of ${allRecordings.length} total) using endpoint: ${successEndpoint}`);
     } else if (recording_ids && recording_ids.length > 0) {
       recordingIdsToSync = recording_ids;
       console.log(`Syncing ${recordingIdsToSync.length} specific recording IDs`);
