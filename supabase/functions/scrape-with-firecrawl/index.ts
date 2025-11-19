@@ -50,7 +50,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: ScrapeRequest = await req.json();
-    const { url, formats = ['markdown', 'html'] } = body;
+    const { url, formats = ['markdown'] } = body;
 
     if (!url) {
       throw new Error('URL is required');
@@ -68,19 +68,26 @@ Deno.serve(async (req: Request) => {
         url: url,
         formats: formats,
         onlyMainContent: true,
-        includeTags: ['article', 'main', 'section'],
-        excludeTags: ['nav', 'footer', 'header', 'aside'],
-        waitFor: 1000,
+        timeout: 30000,
       }),
     });
 
     if (!firecrawlResponse.ok) {
-      const errorText = await firecrawlResponse.text();
-      console.error('Firecrawl API error:', errorText);
-      throw new Error(`Firecrawl API error (${firecrawlResponse.status}): ${errorText}`);
+      const errorData = await firecrawlResponse.json().catch(() => ({}));
+      console.error('Firecrawl API error:', errorData);
+      
+      if (firecrawlResponse.status === 408 || errorData.code === 'SCRAPE_TIMEOUT') {
+        throw new Error('The website took too long to respond. Try a simpler page or a different URL.');
+      }
+      
+      throw new Error(errorData.error || `Firecrawl API error (${firecrawlResponse.status})`);
     }
 
     const result = await firecrawlResponse.json();
+
+    if (!result.success) {
+      throw new Error(result.error || 'Scraping failed');
+    }
 
     console.log('Scraping completed successfully');
 
