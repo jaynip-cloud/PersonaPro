@@ -148,6 +148,7 @@ Deno.serve(async (req: Request) => {
         const summary = await fetchSummary(recordingId, apiKeys.fathom_api_key);
         const highlights = await fetchHighlights(recordingId, apiKeys.fathom_api_key);
         const actions = await fetchActions(recordingId, apiKeys.fathom_api_key);
+        const participantsData = await fetchParticipants(recordingId, apiKeys.fathom_api_key);
 
         const teamName = recording.team || null;
         const meetingType = recording.meeting_type || null;
@@ -183,7 +184,8 @@ Deno.serve(async (req: Request) => {
         const endTime = new Date(recording.end_time).getTime();
         const durationMinutes = Math.round((endTime - startTime) / 60000);
 
-        const participants = (recording.participants || []).map((p: any) => ({
+        const participantsList = participantsData || recording.participants || [];
+        const participants = participantsList.map((p: any) => ({
           name: p.name || '',
           email: p.email || '',
           role: p.role || '',
@@ -239,7 +241,7 @@ Deno.serve(async (req: Request) => {
             topics: topics,
             sentiment_score: null,
             tone_tags: [],
-            raw_response: { recording, transcript, summary, highlights, actions },
+            raw_response: { recording, transcript, summary, highlights, actions, participants: participantsData },
             embeddings_generated: false,
             insights_processed: false,
           })
@@ -409,6 +411,24 @@ async function fetchActions(recordingId: string, apiKey: string): Promise<any> {
 
   if (!response.ok) {
     console.warn(`Failed to fetch actions for ${recordingId}: ${response.status}`);
+    return null;
+  }
+
+  return await response.json();
+}
+
+async function fetchParticipants(recordingId: string, apiKey: string): Promise<any> {
+  const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}/participants`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    console.warn(`Failed to fetch participants for ${recordingId}: ${response.status}`);
     return null;
   }
 
