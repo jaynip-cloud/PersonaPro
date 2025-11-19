@@ -78,53 +78,35 @@ Deno.serve(async (req: Request) => {
         const folderId = folderIdMatch[1];
         console.log('Fetching recordings from folder:', folderId);
 
-      const endpoints = [
-        `https://api.fathom.ai/external/v1/calls`,
-        `https://api.fathom.ai/external/v1/meetings`,
-        `https://api.fathom.ai/external/v1/recordings`,
-      ];
+      console.log(`Fetching meetings from Fathom API...`);
+      const listResponse = await fetch('https://api.fathom.ai/external/v1/meetings', {
+        method: 'GET',
+        headers: {
+          'X-Api-Key': apiKeys.fathom_api_key,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      let listData: any = null;
-      let successEndpoint = '';
-
-      for (const endpoint of endpoints) {
-        console.log(`Trying endpoint: ${endpoint}`);
-        const listResponse = await fetch(endpoint, {
-          method: 'GET',
-          headers: {
-            'X-Api-Key': apiKeys.fathom_api_key,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (listResponse.ok) {
-          try {
-            listData = await listResponse.json();
-            successEndpoint = endpoint;
-            console.log(`Success with endpoint: ${endpoint}`);
-            break;
-          } catch (e) {
-            console.log(`Endpoint ${endpoint} returned OK but invalid JSON`);
-          }
-        } else {
-          console.log(`Endpoint ${endpoint} returned ${listResponse.status}`);
-        }
+      if (!listResponse.ok) {
+        const errorText = await listResponse.text();
+        console.error(`Fathom API error (${listResponse.status}):`, errorText);
+        throw new Error(`Unable to list meetings. Status: ${listResponse.status}. Please check your API key permissions.`);
       }
 
-      if (!listData) {
-        throw new Error(`Unable to list recordings. Fathom API may not support listing, or your API key may not have the required permissions. Please try syncing by specific recording IDs instead.`);
-      }
+      const listData = await listResponse.json();
 
-      const allRecordings = Array.isArray(listData) ? listData : (listData.recordings || listData.calls || listData.meetings || listData.data || []);
+      const allMeetings = Array.isArray(listData) ? listData : (listData.meetings || listData.data || []);
 
-      const folderRecordings = allRecordings.filter((item: any) => {
+      console.log(`Total meetings retrieved: ${allMeetings.length}`);
+
+      const folderMeetings = allMeetings.filter((item: any) => {
         const itemFolderId = item.folder_id || item.folderId || item.folder;
         return itemFolderId === folderId;
       });
 
-        recordingIdsToSync = folderRecordings.map((item: any) => item.recording_id || item.recordingId || item.id || item.call_id);
+        recordingIdsToSync = folderMeetings.map((item: any) => item.recording_id || item.recordingId || item.id || item.call_id);
 
-        console.log(`Found ${recordingIdsToSync.length} recordings in folder (out of ${allRecordings.length} total) using endpoint: ${successEndpoint}`);
+        console.log(`Found ${recordingIdsToSync.length} meetings in folder ${folderId} (out of ${allMeetings.length} total)`);
       } else {
         throw new Error('Invalid Fathom link format. Please provide a folder link (e.g., app.fathom.video/folders/xxx) or recording link (e.g., app.fathom.video/recordings/xxx)');
       }
