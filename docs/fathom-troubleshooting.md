@@ -1,0 +1,537 @@
+# Fathom Integration - Troubleshooting Guide
+
+## Why No Meetings Were Synced
+
+### Common Reasons
+
+#### 1. **API Key Not Configured**
+**Error Message:** `"Fathom API key not configured. Please add it in Settings."`
+
+**Solution:**
+1. Go to Settings → API Keys & Integrations
+2. Scroll to "3. Fathom API Key (Optional)"
+3. Add your Fathom API key
+4. Get it from: https://app.fathom.video/settings/integrations
+
+---
+
+#### 2. **Invalid Folder Link Format**
+**Error Message:** `"Invalid Fathom folder link format"`
+
+**Expected Format:**
+- `https://app.fathom.video/folders/abc123xyz`
+- `https://app.fathom.video/folders/folder_id_here`
+
+**Common Mistakes:**
+- ❌ Missing "folders/" in URL
+- ❌ Using meeting link instead of folder link
+- ❌ Extra parameters or fragments in URL
+
+**Solution:**
+1. Open Fathom app
+2. Navigate to the folder you want to sync
+3. Copy the URL from browser address bar
+4. Ensure URL contains `/folders/`
+
+---
+
+#### 3. **Recordings Already Synced**
+**Message:** `"No new recordings found to sync. They may already be synced or filtered out."`
+
+**What This Means:**
+- The recordings in that folder have already been imported
+- System automatically prevents duplicates
+
+**Solution:**
+- This is normal behavior - recordings sync once
+- To verify, click "View (N)" button to see existing recordings
+- If you need to re-sync, you'd need to delete the existing recordings first (not recommended)
+
+---
+
+#### 4. **Recordings Filtered Out**
+**Message:** `"No new recordings found to sync. They may already be synced or filtered out."`
+
+**What This Means:**
+- You have team or meeting type filters enabled
+- None of the recordings match your filter criteria
+
+**Solution:**
+1. Click the settings icon (⚙️) on the sync form
+2. Review your active filters:
+   - Team Filters: Customer Success, Executive, Sales
+   - Meeting Type Filters: Client Engagement, Sales Initial Call, Client Call
+3. Either:
+   - Remove all filters to sync everything, OR
+   - Adjust filters to match the recordings in your folder
+
+**How Filters Work:**
+- Filters use Fathom's metadata/tags on recordings
+- If a recording doesn't have team/type metadata, it won't match filters
+- Empty filters = sync everything
+
+---
+
+#### 5. **No Recordings in Folder**
+**Message:** `"No recordings found to sync"`
+
+**What This Means:**
+- The folder is empty in Fathom
+- The folder ID is incorrect
+
+**Solution:**
+1. Open the folder in Fathom app
+2. Verify it contains recordings
+3. Try a different folder with recordings
+4. Check folder permissions (you must have access)
+
+---
+
+#### 6. **Recordings Have No Transcript**
+**Console Message:** `"Recording {id} has no transcript, skipping"`
+
+**What This Means:**
+- Recording exists but Fathom hasn't processed the transcript yet
+- Recording might be too recent (still processing)
+- Recording might have failed transcription
+
+**Solution:**
+1. Wait 5-10 minutes for Fathom to process new recordings
+2. Check recording in Fathom app - does it show a transcript?
+3. If transcript exists in Fathom but not syncing, try again later
+4. Very old recordings might not have transcripts
+
+---
+
+#### 7. **API Authentication Failed**
+**Error Message:** `"Unauthorized"` or `"Fathom API error: 401"`
+
+**What This Means:**
+- Your API key is invalid or expired
+- API key doesn't have correct permissions
+
+**Solution:**
+1. Generate a new API key in Fathom Settings
+2. Go to: https://app.fathom.video/settings/integrations
+3. Create new API key with read permissions
+4. Update key in app Settings → API Keys
+5. Try syncing again
+
+---
+
+#### 8. **Network/API Errors**
+**Error Message:** `"Fathom API error: ..."`
+
+**What This Means:**
+- Fathom's API is temporarily unavailable
+- Network connectivity issue
+- Rate limiting
+
+**Solution:**
+1. Wait 1-2 minutes and try again
+2. Check your internet connection
+3. Verify Fathom service status
+4. If persists, check browser console for detailed error
+
+---
+
+## Where to See Extracted Data
+
+### After Successful Sync
+
+Once recordings are synced, you can view them in **two ways**:
+
+### **Method 1: In the Fathom Recordings Section**
+
+**Location:** Client → Intelligence & Assets Tab → Fathom Meeting Recordings
+
+**Steps:**
+1. Navigate to the client
+2. Click "Intelligence & Assets" tab
+3. Scroll to "Fathom Meeting Recordings" card
+4. Click the **"View (N)"** button (where N = number of synced recordings)
+
+**What You'll See:**
+
+Each recording displays:
+
+#### **Header Information**
+- **Meeting Title** - From Fathom recording
+- **Date & Time** - When meeting occurred
+- **Duration** - Length in minutes
+- **Team Badge** - Team name (if filtered/tagged)
+- **Meeting Type Badge** - Type of meeting (if filtered/tagged)
+- **"Indexed" Badge** - Green badge when embeddings are ready for search
+
+#### **Meeting Summary**
+- **AI-Generated Summary** - High-level overview of the meeting
+- Auto-generated by Fathom or OpenAI
+
+#### **Participants**
+- **List of Attendees** - Who was in the meeting
+- Shows names with user icon
+
+#### **Action Items**
+- **Task List** - Actionable items identified
+- Shows first 3 items
+- "+N more" if there are additional items
+- Includes assignees when available
+
+#### **Topics/Keywords**
+- **Topic Tags** - Key themes from conversation
+- Up to 5 topics shown as badges
+- Extracted from Fathom or AI analysis
+
+#### **Sentiment Analysis**
+- **Visual Bar Graph** - Color-coded sentiment indicator
+  - 🟢 Green (>60%) = Positive
+  - 🟡 Yellow (40-60%) = Neutral
+  - 🔴 Red (<40%) = Negative/Concerning
+- **Percentage Score** - Numeric sentiment value
+
+#### **Playback Link**
+- **"View in Fathom"** - Opens original recording
+- Direct link to Fathom app
+
+---
+
+### **Method 2: In Intelligence Agent (Search)**
+
+**Location:** Client → Intelligence & Assets Tab → Intelligence Agent
+
+**What This Does:**
+- Fathom recordings are automatically vectorized
+- Transcripts become searchable via AI
+- Ask questions and get answers with meeting context
+
+**Example Queries:**
+
+```
+"What concerns did the client raise about pricing?"
+→ AI searches through all meetings and documents
+
+"What features did they request in our last call?"
+→ Finds relevant discussion from transcripts
+
+"How did they respond to our proposal?"
+→ Analyzes meeting sentiment and feedback
+
+"What were the action items from last week's meeting?"
+→ Extracts action items from specific timeframe
+
+"Who is the decision maker?"
+→ References participant info and discussion context
+```
+
+**How It Works:**
+1. Type your question in the Intelligence Agent
+2. Click "Ask" or press Enter
+3. AI searches through:
+   - All uploaded documents
+   - All meeting transcripts (manual + Fathom)
+   - Client notes
+   - Website content
+4. Returns relevant excerpts with sources
+5. Generates answer based on actual conversation data
+
+---
+
+### **Method 3: In AI Insights (Enhanced with Meeting Context)**
+
+**Location:** Client → Overview Tab → AI Insights
+
+**What Changed:**
+When you click **"Generate AI Insights"**, the system now includes:
+- Meeting summaries from last 90 days
+- Key topics discussed
+- Client sentiment from calls
+- Action items and next steps
+- Participant engagement
+
+**Enhanced Insights Include:**
+
+1. **Client Profile Understanding**
+   - Based on actual conversations
+   - References specific meetings
+   - Identifies decision makers from calls
+
+2. **Pain Points & Needs**
+   - Extracted from meeting discussions
+   - Direct quotes from transcripts
+   - Prioritized by frequency/importance
+
+3. **Sentiment Analysis**
+   - Overall relationship health
+   - Trend over multiple meetings
+   - Concerns or enthusiasm indicators
+
+4. **Recommended Next Steps**
+   - Based on action items
+   - Follow-ups from recent calls
+   - Opportunities identified in discussions
+
+---
+
+### **Method 4: Directly in Database**
+
+**For Developers:**
+
+If you need raw data, query the `fathom_recordings` table:
+
+```sql
+SELECT
+  title,
+  start_time,
+  duration_minutes,
+  summary,
+  participants,
+  action_items,
+  topics,
+  sentiment_score,
+  transcript,
+  embeddings_generated
+FROM fathom_recordings
+WHERE client_id = 'your-client-id'
+ORDER BY start_time DESC;
+```
+
+**Available Fields:**
+- `recording_id` - Fathom's original ID
+- `title` - Meeting name
+- `start_time`, `end_time` - Timestamps
+- `duration_minutes` - Length
+- `meeting_platform` - Zoom, Teams, Meet, etc.
+- `host_name`, `host_email` - Meeting host
+- `participants` - Array of attendees
+- `team_name` - Team that recorded it
+- `meeting_type` - Type/category
+- `transcript` - Full cleaned transcript
+- `summary` - AI-generated overview
+- `highlights` - Flagged moments
+- `action_items` - Tasks identified
+- `decisions` - Decisions made
+- `topics` - Keywords/themes
+- `sentiment_score` - 0-1 scale
+- `tone_tags` - Sentiment labels
+- `embeddings_generated` - Boolean (searchable?)
+- `raw_response` - Complete Fathom API response
+
+---
+
+## Verifying Sync Success
+
+### Quick Checklist
+
+After syncing, verify the data:
+
+1. **Check Recording Count**
+   - ✅ Success message shows number synced
+   - ✅ "View (N)" button shows count
+   - ✅ Count matches expected recordings
+
+2. **View Recording Details**
+   - ✅ Click "View (N)" to see list
+   - ✅ Each recording shows title and date
+   - ✅ Summary is populated
+   - ✅ Action items appear (if any)
+   - ✅ Topics/keywords are shown
+
+3. **Verify Embeddings**
+   - ✅ Wait 2-5 minutes after sync
+   - ✅ Refresh the page
+   - ✅ Look for green "Indexed" badge on recordings
+   - ✅ Try searching in Intelligence Agent
+
+4. **Test Intelligence Search**
+   - ✅ Go to Intelligence Agent
+   - ✅ Ask a question about meeting content
+   - ✅ Verify it returns relevant transcript excerpts
+   - ✅ Check that source references meetings
+
+---
+
+## Common Issues After Sync
+
+### 1. **"Indexed" Badge Not Appearing**
+
+**Expected Timeline:**
+- Embeddings generation takes 1-5 minutes per recording
+- Depends on transcript length
+- Runs in background
+
+**Solution:**
+- Wait 5 minutes
+- Refresh the client page
+- Check again - badge should appear
+- If not appearing after 10 minutes, check console logs
+
+---
+
+### 2. **Can't Find Meeting Content in Search**
+
+**Checklist:**
+- ✅ Does recording have "Indexed" badge?
+- ✅ Have you refreshed the page since sync?
+- ✅ Is your question specific enough?
+- ✅ Are you searching the correct client?
+
+**Solution:**
+1. Verify "Indexed" badge is present
+2. Try more specific questions
+3. Reference specific topics from the meeting
+4. Check if transcript is actually populated
+
+---
+
+### 3. **Missing Action Items or Topics**
+
+**Possible Reasons:**
+- Fathom didn't extract them
+- Meeting was too short
+- Conversation didn't include clear action items
+- AI couldn't identify topics
+
+**Solution:**
+- This is normal - not all meetings have action items
+- Check the full transcript in recording details
+- Topics are best-effort extraction
+- Very short meetings might not have rich metadata
+
+---
+
+### 4. **Sentiment Score is Null**
+
+**What This Means:**
+- Fathom didn't provide sentiment analysis
+- Feature might not be available on your Fathom plan
+- Recording too old
+
+**Solution:**
+- This field is optional
+- Sentiment analysis is a premium Fathom feature
+- Not all recordings will have sentiment data
+
+---
+
+## Debugging Tools
+
+### Browser Console
+
+**How to Check:**
+1. Open browser developer tools (F12)
+2. Go to "Console" tab
+3. Look for log messages during sync:
+
+**Expected Logs:**
+```
+Syncing Fathom recordings for client: abc-123
+Team filter: ["sales"]
+Meeting type filter: undefined
+Found 5 recordings in folder
+Fetching recording xyz-456...
+Recording xyz-789 already exists, skipping
+Sync complete: 3 recordings synced
+```
+
+**Error Indicators:**
+- Red errors in console
+- "Fathom API error: ..."
+- "Failed to fetch recording ..."
+- Network errors
+
+### Network Tab
+
+**How to Check:**
+1. Open developer tools (F12)
+2. Go to "Network" tab
+3. Click "Sync Fathom" button
+4. Watch requests:
+
+**Expected Requests:**
+- `POST /functions/v1/sync-fathom-recordings` → Status 200
+- `POST /functions/v1/process-fathom-embeddings` → Status 200 (per recording)
+
+**Check Response:**
+- Click on `sync-fathom-recordings` request
+- Go to "Response" tab
+- Look for:
+  ```json
+  {
+    "success": true,
+    "recordings_synced": 3,
+    "recordings": [...],
+    "errors": []
+  }
+  ```
+
+### Database Inspection
+
+**Using Supabase Dashboard:**
+1. Go to Supabase project
+2. Navigate to Table Editor
+3. Open `fathom_recordings` table
+4. Filter by `client_id`
+5. Check:
+   - Are recordings inserted?
+   - Is `transcript` populated?
+   - Is `embeddings_generated` true?
+
+---
+
+## FAQ
+
+### Q: How often should I sync?
+
+**A:** After each client meeting. The system automatically prevents duplicates, so you can re-sync the same folder safely.
+
+### Q: Can I sync multiple folders?
+
+**A:** Yes! Just paste each folder link and sync separately. All recordings go to the same client.
+
+### Q: What if I paste the wrong folder?
+
+**A:** Recordings will be associated with the wrong client. You'd need to manually delete them from the database.
+
+### Q: Do I need to configure filters?
+
+**A:** No, filters are optional. Leave them empty to sync all recordings.
+
+### Q: Can I edit synced recordings?
+
+**A:** Not currently. The data is read-only from Fathom. To update, delete and re-sync.
+
+### Q: How much does this cost?
+
+**A:** The integration itself is free. Costs:
+- Fathom subscription (required for recordings)
+- OpenAI API calls (for embeddings)
+- Supabase storage (minimal)
+
+### Q: What happens if I delete a recording in Fathom?
+
+**A:** It stays in your database. Sync doesn't remove old recordings.
+
+### Q: Can I sync private/personal meetings?
+
+**A:** Yes, if you have access to the folder. Be mindful of privacy/compliance.
+
+---
+
+## Getting Help
+
+### Still Having Issues?
+
+1. **Check Error Messages** - Read them carefully
+2. **Review Console Logs** - Look for detailed errors
+3. **Verify API Key** - Regenerate if needed
+4. **Test Folder Link** - Try a different folder
+5. **Check Fathom** - Ensure recordings have transcripts
+
+### Contact Information
+
+If you continue having problems:
+- Include error message
+- Include console logs
+- Specify folder link (redacted)
+- Note how many recordings expected
+- Check browser network tab for API responses

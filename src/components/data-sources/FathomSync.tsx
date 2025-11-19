@@ -70,10 +70,18 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
         throw new Error(result.error || 'Failed to sync Fathom recordings');
       }
 
+      // Show detailed message
+      let message = `Successfully synced ${result.recordings_synced || 0} recordings`;
+      if (result.recordings_synced === 0) {
+        message = result.message || 'No new recordings found to sync. They may already be synced or filtered out.';
+      } else if (result.errors && result.errors.length > 0) {
+        message += ` (${result.errors.length} errors occurred)`;
+      }
+
       setSyncResult({
         success: true,
         count: result.recordings_synced || 0,
-        message: result.message,
+        message: message,
       });
 
       // Clear input on success
