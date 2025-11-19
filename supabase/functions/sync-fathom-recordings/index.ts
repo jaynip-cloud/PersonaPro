@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
     console.log('Team filter:', team_filter);
     console.log('Meeting type filter:', meeting_type_filter);
 
-    let recordingIdsToSync: string[] = [];
+    let meetingsToSync: any[] = [];
 
     if (folder_link) {
       const folderIdMatch = folder_link.match(/folders\/([a-zA-Z0-9_-]+)/);
@@ -74,13 +74,24 @@ Deno.serve(async (req: Request) => {
       if (recordingIdMatch || callIdMatch) {
         const recordingId = recordingIdMatch?.[1] || callIdMatch?.[1];
         console.log('Single recording link detected:', recordingId);
-        recordingIdsToSync = [recordingId!];
+        
+        const recording = await fetchRecordingDetails(recordingId, apiKeys.fathom_api_key);
+        const transcript = await fetchTranscript(recordingId, apiKeys.fathom_api_key);
+        const summary = await fetchSummary(recordingId, apiKeys.fathom_api_key);
+        const highlights = await fetchHighlights(recordingId, apiKeys.fathom_api_key);
+        const actions = await fetchActions(recordingId, apiKeys.fathom_api_key);
+        const participantsData = await fetchParticipants(recordingId, apiKeys.fathom_api_key);
+        
+        meetingsToSync = [{ ...recording, transcript, summary, highlights, actions, participants: participantsData }];
       } else if (folderIdMatch) {
         const folderId = folderIdMatch[1];
         console.log('Fetching recordings from folder:', folderId);
 
-        console.log(`Fetching all meetings from /meetings endpoint...`);
+        console.log(`Fetching all meetings from API with full details...`);
         const apiUrl = new URL('https://api.fathom.ai/external/v1/meetings');
+        apiUrl.searchParams.set('include_transcript', 'true');
+        apiUrl.searchParams.set('include_summary', 'true');
+        apiUrl.searchParams.set('include_action_items', 'true');
         apiUrl.searchParams.set('limit', '100');
 
         const listResponse = await fetch(apiUrl.toString(), {
@@ -105,22 +116,32 @@ Deno.serve(async (req: Request) => {
 
         if (allMeetings.length > 0) {
           console.log('Sample meeting keys:', Object.keys(allMeetings[0]));
-          console.log('First meeting recording_id:', allMeetings[0].recording_id);
+          console.log('Sample meeting has transcript?', !!allMeetings[0].transcript);
+          console.log('Sample meeting has summary?', !!allMeetings[0].default_summary);
         }
 
-        recordingIdsToSync = allMeetings.map((m: any) => m.recording_id).filter(Boolean);
-        console.log(`Found ${recordingIdsToSync.length} recordings to sync`);
+        meetingsToSync = allMeetings;
+        console.log(`Found ${meetingsToSync.length} meetings from folder (all meetings, will filter later if needed)`);
       } else {
         throw new Error('Invalid Fathom link format. Please provide a folder link (e.g., fathom.video/folders/xxx) or recording link (e.g., fathom.video/recordings/xxx)');
       }
     } else if (recording_ids && recording_ids.length > 0) {
-      recordingIdsToSync = recording_ids;
-      console.log(`Syncing ${recordingIdsToSync.length} specific recording IDs`);
+      console.log(`Syncing ${recording_ids.length} specific recording IDs`);
+      for (const recordingId of recording_ids) {
+        const recording = await fetchRecordingDetails(recordingId, apiKeys.fathom_api_key);
+        const transcript = await fetchTranscript(recordingId, apiKeys.fathom_api_key);
+        const summary = await fetchSummary(recordingId, apiKeys.fathom_api_key);
+        const highlights = await fetchHighlights(recordingId, apiKeys.fathom_api_key);
+        const actions = await fetchActions(recordingId, apiKeys.fathom_api_key);
+        const participantsData = await fetchParticipants(recordingId, apiKeys.fathom_api_key);
+        
+        meetingsToSync.push({ ...recording, transcript, summary, highlights, actions, participants: participantsData });
+      }
     } else {
       throw new Error('Either folder_link or recording_ids must be provided');
     }
 
-    if (recordingIdsToSync.length === 0) {
+    if (meetingsToSync.length === 0) {
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -135,8 +156,14 @@ Deno.serve(async (req: Request) => {
     const skippedRecordings = [];
     const errors = [];
 
-    for (const recordingId of recordingIdsToSync) {
+    for (const meeting of meetingsToSync) {
       try {
+        const recordingId = meeting.recording_id || meeting.recordingId || meeting.id;
+        if (!recordingId) {
+          console.log('Skipping meeting without recording_id:', meeting);
+          continue;
+        }
+
         console.log(`Processing recording ${recordingId}...`);
 
         const { data: existingRecording } = await supabaseClient
@@ -151,56 +178,56 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const recording = await fetchRecordingDetails(recordingId, apiKeys.fathom_api_key);
-        const transcriptData = await fetchTranscript(recordingId, apiKeys.fathom_api_key);
-        const summary = await fetchSummary(recordingId, apiKeys.fathom_api_key);
-        const highlights = await fetchHighlights(recordingId, apiKeys.fathom_api_key);
-        const actions = await fetchActions(recordingId, apiKeys.fathom_api_key);
-
-        const teamName = recording.team || null;
-        const meetingType = recording.meeting_type || null;
+        const teamName = meeting.team || null;
+        const meetingType = meeting.meeting_type || null;
 
         if (team_filter && team_filter.length > 0 && teamName && !team_filter.includes(teamName)) {
           console.log(`Recording ${recordingId} filtered out by team: ${teamName}`);
-          skippedRecordings.push({ id: recordingId, title: recording.title, reason: 'team_filter', team: teamName });
+          skippedRecordings.push({ id: recordingId, title: meeting.title, reason: 'team_filter', team: teamName });
           continue;
         }
 
         if (meeting_type_filter && meeting_type_filter.length > 0 && meetingType && !meeting_type_filter.includes(meetingType)) {
           console.log(`Recording ${recordingId} filtered out by meeting type: ${meetingType}`);
-          skippedRecordings.push({ id: recordingId, title: recording.title, reason: 'meeting_type_filter', meeting_type: meetingType });
+          skippedRecordings.push({ id: recordingId, title: meeting.title, reason: 'meeting_type_filter', meeting_type: meetingType });
           continue;
         }
 
         let fullTranscript = '';
-        if (transcriptData?.transcript && Array.isArray(transcriptData.transcript)) {
-          fullTranscript = transcriptData.transcript
-            .map((seg: any) => {
-              const speakerName = seg.speaker?.display_name || seg.speaker || 'Unknown';
-              return `${speakerName}: ${seg.text}`;
-            })
-            .join('\n\n');
+        const transcriptData = meeting.transcript;
+        if (transcriptData) {
+          if (typeof transcriptData === 'string') {
+            fullTranscript = transcriptData;
+          } else if (transcriptData.segments && Array.isArray(transcriptData.segments)) {
+            fullTranscript = transcriptData.segments
+              .map((seg: any) => `${seg.speaker || 'Unknown'}: ${seg.text}`)
+              .join('\n\n');
+          } else if (transcriptData.text) {
+            fullTranscript = transcriptData.text;
+          }
         }
 
         fullTranscript = cleanTranscript(fullTranscript);
 
         if (!fullTranscript) {
           console.log(`Recording ${recordingId} has no transcript, skipping`);
-          skippedRecordings.push({ id: recordingId, title: recording.title || recording.meeting_title, reason: 'no_transcript' });
+          skippedRecordings.push({ id: recordingId, title: meeting.title || meeting.meeting_title, reason: 'no_transcript' });
           continue;
         }
 
-        const startTime = recording.recording_start_time || recording.start_time || recording.scheduled_start_time;
-        const endTime = recording.recording_end_time || recording.end_time || recording.scheduled_end_time;
+        const startTime = meeting.recording_start_time || meeting.start_time || meeting.scheduled_start_time;
+        const endTime = meeting.recording_end_time || meeting.end_time || meeting.scheduled_end_time;
         const durationMinutes = startTime && endTime ? Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000) : 0;
 
-        const participants = (recording.participants || []).map((p: any) => ({
-          name: p.name || p.display_name || '',
-          email: p.email || p.matched_calendar_invitee_email || '',
+        const participantsList = meeting.participants || [];
+        const participants = participantsList.map((p: any) => ({
+          name: p.name || '',
+          email: p.email || '',
           role: p.role || '',
         }));
 
-        const actionItems = (actions || []).map((item: any) => ({
+        const actionItemsData = meeting.action_items || meeting.actions || [];
+        const actionItems = actionItemsData.map((item: any) => ({
           text: item.text || '',
           assignee: item.assignee || '',
           due_date: item.due_date || null,
@@ -208,7 +235,7 @@ Deno.serve(async (req: Request) => {
           completed: false,
         }));
 
-        const highlightsList = (highlights || []).map((h: any) => ({
+        const highlightsList = (meeting.highlights || []).map((h: any) => ({
           text: h.text || '',
           timestamp: h.timestamp || 0,
           speaker: h.speaker || '',
@@ -216,9 +243,10 @@ Deno.serve(async (req: Request) => {
           selected_by: h.selected_by || '',
         }));
 
-        const summaryText = typeof summary === 'string' ? summary : (summary?.summary_text || summary?.text || '');
-        const summarySections = summary?.summary_sections || summary?.sections || [];
-        const topics = (summary?.topics || []).map((t: any) => ({
+        const summaryData = meeting.default_summary || meeting.summary;
+        const summaryText = typeof summaryData === 'string' ? summaryData : (summaryData?.summary_text || summaryData?.text || '');
+        const summarySections = summaryData?.summary_sections || summaryData?.sections || [];
+        const topics = (summaryData?.topics || []).map((t: any) => ({
           name: typeof t === 'string' ? t : t.name || t.topic || '',
           confidence: typeof t === 'object' ? t.confidence : null,
         }));
@@ -229,21 +257,21 @@ Deno.serve(async (req: Request) => {
             user_id: user.id,
             client_id: client_id,
             recording_id: recordingId,
-            folder_id: recording.folder_id || null,
-            title: recording.title || recording.meeting_title || 'Untitled Meeting',
-            meeting_url: recording.url || recording.meeting_url || '',
-            playback_url: recording.share_url || recording.playback_url || '',
+            folder_id: meeting.folder_id || null,
+            title: meeting.title || meeting.meeting_title || 'Untitled Meeting',
+            meeting_url: meeting.url || meeting.meeting_url || '',
+            playback_url: meeting.share_url || meeting.playback_url || '',
             start_time: startTime,
             end_time: endTime,
             duration_minutes: durationMinutes,
-            meeting_platform: recording.platform || '',
-            host_name: recording.host?.name || recording.host?.display_name || '',
-            host_email: recording.host?.email || '',
+            meeting_platform: meeting.platform || '',
+            host_name: meeting.host?.name || '',
+            host_email: meeting.host?.email || '',
             participants: participants,
             team_name: teamName,
             meeting_type: meetingType,
             transcript: fullTranscript,
-            transcript_language: transcriptData?.language || 'en',
+            transcript_language: transcriptData?.language || meeting.transcript_language || 'en',
             summary: summaryText,
             summary_sections: summarySections,
             highlights: highlightsList,
@@ -252,7 +280,7 @@ Deno.serve(async (req: Request) => {
             topics: topics,
             sentiment_score: null,
             tone_tags: [],
-            raw_response: { recording, transcript: transcriptData, summary, highlights, actions },
+            raw_response: meeting,
             embeddings_generated: false,
             insights_processed: false,
           })
@@ -282,8 +310,8 @@ Deno.serve(async (req: Request) => {
         ).catch(err => console.error('Error triggering embeddings:', err));
 
       } catch (error) {
-        console.error(`Error processing recording ${recordingId}:`, error);
-        errors.push({ recording_id: recordingId, error: error instanceof Error ? error.message : 'Unknown error' });
+        console.error(`Error processing meeting:`, error);
+        errors.push({ recording_id: meeting.recording_id || 'unknown', error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
 
@@ -306,7 +334,7 @@ Deno.serve(async (req: Request) => {
         })
         .join(', ');
 
-      message = `No new recordings synced. ${recordingIdsToSync.length} found: ${reasonText}.`;
+      message = `No new recordings synced. ${meetingsToSync.length} found: ${reasonText}.`;
     }
 
     return new Response(
@@ -315,7 +343,7 @@ Deno.serve(async (req: Request) => {
         recordings_synced: processedRecordings.length,
         recordings: processedRecordings.map(r => ({ id: r.id, title: r.title })),
         skipped: skippedRecordings,
-        total_found: recordingIdsToSync.length,
+        total_found: meetingsToSync.length,
         message: message || undefined,
         errors: errors.length > 0 ? errors : undefined,
       }),
@@ -340,7 +368,6 @@ Deno.serve(async (req: Request) => {
 
 async function fetchRecordingDetails(recordingId: string, apiKey: string): Promise<any> {
   const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}`;
-  console.log(`Fetching recording details for ${recordingId}...`);
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -359,7 +386,6 @@ async function fetchRecordingDetails(recordingId: string, apiKey: string): Promi
 
 async function fetchTranscript(recordingId: string, apiKey: string): Promise<any> {
   const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}/transcript`;
-  console.log(`Fetching transcript for ${recordingId}...`);
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -373,17 +399,11 @@ async function fetchTranscript(recordingId: string, apiKey: string): Promise<any
     return null;
   }
 
-  const data = await response.json();
-  console.log(`Transcript data structure:`, Object.keys(data));
-  if (data.transcript) {
-    console.log(`Transcript has ${data.transcript.length} segments`);
-  }
-  return data;
+  return await response.json();
 }
 
 async function fetchSummary(recordingId: string, apiKey: string): Promise<any> {
   const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}/summary`;
-  console.log(`Fetching summary for ${recordingId}...`);
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -402,7 +422,6 @@ async function fetchSummary(recordingId: string, apiKey: string): Promise<any> {
 
 async function fetchHighlights(recordingId: string, apiKey: string): Promise<any> {
   const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}/highlights`;
-  console.log(`Fetching highlights for ${recordingId}...`);
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -421,7 +440,6 @@ async function fetchHighlights(recordingId: string, apiKey: string): Promise<any
 
 async function fetchActions(recordingId: string, apiKey: string): Promise<any> {
   const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}/actions`;
-  console.log(`Fetching actions for ${recordingId}...`);
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -432,6 +450,24 @@ async function fetchActions(recordingId: string, apiKey: string): Promise<any> {
 
   if (!response.ok) {
     console.warn(`Failed to fetch actions for ${recordingId}: ${response.status}`);
+    return null;
+  }
+
+  return await response.json();
+}
+
+async function fetchParticipants(recordingId: string, apiKey: string): Promise<any> {
+  const url = `https://api.fathom.ai/external/v1/recordings/${recordingId}/participants`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    console.warn(`Failed to fetch participants for ${recordingId}: ${response.status}`);
     return null;
   }
 
