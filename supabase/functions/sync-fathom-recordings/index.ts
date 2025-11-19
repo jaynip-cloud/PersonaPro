@@ -107,7 +107,10 @@ Deno.serve(async (req: Request) => {
         throw new Error('Invalid response from Fathom API. The API format may have changed.');
       }
 
-      recordingIdsToSync = (listData.items || listData.meetings || []).map((item: any) => item.id || item.meeting_id);
+      console.log('Fathom API list response structure:', JSON.stringify(Object.keys(listData), null, 2));
+      console.log('Sample data:', JSON.stringify(listData, null, 2).substring(0, 500));
+
+      recordingIdsToSync = (listData.items || listData.meetings || listData.calls || []).map((item: any) => item.id || item.meeting_id || item.call_id);
 
       console.log(`Found ${recordingIdsToSync.length} recordings in folder`);
     } else if (recording_ids && recording_ids.length > 0) {
@@ -174,6 +177,7 @@ Deno.serve(async (req: Request) => {
         let recording: any;
         try {
           recording = await recordingResponse.json();
+          console.log(`Recording ${recordingId} structure:`, JSON.stringify(Object.keys(recording), null, 2));
         } catch (parseError) {
           console.error(`Failed to parse recording ${recordingId}:`, parseError);
           errors.push({ recording_id: recordingId, error: 'Invalid JSON response from Fathom API' });
