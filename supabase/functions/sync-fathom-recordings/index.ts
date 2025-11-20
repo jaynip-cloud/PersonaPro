@@ -371,28 +371,94 @@ Deno.serve(async (req: Request) => {
 });
 
 function extractRecordingIdsFromHtml(html: string): string[] {
-  const recordingIds = new Set<string>();
+  const idSet = new Set<string>();
+  let m: RegExpExecArray | null;
 
-  const patterns = [
-    /\/(?:calls|recordings)\/([A-Za-z0-9_-]{4,})/g,
-    /\/share\/([A-Za-z0-9_-]{4,})/g,
-    /"recording_id"\s*:\s*"?(\d+)"?/g,
-    /(?:callId|recordingId|recording_id)=([A-Za-z0-9_-]{4,})/g,
-  ];
+  console.log('Extracting recording IDs from folder HTML...');
 
-  for (const pattern of patterns) {
-    const matches = html.matchAll(pattern);
-    for (const match of matches) {
-      const id = match[1];
-      if (id && id.length >= 4) {
-        recordingIds.add(id);
-      }
+  const numericRegex = /\/(?:calls|recordings)\/(\d{6,})/g;
+  let numericCount = 0;
+  while ((m = numericRegex.exec(html)) !== null) {
+    idSet.add(m[1]);
+    numericCount++;
+  }
+  if (numericCount > 0) console.log(`  Found ${numericCount} numeric recording IDs`);
+
+  const hashRegex = /\/(?:calls|recordings)\/([A-Za-z0-9_-]{8,})/g;
+  let hashCount = 0;
+  while ((m = hashRegex.exec(html)) !== null) {
+    idSet.add(m[1]);
+    hashCount++;
+  }
+  if (hashCount > 0) console.log(`  Found ${hashCount} alphanumeric recording hashes`);
+
+  const shareRegex = /\/share\/([A-Za-z0-9_-]{8,})/g;
+  let shareCount = 0;
+  while ((m = shareRegex.exec(html)) !== null) {
+    idSet.add(m[1]);
+    shareCount++;
+  }
+  if (shareCount > 0) console.log(`  Found ${shareCount} share links`);
+
+  const jsonStringIdRegex = /"id"\s*:\s*"([A-Za-z0-9_-]{6,})"/g;
+  let jsonStringCount = 0;
+  while ((m = jsonStringIdRegex.exec(html)) !== null) {
+    idSet.add(m[1]);
+    jsonStringCount++;
+  }
+  if (jsonStringCount > 0) console.log(`  Found ${jsonStringCount} JSON string IDs`);
+
+  const jsonNumericIdRegex = /"recording_id"\s*:\s*(\d{6,})/g;
+  let jsonNumericCount = 0;
+  while ((m = jsonNumericIdRegex.exec(html)) !== null) {
+    idSet.add(String(m[1]));
+    jsonNumericCount++;
+  }
+  if (jsonNumericCount > 0) console.log(`  Found ${jsonNumericCount} JSON numeric recording IDs`);
+
+  const queryParamRegex = /(?:recordingId|callId|recording_id)=([A-Za-z0-9_-]{6,})/g;
+  let queryParamCount = 0;
+  while ((m = queryParamRegex.exec(html)) !== null) {
+    idSet.add(m[1]);
+    queryParamCount++;
+  }
+  if (queryParamCount > 0) console.log(`  Found ${queryParamCount} query parameter IDs`);
+
+  const garbageTokens = new Set([
+    'search', 'folder', 'page', 'null', 'undefined', 'true', 'false', 'query',
+    'filter', 'sort', 'view', 'edit', 'delete', 'create', 'new', 'add',
+    'settings', 'profile', 'dashboard', 'home', 'index', 'main', 'app',
+    'recording', 'recordings', 'call', 'calls', 'meeting', 'meetings'
+  ]);
+
+  const cleanedIds = Array.from(idSet).filter(id => {
+    if (!id) return false;
+    const trimmed = id.trim();
+
+    if (garbageTokens.has(trimmed.toLowerCase())) {
+      console.log(`  Skipped garbage token: "${trimmed}"`);
+      return false;
     }
+
+    if (/^\d{6,}$/.test(trimmed)) {
+      return true;
+    }
+
+    if (/^[A-Za-z0-9_-]{8,}$/.test(trimmed)) {
+      return true;
+    }
+
+    console.log(`  Skipped invalid format: "${trimmed}" (too short or invalid characters)`);
+    return false;
+  });
+
+  console.log(`Extractor found ${idSet.size} raw IDs; ${cleanedIds.length} passed validation.`);
+
+  if (cleanedIds.length === 0) {
+    console.warn('No valid recording IDs found in folder page. Folder may be empty or use unexpected markup.');
   }
 
-  const result = Array.from(recordingIds);
-  console.log(`Regex extraction found ${result.length} unique recording IDs`);
-  return result;
+  return cleanedIds;
 }
 
 async function fetchRecordingIdsFromPrivateFolder(folderId: string, apiKey: string): Promise<string[]> {
