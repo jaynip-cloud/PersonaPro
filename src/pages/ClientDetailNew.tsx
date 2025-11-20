@@ -18,7 +18,7 @@ import { DocumentUpload } from '../components/data-sources/DocumentUpload';
 import { FathomSync } from '../components/data-sources/FathomSync';
 import { FathomRecordingsList } from '../components/data-sources/FathomRecordingsList';
 import { ProjectDetailPanel } from '../components/project/ProjectDetailPanel';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight, Eye } from 'lucide-react';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight, Eye, Link as LinkIcon } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
@@ -96,6 +96,8 @@ export const ClientDetailNew: React.FC = () => {
   const [savingProject, setSavingProject] = useState(false);
   const [fathomRecordings, setFathomRecordings] = useState<any[]>([]);
   const [showFathomRecordings, setShowFathomRecordings] = useState(false);
+  const [meetingInputMode, setMeetingInputMode] = useState<'manual' | 'fathom' | 'list'>('list');
+  const [fathomLinkInput, setFathomLinkInput] = useState('');
 
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
 
@@ -1974,30 +1976,45 @@ export const ClientDetailNew: React.FC = () => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        Meeting Notes
+                        <MessageSquare className="h-5 w-5" />
+                        Meetings & Notes
                       </CardTitle>
-                      {meetingTranscripts.length > 0 && (
+                      <div className="flex gap-2">
                         <Button
-                          variant="outline"
+                          variant={meetingInputMode === 'manual' ? 'primary' : 'outline'}
                           size="sm"
                           onClick={() => {
-                            setShowTranscriptHistory(!showTranscriptHistory);
-                            if (!showTranscriptHistory) {
-                              setMeetingNotes('');
-                              setMeetingTitle('');
-                              setMeetingDate(new Date().toISOString().split('T')[0]);
-                              setEditingTranscriptId(null);
-                            }
+                            setMeetingInputMode('manual');
+                            setMeetingNotes('');
+                            setMeetingTitle('');
+                            setMeetingDate(new Date().toISOString().split('T')[0]);
+                            setEditingTranscriptId(null);
                           }}
+                          title="Add manual meeting note"
                         >
-                          {showTranscriptHistory ? 'New Note' : `History (${meetingTranscripts.length})`}
+                          <Edit2 className="h-4 w-4" />
                         </Button>
-                      )}
+                        <Button
+                          variant={meetingInputMode === 'fathom' ? 'primary' : 'outline'}
+                          size="sm"
+                          onClick={() => setMeetingInputMode('fathom')}
+                          title="Sync from Fathom"
+                        >
+                          <LinkIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant={meetingInputMode === 'list' ? 'primary' : 'outline'}
+                          size="sm"
+                          onClick={() => setMeetingInputMode('list')}
+                          title="View all meetings"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {!showTranscriptHistory ? (
+                    {meetingInputMode === 'manual' && (
                       <div className="space-y-3">
                         <Input
                           value={meetingTitle}
@@ -2021,7 +2038,7 @@ export const ClientDetailNew: React.FC = () => {
                         />
                         <div className="flex justify-between items-center gap-2">
                           {editingTranscriptId && (
-                            <span className="text-sm text-muted-foreground">Editing transcript</span>
+                            <span className="text-sm text-muted-foreground">Editing note</span>
                           )}
                           <div className="flex gap-2 ml-auto">
                             <Button
@@ -2032,6 +2049,7 @@ export const ClientDetailNew: React.FC = () => {
                                 setMeetingTitle('');
                                 setMeetingDate(new Date().toISOString().split('T')[0]);
                                 setEditingTranscriptId(null);
+                                setMeetingInputMode('list');
                               }}
                               disabled={(!meetingNotes && !meetingTitle) || savingNotes}
                             >
@@ -2051,71 +2069,123 @@ export const ClientDetailNew: React.FC = () => {
                               ) : (
                                 <>
                                   <Save className="h-4 w-4 mr-2" />
-                                  {editingTranscriptId ? 'Update Transcript' : 'Save Transcript'}
+                                  {editingTranscriptId ? 'Update Note' : 'Save Note'}
                                 </>
                               )}
                             </Button>
                           </div>
                         </div>
                       </div>
-                    ) : (
-                      <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                        {meetingTranscripts.map((transcript) => (
-                          <div
-                            key={transcript.id}
-                            className="p-4 border border-border rounded-lg hover:bg-accent transition-colors"
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-foreground">{transcript.title}</h4>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(transcript.meeting_date).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric'
-                                  })}
-                                </p>
-                              </div>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => {
-                                    setMeetingNotes(transcript.transcript_text);
-                                    setMeetingTitle(transcript.title);
-                                    setMeetingDate(transcript.meeting_date.split('T')[0]);
-                                    setEditingTranscriptId(transcript.id);
-                                    setShowTranscriptHistory(false);
-                                  }}
-                                  className="p-1 text-muted-foreground hover:text-primary transition-colors"
-                                  title="Edit transcript"
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteTranscript(transcript.id)}
-                                  className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
-                                  title="Delete transcript"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </div>
-                            <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-3">
-                              {transcript.transcript_text}
+                    )}
+
+                    {meetingInputMode === 'fathom' && (
+                      <div className="space-y-4">
+                        <FathomSync
+                          clientId={client.id}
+                          onSyncComplete={() => {
+                            showToast('Fathom recordings synced successfully', 'success');
+                            loadMeetingTranscripts();
+                            setMeetingInputMode('list');
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {meetingInputMode === 'list' && (
+                      <div className="space-y-4">
+                        {(meetingTranscripts.length === 0 && fathomRecordings.length === 0) ? (
+                          <div className="text-center py-12">
+                            <MessageSquare className="mx-auto text-gray-400 mb-4" size={48} />
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">No meetings yet</h3>
+                            <p className="text-sm text-gray-500 mb-4">
+                              Add manual notes or sync from Fathom to get started
                             </p>
-                            <button
-                              onClick={() => {
-                                setMeetingNotes(transcript.transcript_text);
-                                setMeetingTitle(transcript.title);
-                                setMeetingDate(transcript.meeting_date.split('T')[0]);
-                                setEditingTranscriptId(transcript.id);
-                                setShowTranscriptHistory(false);
-                              }}
-                              className="text-xs text-primary hover:underline mt-2"
-                            >
-                              View full transcript
-                            </button>
+                            <div className="flex gap-2 justify-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setMeetingInputMode('manual')}
+                              >
+                                <Edit2 className="h-4 w-4 mr-2" />
+                                Add Manual Note
+                              </Button>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => setMeetingInputMode('fathom')}
+                              >
+                                <LinkIcon className="h-4 w-4 mr-2" />
+                                Sync from Fathom
+                              </Button>
+                            </div>
                           </div>
-                        ))}
+                        ) : (
+                          <div className="space-y-4">
+                            {fathomRecordings.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3">Fathom Recordings ({fathomRecordings.length})</h4>
+                                <FathomRecordingsList
+                                  clientId={client.id}
+                                  onRefresh={() => {
+                                    loadMeetingTranscripts();
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {meetingTranscripts.length > 0 && (
+                              <div>
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3">Manual Notes ({meetingTranscripts.length})</h4>
+                                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                                  {meetingTranscripts.map((transcript) => (
+                                    <div
+                                      key={transcript.id}
+                                      className="p-4 border border-border rounded-lg hover:bg-accent transition-colors"
+                                    >
+                                      <div className="flex items-start justify-between mb-2">
+                                        <div className="flex-1">
+                                          <h4 className="font-semibold text-foreground">{transcript.title}</h4>
+                                          <p className="text-xs text-muted-foreground">
+                                            {new Date(transcript.meeting_date).toLocaleDateString('en-US', {
+                                              year: 'numeric',
+                                              month: 'long',
+                                              day: 'numeric'
+                                            })}
+                                          </p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <button
+                                            onClick={() => {
+                                              setMeetingNotes(transcript.transcript_text);
+                                              setMeetingTitle(transcript.title);
+                                              setMeetingDate(transcript.meeting_date.split('T')[0]);
+                                              setEditingTranscriptId(transcript.id);
+                                              setMeetingInputMode('manual');
+                                            }}
+                                            className="p-1 text-muted-foreground hover:text-primary transition-colors"
+                                            title="Edit note"
+                                          >
+                                            <Edit2 className="h-4 w-4" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteTranscript(transcript.id)}
+                                            className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
+                                            title="Delete note"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-3">
+                                        {transcript.transcript_text}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -2206,52 +2276,6 @@ export const ClientDetailNew: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <MessageSquare className="h-5 w-5" />
-                        Fathom Meeting Recordings
-                      </CardTitle>
-                      {fathomRecordings.length > 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowFathomRecordings(!showFathomRecordings)}
-                        >
-                          {showFathomRecordings ? 'Hide' : `View (${fathomRecordings.length})`}
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {!showFathomRecordings ? (
-                      <FathomSync
-                        clientId={client.id}
-                        onSyncComplete={() => {
-                          showToast('Fathom recordings synced successfully', 'success');
-                          loadMeetingTranscripts();
-                        }}
-                      />
-                    ) : (
-                      <div className="space-y-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowFathomRecordings(false)}
-                        >
-                          ← Back to Sync
-                        </Button>
-                        <FathomRecordingsList
-                          clientId={client.id}
-                          onRefresh={() => {
-                            loadMeetingTranscripts();
-                          }}
-                        />
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
               </div>
             </div>
           </div>
