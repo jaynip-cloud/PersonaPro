@@ -10,8 +10,9 @@ const corsHeaders = {
 const CHUNK_SIZE = 6;
 const MAX_RETRY_ATTEMPTS = 3;
 const INITIAL_RETRY_DELAY_MS = 500;
-const MEETINGS_API_LIMIT = 100;
+const MEETINGS_API_LIMIT = 200;
 const MAX_CONSECUTIVE_FAILURES = 5;
+const DEBUG_MODE = true;
 
 interface SyncRequest {
   client_id: string;
@@ -46,7 +47,7 @@ interface MeetingItem {
 
 interface RecordingData {
   recording_id: string;
-  source: 'meetings_api' | 'recordings_api';
+  source: 'meetings_api' | 'recordings_api' | 'scraping_fallback';
   meeting?: MeetingItem;
   transcript?: any;
   summary?: any;
@@ -105,6 +106,7 @@ Deno.serve(async (req: Request) => {
     console.log('Input URL:', folder_link);
     console.log('Recording IDs:', recording_ids);
     console.log('Filters:', { team_filter, meeting_type_filter, created_after, created_before });
+    console.log('Debug Mode:', DEBUG_MODE);
     console.log('═══════════════════════════════════════');
 
     let recordingsToProcess: RecordingData[] = [];
@@ -120,15 +122,26 @@ Deno.serve(async (req: Request) => {
           console.log(`✓ Found exact match: recording_id=${matchedRecording.recording_id}, source=${matchedRecording.source}`);
           recordingsToProcess = [matchedRecording];
         } else {
-          console.warn('⚠ No exact match found for URL:', exactUrl);
-          return new Response(
-            JSON.stringify({
-              success: true,
-              message: `No recording found matching URL: ${exactUrl}. The recording may be private or not yet available.`,
-              recordings_synced: 0,
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          console.warn('⚠ No exact match found via API, trying scraping fallback...');
+          const scrapedRecording = await tryScrapingFallback(exactUrl, apiKeys.fathom_api_key);
+
+          if (scrapedRecording) {
+            console.log(`✓ Found via scraping: recording_id=${scrapedRecording.recording_id}`);
+            recordingsToProcess = [scrapedRecording];
+          } else {
+            return new Response(
+              JSON.stringify({
+                success: true,
+                message: `No recording found matching URL: ${exactUrl}. The recording may be private, not yet available, or outside the date filter range. Check logs for pagination details.`,
+                recordings_synced: 0,
+                debug: DEBUG_MODE ? {
+                  normalized_url: normalizeUrl(exactUrl),
+                  filters_applied: { created_after, created_before }
+                } : undefined
+              }),
+              { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
         }
       } else if (isFolderUrl(exactUrl)) {
         console.log('📁 Detected folder URL, using API-first lookup with scraping fallback');
@@ -398,25 +411,53 @@ function extractFolderId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+function normalizeUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    let normalized = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}`;
+    normalized = normalized.replace(/\/$/, '');
+    normalized = normalized.toLowerCase();
+    return normalized;
+  } catch {
+    let normalized = url.replace(/\?.*$/, '');
+    normalized = normalized.replace(/\/$/, '');
+    normalized = normalized.toLowerCase();
+    return normalized;
+  }
+}
+
 async function findMeetingByExactUrl(
   inputUrl: string,
   apiKey: string,
   filters: { created_after?: string; created_before?: string }
 ): Promise<RecordingData | null> {
-  console.log('  → Searching for exact URL match via meetings API...');
+  console.log('  → Searching for exact URL match via meetings API (cursor-based)...');
 
-  let page = 1;
-  let hasMore = true;
+  const normalizedInput = normalizeUrl(inputUrl);
+  console.log(`  → Normalized input URL: ${normalizedInput}`);
 
-  while (hasMore) {
+  let cursor: string | null = null;
+  let pageCount = 0;
+  let totalChecked = 0;
+
+  do {
+    pageCount++;
     try {
       const apiUrl = new URL('https://api.fathom.ai/external/v1/meetings');
       apiUrl.searchParams.set('limit', String(MEETINGS_API_LIMIT));
-      apiUrl.searchParams.set('page', String(page));
+
+      if (cursor) {
+        apiUrl.searchParams.set('cursor', cursor);
+      }
+
+      if (!filters.created_after && !filters.created_before && DEBUG_MODE) {
+        console.log(`  → DEBUG: No date filters applied, scanning all meetings`);
+      }
 
       if (filters.created_after) apiUrl.searchParams.set('created_after', filters.created_after);
       if (filters.created_before) apiUrl.searchParams.set('created_before', filters.created_before);
 
+      console.log(`  → Page ${pageCount}: Fetching up to ${MEETINGS_API_LIMIT} meetings...`);
       const response = await fetchWithRetry(apiUrl.toString(), apiKey, 'meetings list');
 
       if (!response) {
@@ -425,15 +466,36 @@ async function findMeetingByExactUrl(
       }
 
       const items: MeetingItem[] = response.items || [];
-      console.log(`  → Page ${page}: checking ${items.length} meetings`);
+      const nextCursor = response.next_cursor || null;
+
+      console.log(`  → Page ${pageCount}: Received ${items.length} meetings, next_cursor=${nextCursor ? 'exists' : 'null'}`);
+      totalChecked += items.length;
+
+      if (DEBUG_MODE && pageCount <= 3) {
+        console.log(`  → DEBUG: Sample URLs from page ${pageCount}:`);
+        items.slice(0, 3).forEach((item, idx) => {
+          console.log(`    [${idx}] share_url: ${item.share_url || 'null'}`);
+          console.log(`    [${idx}] url: ${item.url || 'null'}`);
+          console.log(`    [${idx}] recording_id: ${item.recording_id || item.id || 'null'}`);
+        });
+      }
 
       for (const item of items) {
         const shareUrl = item.share_url || '';
         const meetingUrl = item.url || '';
 
-        if (shareUrl === inputUrl || meetingUrl === inputUrl) {
+        const normalizedShare = shareUrl ? normalizeUrl(shareUrl) : '';
+        const normalizedMeeting = meetingUrl ? normalizeUrl(meetingUrl) : '';
+
+        if (DEBUG_MODE && (normalizedShare.includes('share') || normalizedMeeting.includes('share'))) {
+          console.log(`  → Comparing: ${normalizedShare} vs ${normalizedInput}`);
+        }
+
+        if (normalizedShare === normalizedInput || normalizedMeeting === normalizedInput) {
           const recordingId = String(item.recording_id || item.id || '');
-          console.log(`  ✓ Exact match found: recording_id=${recordingId}`);
+          console.log(`  ✓ Exact match found on page ${pageCount}!`);
+          console.log(`    → recording_id: ${recordingId}`);
+          console.log(`    → matched on: ${normalizedShare === normalizedInput ? 'share_url' : 'url'}`);
 
           const hasTranscript = item.transcript && (typeof item.transcript === 'string' || item.transcript.segments || item.transcript.text);
           const hasSummary = item.default_summary && (typeof item.default_summary === 'string' || item.default_summary.summary_text || item.default_summary.text);
@@ -455,20 +517,95 @@ async function findMeetingByExactUrl(
         }
       }
 
-      hasMore = items.length === MEETINGS_API_LIMIT;
-      page++;
+      cursor = nextCursor;
 
-      if (hasMore) {
+      if (cursor) {
+        console.log(`  → Continuing to next page (cursor exists)...`);
         await sleep(200);
       }
+
     } catch (error) {
-      console.error(`  ✗ Error in page ${page}:`, error instanceof Error ? error.message : error);
+      console.error(`  ✗ Error on page ${pageCount}:`, error instanceof Error ? error.message : error);
       return null;
     }
-  }
+  } while (cursor !== null);
 
-  console.log('  ⊚ No exact match found after scanning all pages');
+  console.log(`  ⊚ No exact match found after scanning ${pageCount} pages (${totalChecked} total meetings)`);
+  console.log(`  → Filters applied: created_after=${filters.created_after || 'none'}, created_before=${filters.created_before || 'none'}`);
+
   return null;
+}
+
+async function tryScrapingFallback(shareUrl: string, apiKey: string): Promise<RecordingData | null> {
+  console.log('  → Attempting scraping fallback for share URL...');
+
+  try {
+    const response = await fetch(shareUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; FathomSync/1.0)',
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`  ✗ Failed to fetch share page: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const html = await response.text();
+
+    const recordingIdMatch = html.match(/recording[_-]?id["']?\s*[:=]\s*["']?(\d+)/i);
+    const dataRecordingMatch = html.match(/data-recording-id=["'](\d+)["']/i);
+    const apiRecordingMatch = html.match(/\/recordings\/(\d+)/i);
+
+    const recordingId = recordingIdMatch?.[1] || dataRecordingMatch?.[1] || apiRecordingMatch?.[1];
+
+    if (!recordingId) {
+      console.log('  ✗ Could not extract recording_id from share page HTML');
+      return null;
+    }
+
+    console.log(`  → Extracted recording_id: ${recordingId} from HTML`);
+    console.log(`  → Testing direct access to /recordings/${recordingId}...`);
+
+    const testResponse = await fetch(`https://api.fathom.ai/external/v1/recordings/${recordingId}`, {
+      method: 'GET',
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log(`  → Direct API status: ${testResponse.status} ${testResponse.statusText}`);
+
+    if (testResponse.status === 200) {
+      const recordingDetails = await testResponse.json();
+      console.log(`  ✓ Recording accessible via API (200 OK)`);
+
+      const recordingData: RecordingData = {
+        recording_id: recordingId,
+        source: 'scraping_fallback',
+        meeting: recordingDetails,
+      };
+
+      await enrichRecordingData(recordingData, apiKey);
+      return recordingData;
+    } else if (testResponse.status === 403) {
+      console.log(`  ✗ Recording exists but API key lacks permission (403 Forbidden)`);
+      console.log(`  → The recording may be in a workspace/team not accessible to your API key`);
+      return null;
+    } else if (testResponse.status === 404) {
+      console.log(`  ✗ Recording not found via API (404 Not Found)`);
+      console.log(`  → The recording_id may be incorrect or the recording was deleted`);
+      return null;
+    } else {
+      console.log(`  ✗ Unexpected API response: ${testResponse.status}`);
+      return null;
+    }
+
+  } catch (error) {
+    console.error('  ✗ Scraping fallback failed:', error instanceof Error ? error.message : error);
+    return null;
+  }
 }
 
 async function findRecordingsInFolder(
@@ -476,27 +613,33 @@ async function findRecordingsInFolder(
   apiKey: string,
   filters: { created_after?: string; created_before?: string; team_filter?: string[]; meeting_type_filter?: string[] }
 ): Promise<RecordingData[]> {
-  console.log(`  → Fetching recordings for folder ${folderId} via API...`);
+  console.log(`  → Fetching recordings for folder ${folderId} via API (cursor-based)...`);
 
   const recordings: RecordingData[] = [];
-  let page = 1;
-  let hasMore = true;
+  let cursor: string | null = null;
+  let pageCount = 0;
 
-  while (hasMore) {
+  do {
+    pageCount++;
     try {
       const apiUrl = new URL('https://api.fathom.ai/external/v1/meetings');
       apiUrl.searchParams.set('limit', String(MEETINGS_API_LIMIT));
-      apiUrl.searchParams.set('page', String(page));
+
+      if (cursor) {
+        apiUrl.searchParams.set('cursor', cursor);
+      }
 
       if (filters.created_after) apiUrl.searchParams.set('created_after', filters.created_after);
       if (filters.created_before) apiUrl.searchParams.set('created_before', filters.created_before);
 
-      const response = await fetchWithRetry(apiUrl.toString(), apiKey, `meetings list page ${page}`);
+      const response = await fetchWithRetry(apiUrl.toString(), apiKey, `meetings list page ${pageCount}`);
 
       if (!response) break;
 
       const items: MeetingItem[] = response.items || [];
-      console.log(`  → Page ${page}: ${items.length} meetings`);
+      const nextCursor = response.next_cursor || null;
+
+      console.log(`  → Page ${pageCount}: ${items.length} meetings, next_cursor=${nextCursor ? 'exists' : 'null'}`);
 
       const folderItems = items.filter(item => {
         const itemFolderId = String(item.folder_id || '');
@@ -524,17 +667,16 @@ async function findRecordingsInFolder(
         recordings.push(recordingData);
       }
 
-      hasMore = items.length === MEETINGS_API_LIMIT;
-      page++;
+      cursor = nextCursor;
 
-      if (hasMore) {
+      if (cursor) {
         await sleep(200);
       }
     } catch (error) {
-      console.error(`  ✗ Error in page ${page}:`, error instanceof Error ? error.message : error);
+      console.error(`  ✗ Error on page ${pageCount}:`, error instanceof Error ? error.message : error);
       break;
     }
-  }
+  } while (cursor !== null);
 
   if (recordings.length > 0) {
     console.log(`  → Enriching ${recordings.length} recordings with missing data...`);
