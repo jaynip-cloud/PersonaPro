@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RefreshCw, FolderOpen, Settings, Link2, Calendar, Info } from 'lucide-react';
+import { RefreshCw, Link2, Info } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabase';
@@ -9,27 +9,9 @@ interface FathomSyncProps {
   onSyncComplete?: () => void;
 }
 
-const TEAM_OPTIONS = [
-  { value: 'customer_success', label: 'Customer Success' },
-  { value: 'executive', label: 'Executive' },
-  { value: 'sales', label: 'Sales' },
-];
-
-const MEETING_TYPE_OPTIONS = [
-  { value: 'client_engagement', label: 'Client Engagement' },
-  { value: 'sales_initial_call', label: 'Sales Initial Call' },
-  { value: 'client_call', label: 'Client Call' },
-];
-
 export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
   const [folderLink, setFolderLink] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [teamFilters, setTeamFilters] = useState<string[]>([]);
-  const [meetingTypeFilters, setMeetingTypeFilters] = useState<string[]>([]);
-  const [createdAfter, setCreatedAfter] = useState('');
-  const [createdBefore, setCreatedBefore] = useState('');
   const [syncResult, setSyncResult] = useState<{
     success: boolean;
     count: number;
@@ -39,7 +21,7 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
 
   const handleSync = async () => {
     if (!folderLink.trim()) {
-      alert('Please enter a Fathom folder or recording link');
+      alert('Please enter a Fathom meeting link');
       return;
     }
 
@@ -63,10 +45,6 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
         body: JSON.stringify({
           client_id: clientId,
           folder_link: folderLink,
-          team_filter: teamFilters.length > 0 ? teamFilters : undefined,
-          meeting_type_filter: meetingTypeFilters.length > 0 ? meetingTypeFilters : undefined,
-          created_after: createdAfter || undefined,
-          created_before: createdBefore || undefined,
         }),
       });
 
@@ -104,20 +82,12 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
           if (reasons.no_transcript) {
             message += `\n• ${reasons.no_transcript} missing transcript (may still be processing in Fathom)`;
           }
-          if (reasons.team_filter) {
-            message += `\n• ${reasons.team_filter} filtered out by team filter`;
-          }
-          if (reasons.meeting_type_filter) {
-            message += `\n• ${reasons.meeting_type_filter} filtered out by meeting type`;
-          }
 
           // Add suggestions
-          if (reasons.already_synced && !reasons.no_transcript && !reasons.team_filter && !reasons.meeting_type_filter) {
-            message += '\n\n💡 All recordings were already synced. Click "View" to see them.';
+          if (reasons.already_synced && !reasons.no_transcript) {
+            message += '\n\n💡 This recording was already synced. Click "View" to see it.';
           } else if (reasons.no_transcript) {
-            message += '\n\n💡 Wait a few minutes for Fathom to process transcripts, then try again.';
-          } else if (reasons.team_filter || reasons.meeting_type_filter) {
-            message += '\n\n💡 Try removing filters (⚙️ icon) to sync all recordings.';
+            message += '\n\n💡 Wait a few minutes for Fathom to process the transcript, then try again.';
           }
         }
       }
@@ -163,55 +133,27 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
     }
   };
 
-  const toggleTeamFilter = (team: string) => {
-    setTeamFilters(prev =>
-      prev.includes(team)
-        ? prev.filter(t => t !== team)
-        : [...prev, team]
-    );
-  };
-
-  const toggleMeetingTypeFilter = (type: string) => {
-    setMeetingTypeFilters(prev =>
-      prev.includes(type)
-        ? prev.filter(t => t !== type)
-        : [...prev, type]
-    );
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
         <div className="flex-1">
           <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
             <Link2 size={16} />
-            Fathom Link
+            Fathom Meeting Link
           </label>
           <div className="flex gap-2">
-            <div className="relative flex-1">
-              <FolderOpen className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-              <Input
-                type="text"
-                value={folderLink}
-                onChange={(e) => setFolderLink(e.target.value)}
-                placeholder="https://fathom.video/share/... or /folders/... or /recordings/..."
-                disabled={syncing}
-                className="pl-10"
-              />
-            </div>
-            <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant="outline"
+            <Input
+              type="text"
+              value={folderLink}
+              onChange={(e) => setFolderLink(e.target.value)}
+              placeholder="Paste Fathom meeting link (e.g., https://fathom.video/share/...)"
               disabled={syncing}
-              title="Configure filters"
-            >
-              <Settings size={18} />
-            </Button>
+            />
           </div>
           <div className="flex items-start gap-1 mt-1">
             <Info size={12} className="text-blue-600 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-gray-600">
-              Share links use exact API matching • Folder links sync all recordings • Supports date filters
+              Paste individual Fathom meeting URLs to sync recordings and transcripts
             </p>
           </div>
         </div>
@@ -235,99 +177,6 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
         </Button>
       </div>
 
-      {/* Filters Section */}
-      {showFilters && (
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by Team
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {TEAM_OPTIONS.map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => toggleTeamFilter(option.value)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    teamFilters.includes(option.value)
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {teamFilters.length === 0
-                ? 'No filter - will sync all teams'
-                : `Syncing only: ${teamFilters.join(', ')}`}
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by Meeting Type
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {MEETING_TYPE_OPTIONS.map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => toggleMeetingTypeFilter(option.value)}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    meetingTypeFilters.includes(option.value)
-                      ? 'bg-green-600 text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {meetingTypeFilters.length === 0
-                ? 'No filter - will sync all meeting types'
-                : `Syncing only: ${meetingTypeFilters.join(', ')}`}
-            </p>
-          </div>
-
-          <div>
-            <button
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
-            >
-              <Calendar size={14} />
-              {showAdvanced ? 'Hide' : 'Show'} Date Range Filters
-            </button>
-
-            {showAdvanced && (
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Created After
-                  </label>
-                  <Input
-                    type="date"
-                    value={createdAfter}
-                    onChange={(e) => setCreatedAfter(e.target.value)}
-                    className="text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Created Before
-                  </label>
-                  <Input
-                    type="date"
-                    value={createdBefore}
-                    onChange={(e) => setCreatedBefore(e.target.value)}
-                    className="text-sm"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Sync Result */}
       {syncResult && (
@@ -362,21 +211,6 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
         </div>
       )}
 
-      {/* Info Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <p className="text-sm text-blue-800 font-medium mb-1 flex items-center gap-2">
-          <Info size={16} />
-          How it works:
-        </p>
-        <ul className="text-xs text-blue-700 space-y-1 ml-4 list-disc">
-          <li><strong>Share links:</strong> Exact API matching finds specific recordings instantly</li>
-          <li><strong>Folder links:</strong> API-first approach syncs all recordings in folder</li>
-          <li><strong>Smart filtering:</strong> Team, meeting type, and date range filters</li>
-          <li><strong>Conditional fetching:</strong> Only calls endpoints when data is missing</li>
-          <li><strong>Auto-processing:</strong> Transcripts chunked and vectorized for semantic search</li>
-          <li><strong>AI insights:</strong> Embeddings power intelligent pitch generation and analysis</li>
-        </ul>
-      </div>
     </div>
   );
 }
