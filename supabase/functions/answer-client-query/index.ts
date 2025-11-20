@@ -260,8 +260,12 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
 
   // Document matches - Semantic search results
   if (documentMatches && documentMatches.length > 0) {
-    const docMatches = documentMatches.filter((doc: any) => doc.source_type !== 'meeting_transcript');
-    const transcriptMatches = documentMatches.filter((doc: any) => doc.source_type === 'meeting_transcript');
+    const docMatches = documentMatches.filter((doc: any) =>
+      doc.source_type !== 'meeting_transcript' && doc.source_type !== 'fathom_transcript'
+    );
+    const transcriptMatches = documentMatches.filter((doc: any) =>
+      doc.source_type === 'meeting_transcript' || doc.source_type === 'fathom_transcript'
+    );
 
     if (docMatches.length > 0) {
       const docsSection = ['\n=== RELEVANT DOCUMENTS ==='];
@@ -272,10 +276,18 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
       contextParts.push(docsSection.join('\n'));
     }
 
-    if (transcriptMatches.length > 0 && mode === 'quick') {
+    if (transcriptMatches.length > 0) {
       const transcriptSection = ['\n=== RELEVANT MEETING EXCERPTS ==='];
       transcriptMatches.forEach((doc: any, i: number) => {
-        transcriptSection.push(`\n[Excerpt ${i + 1}] From: ${doc.document_name} (${(doc.similarity * 100).toFixed(1)}% relevant)`);
+        const meetingDate = doc.metadata?.meeting_date
+          ? new Date(doc.metadata.meeting_date).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            })
+          : '';
+        const speaker = doc.metadata?.speaker_name ? ` - ${doc.metadata.speaker_name}` : '';
+        transcriptSection.push(`\n[Excerpt ${i + 1}] From: ${doc.document_name}${meetingDate ? ` (${meetingDate})` : ''}${speaker} (${(doc.similarity * 100).toFixed(1)}% relevant)`);
         transcriptSection.push(doc.content_chunk);
       });
       contextParts.push(transcriptSection.join('\n'));
@@ -410,7 +422,7 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'text-embedding-ada-002',
+        model: 'text-embedding-3-small',
         input: query,
       }),
     });
@@ -426,7 +438,8 @@ Deno.serve(async (req: Request) => {
     const searchLimit = mode === 'deep' ? 15 : 8;
     const similarityThreshold = intent.type === 'factual' ? 0.75 : 0.65; // Higher threshold for factual queries
 
-    const { data: documentMatches } = await supabaseClient.rpc('match_documents', {
+    // Use unified search that includes both document and Fathom embeddings
+    const { data: documentMatches } = await supabaseClient.rpc('match_all_content', {
       query_embedding: queryEmbedding,
       match_threshold: similarityThreshold,
       match_count: searchLimit,
@@ -513,9 +526,16 @@ Deno.serve(async (req: Request) => {
           intent: intent.type,
           confidence,
           sources: {
-            documentsSearched: documentMatches?.filter((d: any) => d.source_type !== 'meeting_transcript').length || 0,
+            documentsSearched: documentMatches?.filter((d: any) =>
+              d.source_type !== 'meeting_transcript' && d.source_type !== 'fathom_transcript'
+            ).length || 0,
             transcriptsIncluded: transcripts.length,
-            transcriptMatchesFound: documentMatches?.filter((d: any) => d.source_type === 'meeting_transcript').length || 0,
+            transcriptMatchesFound: documentMatches?.filter((d: any) =>
+              d.source_type === 'meeting_transcript' || d.source_type === 'fathom_transcript'
+            ).length || 0,
+            fathomTranscriptsFound: documentMatches?.filter((d: any) =>
+              d.source_type === 'fathom_transcript'
+            ).length || 0,
             contactsFound: contacts.length,
             opportunitiesFound: opportunities.length,
           },
