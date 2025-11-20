@@ -42,6 +42,7 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
   const [selectedRecording, setSelectedRecording] = useState<FathomRecording | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'summary' | 'transcript'>('summary');
 
   useEffect(() => {
     loadRecordings();
@@ -271,12 +272,15 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
       {selectedRecording && (
         <Modal
           isOpen={true}
-          onClose={() => setSelectedRecording(null)}
+          onClose={() => {
+            setSelectedRecording(null);
+            setActiveTab('summary');
+          }}
           title={selectedRecording.title}
-          size="large"
+          size="medium"
         >
-          <div className="space-y-6">
-            <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-3 text-sm text-gray-600 pb-4 border-b border-gray-200">
               <div className="flex items-center gap-1">
                 <Calendar size={14} />
                 <span>{new Date(selectedRecording.start_time).toLocaleDateString()}</span>
@@ -314,107 +318,147 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
               )}
             </div>
 
-            {selectedRecording.summary && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <MessageSquare size={16} />
-                  Meeting Summary
-                </h4>
-                <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-100">
-                  <MarkdownRenderer content={selectedRecording.summary} />
-                </div>
-              </div>
-            )}
+            <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+              <button
+                onClick={() => setActiveTab('summary')}
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  activeTab === 'summary'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Summary & Insights
+              </button>
+              <button
+                onClick={() => setActiveTab('transcript')}
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  activeTab === 'transcript'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Full Transcript
+              </button>
+            </div>
 
-            {selectedRecording.action_items && selectedRecording.action_items.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Action Items</h4>
-                <ul className="space-y-2">
-                  {selectedRecording.action_items.map((item: any, idx: number) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-gray-700">{item.text}</p>
-                        {item.assignee && (
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            Assigned to: {item.assignee}
-                          </p>
-                        )}
+            <div className="max-h-[60vh] overflow-y-auto">
+              {activeTab === 'summary' ? (
+                <div className="space-y-4">
+                  {selectedRecording.summary && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <MessageSquare size={16} />
+                        Meeting Summary
+                      </h4>
+                      <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-100">
+                        <MarkdownRenderer content={selectedRecording.summary} />
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+                    </div>
+                  )}
 
-            {selectedRecording.highlights && selectedRecording.highlights.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Highlights</h4>
-                <div className="space-y-2">
-                  {selectedRecording.highlights.map((highlight: any, idx: number) => (
-                    <div key={idx} className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
-                      <p className="text-sm text-gray-700">{highlight.text}</p>
-                      {highlight.speaker && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {highlight.speaker}
-                          {highlight.timestamp && ` • ${Math.floor(highlight.timestamp / 60)}:${String(highlight.timestamp % 60).padStart(2, '0')}`}
+                  {selectedRecording.action_items && selectedRecording.action_items.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-2">Action Items</h4>
+                      <ul className="space-y-2">
+                        {selectedRecording.action_items.map((item: any, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm bg-white p-3 rounded-lg border border-gray-200">
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-gray-700">{item.text}</p>
+                              {item.assignee && (
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  Assigned to: {item.assignee}
+                                </p>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {selectedRecording.highlights && selectedRecording.highlights.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-2">Highlights</h4>
+                      <div className="space-y-2">
+                        {selectedRecording.highlights.map((highlight: any, idx: number) => (
+                          <div key={idx} className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                            <p className="text-sm text-gray-700">{highlight.text}</p>
+                            {highlight.speaker && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {highlight.speaker}
+                                {highlight.timestamp && ` • ${Math.floor(highlight.timestamp / 60)}:${String(highlight.timestamp % 60).padStart(2, '0')}`}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedRecording.topics && selectedRecording.topics.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-2">Topics</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedRecording.topics.map((topic: any, idx: number) => (
+                          <span
+                            key={idx}
+                            className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-xs font-medium"
+                          >
+                            {typeof topic === 'string' ? topic : topic.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedRecording.participants && selectedRecording.participants.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900 mb-2">Participants</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {selectedRecording.participants.map((participant: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2 text-sm bg-white p-2 rounded-lg border border-gray-200">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-xs font-medium text-white">
+                              {participant.name?.charAt(0).toUpperCase() || '?'}
+                            </div>
+                            <div className="overflow-hidden">
+                              <p className="font-medium text-gray-900 truncate">{participant.name}</p>
+                              {participant.email && (
+                                <p className="text-xs text-gray-500 truncate">{participant.email}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  {selectedRecording.transcript ? (
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                        <h4 className="text-sm font-semibold text-gray-900">
+                          Full Transcript
+                        </h4>
+                        <span className="text-xs text-gray-500 font-medium">
+                          {selectedRecording.transcript.split(/\s+/).length.toLocaleString()} words
+                        </span>
+                      </div>
+                      <div className="prose prose-sm max-w-none">
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                          {selectedRecording.transcript}
                         </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {selectedRecording.topics && selectedRecording.topics.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Topics</h4>
-                <div className="flex flex-wrap gap-2">
-                  {selectedRecording.topics.map((topic: any, idx: number) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs"
-                    >
-                      {typeof topic === 'string' ? topic : topic.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {selectedRecording.participants && selectedRecording.participants.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Participants</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {selectedRecording.participants.map((participant: any, idx: number) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm">
-                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
-                        {participant.name?.charAt(0).toUpperCase() || '?'}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{participant.name}</p>
-                        {participant.email && (
-                          <p className="text-xs text-gray-500">{participant.email}</p>
-                        )}
                       </div>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      No transcript available
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-
-            {selectedRecording.transcript && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                  Transcript ({selectedRecording.transcript.split(/\s+/).length.toLocaleString()} words)
-                </h4>
-                <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">
-                    {selectedRecording.transcript}
-                  </p>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-gray-200 text-xs text-gray-500">
               <div>
