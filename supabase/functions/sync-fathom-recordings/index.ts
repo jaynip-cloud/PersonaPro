@@ -87,9 +87,11 @@ Deno.serve(async (req: Request) => {
         const folderId = folderIdMatch[1];
         console.log('Fetching recordings from folder:', folderId);
 
-        console.log(`Fetching recordings from folder: ${folderId}`);
-        const apiUrl = new URL(`https://api.fathom.ai/external/v1/folders/${folderId}/recordings`);
-        apiUrl.searchParams.set('limit', '100');
+        console.log(`Fetching all meetings and filtering by folder_id: ${folderId}`);
+        const apiUrl = new URL('https://api.fathom.ai/external/v1/meetings');
+        apiUrl.searchParams.set('include_transcript', 'true');
+        apiUrl.searchParams.set('include_summary', 'true');
+        apiUrl.searchParams.set('include_action_items', 'true');
 
         const listResponse = await fetch(apiUrl.toString(), {
           method: 'GET',
@@ -102,21 +104,38 @@ Deno.serve(async (req: Request) => {
         if (!listResponse.ok) {
           const errorText = await listResponse.text();
           console.error(`Fathom API error (${listResponse.status}):`, errorText);
-          throw new Error(`Unable to list recordings from folder. Status: ${listResponse.status}. Error: ${errorText}. Please check that the folder ID is correct and accessible with your API key.`);
+          throw new Error(`Unable to list meetings. Status: ${listResponse.status}. Error: ${errorText}. Please check your Fathom API key.`);
         }
 
         const listData = await listResponse.json();
-        console.log('API response structure:', Object.keys(listData));
+        const allMeetings = listData.meetings || listData.items || [];
+        console.log(`Total meetings fetched: ${allMeetings.length}`);
 
-        const recordings = listData.recordings || listData.items || [];
-        console.log('Total recordings found in folder:', recordings.length);
-
-        if (recordings.length === 0) {
-          console.log('No recordings found in this folder. The folder may be empty or the folder ID may be incorrect.');
+        if (allMeetings.length > 0) {
+          console.log('Sample meeting structure:', Object.keys(allMeetings[0]));
         }
 
-        for (const recording of recordings) {
-          const recordingId = recording.id || recording.recording_id;
+        const folderMeetings = allMeetings.filter((meeting: any) => {
+          const meetingFolderId = meeting.folder_id || meeting.folderId || meeting.folder;
+          if (meetingFolderId) {
+            console.log(`Meeting ${meeting.recording_id || meeting.id} has folder_id: ${meetingFolderId}`);
+            return meetingFolderId === folderId;
+          }
+          return false;
+        });
+
+        console.log(`Filtered to ${folderMeetings.length} meetings in folder ${folderId}`);
+
+        if (folderMeetings.length === 0) {
+          console.warn(`No meetings found with folder_id matching "${folderId}". This could mean:`);
+          console.warn('1. The folder is empty');
+          console.warn('2. The folder ID is incorrect');
+          console.warn('3. Fathom API does not include folder_id in meeting responses');
+          console.warn('Consider using the full folder share link from Fathom instead');
+        }
+
+        for (const meeting of folderMeetings) {
+          const recordingId = meeting.recording_id || meeting.id;
           if (!recordingId) continue;
 
           try {
