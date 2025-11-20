@@ -35,7 +35,8 @@ export const ClientDetailNew: React.FC = () => {
   const { showToast } = useToast();
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'growth' | 'projects' | 'pitch' | 'intelligence' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'intelligence-agent' | 'relationships' | 'growth' | 'assets' | 'settings'>('overview');
+  const [assetsSubTab, setAssetsSubTab] = useState<'meeting-notes' | 'documents' | 'fathom'>('meeting-notes');
   const [projectsSubTab, setProjectsSubTab] = useState<'projects' | 'pitch-history'>('projects');
   const [savedPitches, setSavedPitches] = useState<any[]>([]);
   const [selectedPitch, setSelectedPitch] = useState<any | null>(null);
@@ -1213,10 +1214,10 @@ export const ClientDetailNew: React.FC = () => {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Sparkles },
+    { id: 'intelligence-agent', label: 'Intelligence Agent', icon: MessageSquare },
     { id: 'relationships', label: 'Relationships', icon: Users },
     { id: 'growth', label: 'Growth Opportunities', icon: TrendingUp },
-    { id: 'projects', label: 'Projects & Deals', icon: Briefcase, hasSubnav: true },
-    { id: 'intelligence', label: 'Intelligence & Assets', icon: MessageSquare },
+    { id: 'assets', label: 'Assets', icon: FileText },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -1958,17 +1959,61 @@ export const ClientDetailNew: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'intelligence' && (
+        {activeTab === 'intelligence-agent' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="lg:col-span-1">
-                <IntelligenceAgent
-                  clientId={client.id}
-                  onQuery={handleQuery}
-                  isProcessing={isProcessingQuery}
-                />
-              </div>
+            <IntelligenceAgent
+              clientId={client.id}
+              onQuery={handleQuery}
+              isProcessing={isProcessingQuery}
+            />
 
+            {queries.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Query History</h3>
+                {queries.map((query) => (
+                  <QueryResult key={query.id} query={query} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'assets' && (
+          <div className="space-y-6">
+            <div className="flex gap-2 bg-gray-100 p-1 rounded-lg mb-6">
+              <button
+                onClick={() => setAssetsSubTab('meeting-notes')}
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  assetsSubTab === 'meeting-notes'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Meeting Notes
+              </button>
+              <button
+                onClick={() => setAssetsSubTab('documents')}
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  assetsSubTab === 'documents'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Documents & Assets
+              </button>
+              <button
+                onClick={() => setAssetsSubTab('fathom')}
+                className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                  assetsSubTab === 'fathom'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Fathom Meeting Recordings
+              </button>
+            </div>
+
+            {assetsSubTab === 'meeting-notes' && (
               <div className="lg:col-span-1 space-y-6">
                 <Card>
                   <CardHeader>
@@ -2120,140 +2165,144 @@ export const ClientDetailNew: React.FC = () => {
                     )}
                   </CardContent>
                 </Card>
+              </div>
+            )}
 
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <Upload className="h-5 w-5" />
-                        Documents & Assets
-                      </CardTitle>
+            {assetsSubTab === 'documents' && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Upload className="h-5 w-5" />
+                      Documents & Assets
+                    </CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowDocumentUpload(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Upload
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {uploadingDoc && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                      <span className="text-sm text-blue-900">Uploading and generating embeddings...</span>
+                    </div>
+                  )}
+                  {uploadedDocuments.length === 0 ? (
+                    <div className="text-center py-8">
+                      <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <p className="text-sm text-muted-foreground mb-4">
+                        No documents uploaded yet
+                      </p>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setShowDocumentUpload(true)}
                       >
                         <Plus className="h-4 w-4 mr-2" />
-                        Upload
+                        Upload First Document
                       </Button>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    {uploadingDoc && (
-                      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
-                        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                        <span className="text-sm text-blue-900">Uploading and generating embeddings...</span>
-                      </div>
-                    )}
-                    {uploadedDocuments.length === 0 ? (
-                      <div className="text-center py-8">
-                        <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                        <p className="text-sm text-muted-foreground mb-4">
-                          No documents uploaded yet
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowDocumentUpload(true)}
+                  ) : (
+                    <div className="space-y-3">
+                      {uploadedDocuments.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="flex items-start gap-3 p-3 border border-border rounded-lg hover:bg-accent transition-colors"
                         >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Upload First Document
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {uploadedDocuments.map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="flex items-start gap-3 p-3 border border-border rounded-lg hover:bg-accent transition-colors"
-                          >
-                            <FileText className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">
-                                {doc.name}
-                              </p>
-                              <div className="flex items-center gap-3 mt-1">
-                                <Badge variant="secondary" className="text-xs">
-                                  {doc.type}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(doc.uploaded_at).toLocaleDateString()}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <a
-                                href={doc.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:text-primary/80 transition-colors"
-                                title="Download document"
-                              >
-                                <Download className="h-4 w-4" />
-                              </a>
-                              <button
-                                onClick={() => handleDeleteDocument(doc)}
-                                className="text-muted-foreground hover:text-red-600 transition-colors"
-                                title="Delete document"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                          <FileText className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {doc.name}
+                            </p>
+                            <div className="flex items-center gap-3 mt-1">
+                              <Badge variant="secondary" className="text-xs">
+                                {doc.type}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(doc.uploaded_at).toLocaleDateString()}
+                              </span>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <MessageSquare className="h-5 w-5" />
-                        Fathom Meeting Recordings
-                      </CardTitle>
-                      {fathomRecordings.length > 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowFathomRecordings(!showFathomRecordings)}
-                        >
-                          {showFathomRecordings ? 'Hide' : `View (${fathomRecordings.length})`}
-                        </Button>
-                      )}
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:text-primary/80 transition-colors"
+                              title="Download document"
+                            >
+                              <Download className="h-4 w-4" />
+                            </a>
+                            <button
+                              onClick={() => handleDeleteDocument(doc)}
+                              className="text-muted-foreground hover:text-red-600 transition-colors"
+                              title="Delete document"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    {!showFathomRecordings ? (
-                      <FathomSync
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {assetsSubTab === 'fathom' && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5" />
+                      Fathom Meeting Recordings
+                    </CardTitle>
+                    {fathomRecordings.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowFathomRecordings(!showFathomRecordings)}
+                      >
+                        {showFathomRecordings ? 'Hide' : `View (${fathomRecordings.length})`}
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {!showFathomRecordings ? (
+                    <FathomSync
+                      clientId={client.id}
+                      onSyncComplete={() => {
+                        showToast('Fathom recordings synced successfully', 'success');
+                        loadMeetingTranscripts();
+                      }}
+                    />
+                  ) : (
+                    <div className="space-y-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowFathomRecordings(false)}
+                      >
+                        ← Back to Sync
+                      </Button>
+                      <FathomRecordingsList
                         clientId={client.id}
-                        onSyncComplete={() => {
-                          showToast('Fathom recordings synced successfully', 'success');
+                        onRefresh={() => {
                           loadMeetingTranscripts();
                         }}
                       />
-                    ) : (
-                      <div className="space-y-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowFathomRecordings(false)}
-                        >
-                          ← Back to Sync
-                        </Button>
-                        <FathomRecordingsList
-                          clientId={client.id}
-                          onRefresh={() => {
-                            loadMeetingTranscripts();
-                          }}
-                        />
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
