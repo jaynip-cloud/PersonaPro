@@ -156,11 +156,6 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
                     <div className="flex items-center gap-3 mb-2">
                       <Video className="text-purple-600 flex-shrink-0" size={20} />
                       <h3 className="text-lg font-semibold text-gray-900">{recording.title}</h3>
-                      {recording.embeddings_generated && (
-                        <Badge variant="success" className="text-xs">
-                          AI Ready
-                        </Badge>
-                      )}
                     </div>
 
                     <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">

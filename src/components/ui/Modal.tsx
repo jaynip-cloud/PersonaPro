@@ -7,7 +7,7 @@ interface ModalProps {
   children: React.ReactNode;
   title?: string;
   description?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'medium' | 'lg' | 'xl';
   closeOnEscape?: boolean;
   closeOnClickOutside?: boolean;
 }
@@ -43,6 +43,7 @@ export const Modal: React.FC<ModalProps> = ({
   const sizeClasses = {
     sm: 'max-w-md',
     md: 'max-w-lg',
+    medium: 'max-w-xl',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
   };
