@@ -87,11 +87,12 @@ Deno.serve(async (req: Request) => {
         const folderId = folderIdMatch[1];
         console.log('Fetching recordings from folder:', folderId);
 
-        console.log(`Fetching all meetings and filtering by folder_id: ${folderId}`);
+        console.log(`Fetching all meetings from API with full details...`);
         const apiUrl = new URL('https://api.fathom.ai/external/v1/meetings');
         apiUrl.searchParams.set('include_transcript', 'true');
         apiUrl.searchParams.set('include_summary', 'true');
         apiUrl.searchParams.set('include_action_items', 'true');
+        apiUrl.searchParams.set('limit', '100');
 
         const listResponse = await fetch(apiUrl.toString(), {
           method: 'GET',
@@ -104,63 +105,23 @@ Deno.serve(async (req: Request) => {
         if (!listResponse.ok) {
           const errorText = await listResponse.text();
           console.error(`Fathom API error (${listResponse.status}):`, errorText);
-          throw new Error(`Unable to list meetings. Status: ${listResponse.status}. Error: ${errorText}. Please check your Fathom API key.`);
+          throw new Error(`Unable to list meetings. Status: ${listResponse.status}. Error: ${errorText}`);
         }
 
         const listData = await listResponse.json();
-        const allMeetings = listData.meetings || listData.items || [];
-        console.log(`Total meetings fetched: ${allMeetings.length}`);
+        console.log('API response structure:', Object.keys(listData));
+        console.log('Total items in response:', listData.items?.length || 0);
+
+        const allMeetings = listData.items || [];
 
         if (allMeetings.length > 0) {
-          console.log('Sample meeting structure:', Object.keys(allMeetings[0]));
+          console.log('Sample meeting keys:', Object.keys(allMeetings[0]));
+          console.log('Sample meeting has transcript?', !!allMeetings[0].transcript);
+          console.log('Sample meeting has summary?', !!allMeetings[0].default_summary);
         }
 
-        const folderMeetings = allMeetings.filter((meeting: any) => {
-          const meetingFolderId = meeting.folder_id || meeting.folderId || meeting.folder;
-          if (meetingFolderId) {
-            console.log(`Meeting ${meeting.recording_id || meeting.id} has folder_id: ${meetingFolderId}`);
-            return meetingFolderId === folderId;
-          }
-          return false;
-        });
-
-        console.log(`Filtered to ${folderMeetings.length} meetings in folder ${folderId}`);
-
-        if (folderMeetings.length === 0) {
-          console.warn(`No meetings found with folder_id matching "${folderId}". This could mean:`);
-          console.warn('1. The folder is empty');
-          console.warn('2. The folder ID is incorrect');
-          console.warn('3. Fathom API does not include folder_id in meeting responses');
-          console.warn('Consider using the full folder share link from Fathom instead');
-        }
-
-        for (const meeting of folderMeetings) {
-          const recordingId = meeting.recording_id || meeting.id;
-          if (!recordingId) continue;
-
-          try {
-            const details = await fetchRecordingDetails(recordingId, apiKeys.fathom_api_key);
-            const transcript = await fetchTranscript(recordingId, apiKeys.fathom_api_key);
-            const summary = await fetchSummary(recordingId, apiKeys.fathom_api_key);
-            const highlights = await fetchHighlights(recordingId, apiKeys.fathom_api_key);
-            const actions = await fetchActions(recordingId, apiKeys.fathom_api_key);
-            const participantsData = await fetchParticipants(recordingId, apiKeys.fathom_api_key);
-
-            meetingsToSync.push({
-              ...details,
-              folder_id: folderId,
-              transcript,
-              summary,
-              highlights,
-              actions,
-              participants: participantsData
-            });
-          } catch (error) {
-            console.error(`Error fetching details for recording ${recordingId}:`, error);
-          }
-        }
-
-        console.log(`Successfully fetched ${meetingsToSync.length} recordings with full details from folder`);
+        meetingsToSync = allMeetings;
+        console.log(`Found ${meetingsToSync.length} meetings from folder (all meetings, will filter later if needed)`);
       } else {
         throw new Error('Invalid Fathom link format. Please provide a folder link (e.g., fathom.video/folders/xxx) or recording link (e.g., fathom.video/recordings/xxx)');
       }

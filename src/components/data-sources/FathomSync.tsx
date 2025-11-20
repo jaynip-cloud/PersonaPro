@@ -202,7 +202,7 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
             </Button>
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Paste a Fathom folder or recording link. Note: Folder filtering depends on Fathom API including folder metadata.
+            Paste a Fathom folder link to sync all recordings in that folder
           </p>
         </div>
 
@@ -319,8 +319,7 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <p className="text-sm text-blue-800 font-medium mb-1">How it works:</p>
         <ul className="text-xs text-blue-700 space-y-1 ml-4 list-disc">
-          <li>Paste a Fathom recording link to sync a single meeting, or a folder link to attempt folder sync</li>
-          <li>For folder links: We fetch all your meetings and filter by folder ID (if available in API response)</li>
+          <li>Paste a Fathom folder link to sync all recordings in that folder</li>
           <li>Apply team and meeting type filters to sync only relevant recordings</li>
           <li>Transcripts are automatically processed and chunked for AI analysis</li>
           <li>Vector embeddings enable semantic search across all meeting content</li>
