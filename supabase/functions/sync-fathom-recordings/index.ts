@@ -144,21 +144,9 @@ Deno.serve(async (req: Request) => {
           }
         }
       } else if (isFolderUrl(exactUrl)) {
-        console.log('📁 Detected folder URL, using API-first lookup with scraping fallback');
-        const folderId = extractFolderId(exactUrl);
-
-        if (folderId) {
-          recordingsToProcess = await findRecordingsInFolder(
-            folderId,
-            apiKeys.fathom_api_key,
-            { created_after, created_before, team_filter, meeting_type_filter }
-          );
-          console.log(`✓ Found ${recordingsToProcess.length} recordings in folder ${folderId}`);
-        } else {
-          throw new Error('Invalid folder URL format');
-        }
+        throw new Error('Folder URLs are not supported. Please use individual share links or recording IDs instead.');
       } else {
-        throw new Error('Invalid URL format. Provide a share link, call link, or folder link.');
+        throw new Error('Invalid URL format. Provide a share link or call link.');
       }
     } else if (recording_ids && recording_ids.length > 0) {
       console.log(`📋 Processing ${recording_ids.length} specific recording IDs`);
@@ -496,22 +484,15 @@ async function findMeetingByExactUrl(
           console.log(`  ✓ Exact match found on page ${pageCount}!`);
           console.log(`    → recording_id: ${recordingId}`);
           console.log(`    → matched on: ${normalizedShare === normalizedInput ? 'share_url' : 'url'}`);
-
-          const hasTranscript = item.transcript && (typeof item.transcript === 'string' || item.transcript.segments || item.transcript.text);
-          const hasSummary = item.default_summary && (typeof item.default_summary === 'string' || item.default_summary.summary_text || item.default_summary.text);
+          console.log(`    → Now fetching transcript and summary directly...`);
 
           const recordingData: RecordingData = {
             recording_id: recordingId,
             source: 'meetings_api',
             meeting: item,
-            transcript: hasTranscript ? item.transcript : null,
-            summary: hasSummary ? item.default_summary : null,
           };
 
-          if (!hasTranscript || !hasSummary) {
-            console.log(`  → Missing data in meetings object, fetching from recordings endpoints...`);
-            await enrichRecordingData(recordingData, apiKey);
-          }
+          await fetchTranscriptAndSummary(recordingData, apiKey);
 
           return recordingData;
         }
@@ -565,42 +546,21 @@ async function tryScrapingFallback(shareUrl: string, apiKey: string): Promise<Re
     }
 
     console.log(`  → Extracted recording_id: ${recordingId} from HTML`);
-    console.log(`  → Testing direct access to /recordings/${recordingId}...`);
+    console.log(`  → Fetching transcript and summary directly...`);
 
-    const testResponse = await fetch(`https://api.fathom.ai/external/v1/recordings/${recordingId}`, {
-      method: 'GET',
-      headers: {
-        'X-Api-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-    });
+    const recordingData: RecordingData = {
+      recording_id: recordingId,
+      source: 'scraping_fallback',
+    };
 
-    console.log(`  → Direct API status: ${testResponse.status} ${testResponse.statusText}`);
+    await fetchTranscriptAndSummary(recordingData, apiKey);
 
-    if (testResponse.status === 200) {
-      const recordingDetails = await testResponse.json();
-      console.log(`  ✓ Recording accessible via API (200 OK)`);
-
-      const recordingData: RecordingData = {
-        recording_id: recordingId,
-        source: 'scraping_fallback',
-        meeting: recordingDetails,
-      };
-
-      await enrichRecordingData(recordingData, apiKey);
-      return recordingData;
-    } else if (testResponse.status === 403) {
-      console.log(`  ✗ Recording exists but API key lacks permission (403 Forbidden)`);
-      console.log(`  → The recording may be in a workspace/team not accessible to your API key`);
-      return null;
-    } else if (testResponse.status === 404) {
-      console.log(`  ✗ Recording not found via API (404 Not Found)`);
-      console.log(`  → The recording_id may be incorrect or the recording was deleted`);
-      return null;
-    } else {
-      console.log(`  ✗ Unexpected API response: ${testResponse.status}`);
+    if (!recordingData.transcript && !recordingData.summary) {
+      console.log(`  ✗ Could not fetch transcript or summary - recording may be inaccessible`);
       return null;
     }
+
+    return recordingData;
 
   } catch (error) {
     console.error('  ✗ Scraping fallback failed:', error instanceof Error ? error.message : error);
@@ -608,102 +568,70 @@ async function tryScrapingFallback(shareUrl: string, apiKey: string): Promise<Re
   }
 }
 
-async function findRecordingsInFolder(
-  folderId: string,
-  apiKey: string,
-  filters: { created_after?: string; created_before?: string; team_filter?: string[]; meeting_type_filter?: string[] }
-): Promise<RecordingData[]> {
-  console.log(`  → Fetching recordings for folder ${folderId} via API (cursor-based)...`);
+async function fetchTranscriptAndSummary(recData: RecordingData, apiKey: string): Promise<void> {
+  const recordingId = recData.recording_id;
+  console.log(`    → Fetching transcript for recording ${recordingId}...`);
 
-  const recordings: RecordingData[] = [];
-  let cursor: string | null = null;
-  let pageCount = 0;
-
-  do {
-    pageCount++;
-    try {
-      const apiUrl = new URL('https://api.fathom.ai/external/v1/meetings');
-      apiUrl.searchParams.set('limit', String(MEETINGS_API_LIMIT));
-
-      if (cursor) {
-        apiUrl.searchParams.set('cursor', cursor);
-      }
-
-      if (filters.created_after) apiUrl.searchParams.set('created_after', filters.created_after);
-      if (filters.created_before) apiUrl.searchParams.set('created_before', filters.created_before);
-
-      const response = await fetchWithRetry(apiUrl.toString(), apiKey, `meetings list page ${pageCount}`);
-
-      if (!response) break;
-
-      const items: MeetingItem[] = response.items || [];
-      const nextCursor = response.next_cursor || null;
-
-      console.log(`  → Page ${pageCount}: ${items.length} meetings, next_cursor=${nextCursor ? 'exists' : 'null'}`);
-
-      const folderItems = items.filter(item => {
-        const itemFolderId = String(item.folder_id || '');
-        return itemFolderId === folderId;
-      });
-
-      console.log(`    → ${folderItems.length} matches folder ${folderId}`);
-
-      for (const item of folderItems) {
-        const recordingId = String(item.recording_id || item.id || '');
-
-        if (!recordingId) continue;
-
-        const hasTranscript = item.transcript && (typeof item.transcript === 'string' || item.transcript.segments || item.transcript.text);
-        const hasSummary = item.default_summary && (typeof item.default_summary === 'string' || item.default_summary.summary_text || item.default_summary.text);
-
-        const recordingData: RecordingData = {
-          recording_id: recordingId,
-          source: 'meetings_api',
-          meeting: item,
-          transcript: hasTranscript ? item.transcript : null,
-          summary: hasSummary ? item.default_summary : null,
-        };
-
-        recordings.push(recordingData);
-      }
-
-      cursor = nextCursor;
-
-      if (cursor) {
-        await sleep(200);
-      }
-    } catch (error) {
-      console.error(`  ✗ Error on page ${pageCount}:`, error instanceof Error ? error.message : error);
-      break;
+  try {
+    const transcript = await fetchWithRetry(
+      `https://api.fathom.ai/external/v1/recordings/${recordingId}/transcript`,
+      apiKey,
+      'transcript'
+    );
+    if (transcript) {
+      recData.transcript = transcript;
+      console.log(`    ✓ Transcript fetched successfully`);
+    } else {
+      console.warn(`    ⚠ No transcript available for recording ${recordingId}`);
     }
-  } while (cursor !== null);
-
-  if (recordings.length > 0) {
-    console.log(`  → Enriching ${recordings.length} recordings with missing data...`);
-    const chunks = chunkArray(recordings, CHUNK_SIZE);
-
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      console.log(`    → Chunk ${i + 1}/${chunks.length} (${chunk.length} recordings)`);
-
-      await Promise.all(
-        chunk.map(async (recData) => {
-          const needsTranscript = !recData.transcript;
-          const needsSummary = !recData.summary;
-
-          if (needsTranscript || needsSummary) {
-            await enrichRecordingData(recData, apiKey);
-          }
-        })
-      );
-
-      if (i < chunks.length - 1) {
-        await sleep(300);
-      }
-    }
+  } catch (error) {
+    console.warn(`    ⚠ Failed to fetch transcript:`, error instanceof Error ? error.message : error);
   }
 
-  return recordings;
+  console.log(`    → Fetching summary for recording ${recordingId}...`);
+
+  try {
+    const summary = await fetchWithRetry(
+      `https://api.fathom.ai/external/v1/recordings/${recordingId}/summary`,
+      apiKey,
+      'summary'
+    );
+    if (summary) {
+      recData.summary = summary;
+      console.log(`    ✓ Summary fetched successfully`);
+    } else {
+      console.warn(`    ⚠ No summary available for recording ${recordingId}`);
+    }
+  } catch (error) {
+    console.warn(`    ⚠ Failed to fetch summary:`, error instanceof Error ? error.message : error);
+  }
+
+  try {
+    recData.highlights = await fetchWithRetry(
+      `https://api.fathom.ai/external/v1/recordings/${recordingId}/highlights`,
+      apiKey,
+      'highlights'
+    );
+  } catch (error) {
+  }
+
+  try {
+    recData.actions = await fetchWithRetry(
+      `https://api.fathom.ai/external/v1/recordings/${recordingId}/actions`,
+      apiKey,
+      'actions'
+    );
+  } catch (error) {
+  }
+
+  try {
+    recData.participants = await fetchWithRetry(
+      `https://api.fathom.ai/external/v1/recordings/${recordingId}/participants`,
+      apiKey,
+      'participants'
+    );
+  } catch (error) {
+  }
 }
 
 async function fetchRecordingsByIds(
@@ -725,7 +653,7 @@ async function fetchRecordingsByIds(
           recording_id: recordingId,
           source: 'recordings_api',
         };
-        await enrichRecordingData(recData, apiKey);
+        await fetchTranscriptAndSummary(recData, apiKey);
         return recData;
       })
     );
@@ -738,105 +666,6 @@ async function fetchRecordingsByIds(
   }
 
   return recordings;
-}
-
-async function enrichRecordingData(recData: RecordingData, apiKey: string): Promise<void> {
-  const recordingId = recData.recording_id;
-  let consecutiveFailures = 0;
-
-  if (!recData.meeting) {
-    try {
-      const details = await fetchWithRetry(
-        `https://api.fathom.ai/external/v1/recordings/${recordingId}`,
-        apiKey,
-        'recording details'
-      );
-      if (details) {
-        recData.meeting = details;
-      } else {
-        consecutiveFailures++;
-      }
-    } catch (error) {
-      console.warn(`    ⚠ Failed to fetch details for ${recordingId}`);
-      consecutiveFailures++;
-    }
-  }
-
-  if (!recData.transcript) {
-    try {
-      const transcript = await fetchWithRetry(
-        `https://api.fathom.ai/external/v1/recordings/${recordingId}/transcript`,
-        apiKey,
-        'transcript'
-      );
-      if (transcript) {
-        recData.transcript = transcript;
-      } else {
-        consecutiveFailures++;
-      }
-    } catch (error) {
-      console.warn(`    ⚠ Failed to fetch transcript for ${recordingId}`);
-      consecutiveFailures++;
-    }
-  }
-
-  if (!recData.summary) {
-    try {
-      const summary = await fetchWithRetry(
-        `https://api.fathom.ai/external/v1/recordings/${recordingId}/summary`,
-        apiKey,
-        'summary'
-      );
-      if (summary) {
-        recData.summary = summary;
-      } else {
-        consecutiveFailures++;
-      }
-    } catch (error) {
-      console.warn(`    ⚠ Failed to fetch summary for ${recordingId}`);
-      consecutiveFailures++;
-    }
-  }
-
-  if (!recData.highlights) {
-    try {
-      recData.highlights = await fetchWithRetry(
-        `https://api.fathom.ai/external/v1/recordings/${recordingId}/highlights`,
-        apiKey,
-        'highlights'
-      );
-    } catch (error) {
-      consecutiveFailures++;
-    }
-  }
-
-  if (!recData.actions) {
-    try {
-      recData.actions = await fetchWithRetry(
-        `https://api.fathom.ai/external/v1/recordings/${recordingId}/actions`,
-        apiKey,
-        'actions'
-      );
-    } catch (error) {
-      consecutiveFailures++;
-    }
-  }
-
-  if (!recData.participants) {
-    try {
-      recData.participants = await fetchWithRetry(
-        `https://api.fathom.ai/external/v1/recordings/${recordingId}/participants`,
-        apiKey,
-        'participants'
-      );
-    } catch (error) {
-      consecutiveFailures++;
-    }
-  }
-
-  if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-    console.error(`    ⚠ Circuit breaker: ${consecutiveFailures} consecutive failures for recording ${recordingId}`);
-  }
 }
 
 async function fetchWithRetry(url: string, apiKey: string, label: string): Promise<any> {
