@@ -36,38 +36,6 @@ interface FathomRecording {
   created_at: string;
 }
 
-interface TranscriptLine {
-  speaker: string;
-  message: string;
-}
-
-function parseTranscriptLines(transcript: string): TranscriptLine[] {
-  if (!transcript) return [];
-
-  const lines: TranscriptLine[] = [];
-  const rawLines = transcript.split('\n').filter(line => line.trim());
-
-  for (const line of rawLines) {
-    // Try to match "Speaker: Message" or "Speaker - Message" format
-    const match = line.match(/^([^::\-]+)[\:\-]\s*(.+)$/);
-
-    if (match) {
-      lines.push({
-        speaker: match[1].trim(),
-        message: match[2].trim()
-      });
-    } else if (line.trim()) {
-      // If no speaker format detected, use "Unknown" as speaker
-      lines.push({
-        speaker: 'Unknown',
-        message: line.trim()
-      });
-    }
-  }
-
-  return lines;
-}
-
 export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsListProps) {
   const [recordings, setRecordings] = useState<FathomRecording[]>([]);
   const [loading, setLoading] = useState(true);
@@ -469,24 +437,7 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
                         </span>
                       </div>
                       <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-100">
-                        <div className="space-y-4">
-                          {parseTranscriptLines(selectedRecording.transcript).map((line, idx) => (
-                            <div key={idx} className="flex gap-3 items-start">
-                              <div className="flex-shrink-0 w-28 text-right pt-1">
-                                <span className="text-xs font-semibold text-gray-700 inline-block bg-white/60 px-2 py-1 rounded">
-                                  {line.speaker}
-                                </span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="bg-white rounded-lg px-4 py-3 shadow-sm border border-gray-200">
-                                  <p className="text-sm text-gray-800 leading-relaxed">
-                                    {line.message}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        <MarkdownRenderer content={selectedRecording.transcript} />
                       </div>
                     </div>
                   ) : (
