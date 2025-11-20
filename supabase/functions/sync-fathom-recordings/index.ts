@@ -215,18 +215,34 @@ Deno.serve(async (req: Request) => {
         if (transcript) {
           if (typeof transcript === 'string') {
             fullTranscript = transcript;
+          } else if (transcript.transcript && Array.isArray(transcript.transcript)) {
+            fullTranscript = transcript.transcript
+              .map((seg: any) => {
+                const speakerName = seg.speaker?.display_name || seg.speaker?.name || 'Unknown';
+                return `${speakerName}: ${seg.text}`;
+              })
+              .join('\n\n');
           } else if (transcript.segments && Array.isArray(transcript.segments)) {
             fullTranscript = transcript.segments
               .map((seg: any) => `${seg.speaker || 'Unknown'}: ${seg.text}`)
               .join('\n\n');
           } else if (transcript.text) {
             fullTranscript = transcript.text;
+          } else if (Array.isArray(transcript)) {
+            fullTranscript = transcript
+              .map((seg: any) => {
+                const speakerName = seg.speaker?.display_name || seg.speaker?.name || 'Unknown';
+                return `${speakerName}: ${seg.text}`;
+              })
+              .join('\n\n');
           }
         }
 
         fullTranscript = cleanTranscript(fullTranscript);
 
-        const summaryText = typeof summary === 'string' ? summary : (summary?.summary_text || summary?.text || '');
+        const summaryText = typeof summary === 'string'
+          ? summary
+          : (summary?.summary?.markdown_formatted || summary?.summary_text || summary?.text || '');
 
         if (!fullTranscript && !summaryText) {
           console.log(`  ⊚ No transcript or summary available - recording may not be processed yet`);
@@ -586,7 +602,8 @@ async function fetchTranscriptAndSummary(recData: RecordingData, apiKey: string)
     );
     if (transcript) {
       recData.transcript = transcript;
-      console.log(`    ✓ Transcript fetched successfully (${transcript.segments?.length || 'N/A'} segments)`);
+      const segmentCount = transcript.transcript?.length || transcript.segments?.length || (Array.isArray(transcript) ? transcript.length : 'N/A');
+      console.log(`    ✓ Transcript fetched successfully (${segmentCount} segments)`);
     } else {
       console.warn(`    ⚠ No transcript available for recording ${recordingId} (API returned null or 404)`);
     }
@@ -604,7 +621,9 @@ async function fetchTranscriptAndSummary(recData: RecordingData, apiKey: string)
     );
     if (summary) {
       recData.summary = summary;
-      const summaryLength = typeof summary === 'string' ? summary.length : (summary.summary_text?.length || summary.text?.length || 0);
+      const summaryLength = typeof summary === 'string'
+        ? summary.length
+        : (summary.summary?.markdown_formatted?.length || summary.summary_text?.length || summary.text?.length || 0);
       console.log(`    ✓ Summary fetched successfully (${summaryLength} chars)`);
     } else {
       console.warn(`    ⚠ No summary available for recording ${recordingId} (API returned null or 404)`);
