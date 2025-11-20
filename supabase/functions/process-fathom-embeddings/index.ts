@@ -162,29 +162,46 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Mark recording as embeddings generated
-    const { error: updateError } = await supabaseClient
-      .from('fathom_recordings')
-      .update({ embeddings_generated: true })
-      .eq('id', recording_id);
+    // Only mark recording as embeddings generated if we actually created embeddings
+    if (embeddings.length > 0) {
+      const { error: updateError } = await supabaseClient
+        .from('fathom_recordings')
+        .update({ embeddings_generated: true })
+        .eq('id', recording_id);
 
-    if (updateError) {
-      console.error('Error updating recording status:', updateError);
-    }
-
-    console.log(`Successfully generated ${embeddings.length} embeddings`);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        embeddings_created: embeddings.length,
-        chunks_total: chunks.length,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (updateError) {
+        console.error('Error updating recording status:', updateError);
       }
-    );
+
+      console.log(`Successfully generated ${embeddings.length} embeddings`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          embeddings_created: embeddings.length,
+          chunks_total: chunks.length,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    } else {
+      // No embeddings were created - return error
+      console.error('Failed to create any embeddings');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to create embeddings. Check logs for details.',
+          embeddings_created: 0,
+          chunks_total: chunks.length,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
   } catch (error) {
     console.error('Error in process-fathom-embeddings:', error);
     return new Response(
