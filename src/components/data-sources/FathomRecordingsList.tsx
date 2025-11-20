@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Video, Clock, Users, Calendar, TrendingUp, ExternalLink, Trash2, RefreshCw, Search, Filter, ChevronDown, ChevronUp, MessageSquare, Eye } from 'lucide-react';
+import { Video, Clock, Users, Calendar, TrendingUp, ExternalLink, Trash2, RefreshCw, Search, Filter, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { MarkdownRenderer } from '../ui/MarkdownRenderer';
-import { MeetingDetailModal } from './MeetingDetailModal';
 import { supabase } from '../../lib/supabase';
 
 interface FathomRecordingsListProps {
@@ -39,10 +38,11 @@ interface FathomRecording {
 export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsListProps) {
   const [recordings, setRecordings] = useState<FathomRecording[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterTeam, setFilterTeam] = useState<string>('all');
+  const [filterMeetingType, setFilterMeetingType] = useState<string>('all');
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [selectedMeeting, setSelectedMeeting] = useState<FathomRecording | null>(null);
-  const [showMeetingModal, setShowMeetingModal] = useState(false);
 
   useEffect(() => {
     loadRecordings();
@@ -96,8 +96,14 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
       recording.transcript?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       recording.summary?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesSearch;
+    const matchesTeam = filterTeam === 'all' || recording.team_name === filterTeam;
+    const matchesMeetingType = filterMeetingType === 'all' || recording.meeting_type === filterMeetingType;
+
+    return matchesSearch && matchesTeam && matchesMeetingType;
   });
+
+  const uniqueTeams = Array.from(new Set(recordings.map(r => r.team_name).filter(Boolean)));
+  const uniqueMeetingTypes = Array.from(new Set(recordings.map(r => r.meeting_type).filter(Boolean)));
 
   if (loading) {
     return (
@@ -121,29 +127,46 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
   }
 
   return (
-    <>
-      <MeetingDetailModal
-        isOpen={showMeetingModal}
-        onClose={() => {
-          setShowMeetingModal(false);
-          setSelectedMeeting(null);
-        }}
-        meeting={selectedMeeting}
-      />
-
-      <div className="space-y-4">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search recordings, transcripts, summaries..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search recordings, transcripts, summaries..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
         </div>
+
+        <select
+          value={filterTeam}
+          onChange={(e) => setFilterTeam(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="all">All Teams</option>
+          {uniqueTeams.map(team => (
+            <option key={team} value={team}>{team}</option>
+          ))}
+        </select>
+
+        <select
+          value={filterMeetingType}
+          onChange={(e) => setFilterMeetingType(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="all">All Types</option>
+          {uniqueMeetingTypes.map(type => (
+            <option key={type} value={type}>{type}</option>
+          ))}
+        </select>
+
+        <Button onClick={loadRecordings} variant="outline">
+          <RefreshCw size={18} />
+          Refresh
+        </Button>
+      </div>
 
       <div className="text-sm text-gray-600">
         Showing {filteredRecordings.length} of {recordings.length} recording{recordings.length !== 1 ? 's' : ''}
@@ -151,17 +174,17 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
 
       <div className="space-y-3">
         {filteredRecordings.map((recording) => {
+          const isExpanded = expandedId === recording.id;
+          const wordCount = recording.transcript ? recording.transcript.split(/\s+/).length : 0;
+
           return (
-            <Card key={recording.id} className="overflow-hidden hover:shadow-md transition-shadow">
+            <Card key={recording.id} className="overflow-hidden">
               <div className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <Video className="text-purple-600 flex-shrink-0" size={20} />
                       <h3 className="text-lg font-semibold text-gray-900">{recording.title}</h3>
-                      <Badge variant="primary" className="text-xs">
-                        Fathom Sync
-                      </Badge>
                       {recording.embeddings_generated && (
                         <Badge variant="success" className="text-xs">
                           AI Ready
@@ -207,7 +230,7 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
                       )}
                     </div>
 
-                    {recording.summary && (
+                    {recording.summary && !isExpanded && (
                       <div className="text-sm text-gray-700 line-clamp-2 mb-3">
                         {recording.summary.length > 200
                           ? `${recording.summary.substring(0, 200)}...`
@@ -215,7 +238,7 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
                       </div>
                     )}
 
-                    {recording.topics && recording.topics.length > 0 && (
+                    {recording.topics && recording.topics.length > 0 && !isExpanded && (
                       <div className="flex flex-wrap gap-2 mb-3">
                         {recording.topics.slice(0, 5).map((topic: any, idx: number) => (
                           <span
@@ -248,14 +271,11 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
                     )}
 
                     <button
-                      onClick={() => {
-                        setSelectedMeeting(recording);
-                        setShowMeetingModal(true);
-                      }}
-                      className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                      title="View meeting details"
+                      onClick={() => setExpandedId(isExpanded ? null : recording.id)}
+                      className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                      title={isExpanded ? 'Collapse' : 'Expand'}
                     >
-                      <Eye size={18} />
+                      {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
 
                     <button
@@ -272,12 +292,110 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
                     </button>
                   </div>
                 </div>
+
+                {isExpanded && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                    {recording.summary && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                          <MessageSquare size={16} />
+                          Meeting Summary
+                        </h4>
+                        <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-100">
+                          <MarkdownRenderer content={recording.summary} />
+                        </div>
+                      </div>
+                    )}
+
+                    {recording.action_items && recording.action_items.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 mb-2">Action Items</h4>
+                        <ul className="space-y-2">
+                          {recording.action_items.map((item: any, idx: number) => (
+                            <li key={idx} className="flex items-start gap-2 text-sm">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0" />
+                              <div>
+                                <p className="text-gray-700">{item.text}</p>
+                                {item.assignee && (
+                                  <p className="text-xs text-gray-500 mt-0.5">
+                                    Assigned to: {item.assignee}
+                                  </p>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {recording.highlights && recording.highlights.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 mb-2">Highlights</h4>
+                        <div className="space-y-2">
+                          {recording.highlights.map((highlight: any, idx: number) => (
+                            <div key={idx} className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                              <p className="text-sm text-gray-700">{highlight.text}</p>
+                              {highlight.speaker && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {highlight.speaker}
+                                  {highlight.timestamp && ` • ${Math.floor(highlight.timestamp / 60)}:${String(highlight.timestamp % 60).padStart(2, '0')}`}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {recording.participants && recording.participants.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 mb-2">Participants</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {recording.participants.map((participant: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-2 text-sm">
+                              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
+                                {participant.name?.charAt(0).toUpperCase() || '?'}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">{participant.name}</p>
+                                {participant.email && (
+                                  <p className="text-xs text-gray-500">{participant.email}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {recording.transcript && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                          Transcript ({wordCount.toLocaleString()} words)
+                        </h4>
+                        <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed">
+                            {recording.transcript}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 text-xs text-gray-500">
+                      <div>
+                        Synced {new Date(recording.created_at).toLocaleDateString()}
+                      </div>
+                      <div>
+                        Recording ID: {recording.recording_id}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
           );
         })}
       </div>
-      </div>
-    </>
+    </div>
   );
 }
