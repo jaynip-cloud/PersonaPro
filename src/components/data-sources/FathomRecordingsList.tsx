@@ -3,6 +3,7 @@ import { Video, Clock, Users, Calendar, TrendingUp, ExternalLink, Trash2, Refres
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
+import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 import { supabase } from '../../lib/supabase';
 
 interface FathomRecordingsListProps {
@@ -230,9 +231,11 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
                     </div>
 
                     {recording.summary && !isExpanded && (
-                      <p className="text-sm text-gray-700 line-clamp-2 mb-3">
-                        {recording.summary}
-                      </p>
+                      <div className="text-sm text-gray-700 line-clamp-2 mb-3">
+                        {recording.summary.length > 200
+                          ? `${recording.summary.substring(0, 200)}...`
+                          : recording.summary}
+                      </div>
                     )}
 
                     {recording.topics && recording.topics.length > 0 && !isExpanded && (
@@ -294,13 +297,13 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
                   <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
                     {recording.summary && (
                       <div>
-                        <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                           <MessageSquare size={16} />
-                          Summary
+                          Meeting Summary
                         </h4>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                          {recording.summary}
-                        </p>
+                        <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-100">
+                          <MarkdownRenderer content={recording.summary} />
+                        </div>
                       </div>
                     )}
 
