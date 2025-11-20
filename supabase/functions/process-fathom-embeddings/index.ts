@@ -254,8 +254,11 @@ function createOverlappingChunks(segments: Array<{
     const segment = segments[segmentIndex];
     const segmentText = `${segment.speaker}: ${segment.text}`;
 
-    // If adding this segment would exceed chunk size, save current chunk
-    if (currentChunk && currentChunk.length + segmentText.length > chunkSizeChars) {
+    // Check if adding this segment would exceed chunk size
+    const wouldExceedLimit = currentChunk && (currentChunk.length + segmentText.length + 2) > chunkSizeChars;
+
+    if (wouldExceedLimit) {
+      // Save current chunk before adding this segment
       chunks.push({
         text: currentChunk.trim(),
         start_timestamp: chunkStartTimestamp,
@@ -289,6 +292,8 @@ function createOverlappingChunks(segments: Array<{
         chunkStartTimestamp = segment.timestamp;
         currentSpeaker = segment.speaker;
       }
+
+      // Don't skip the current segment, continue to add it below
     }
 
     // Add current segment to chunk
@@ -297,7 +302,7 @@ function createOverlappingChunks(segments: Array<{
     }
     currentChunk += segmentText;
     chunkEndTimestamp = segment.timestamp;
-    
+
     if (!currentSpeaker) {
       currentSpeaker = segment.speaker;
       chunkStartTimestamp = segment.timestamp;
