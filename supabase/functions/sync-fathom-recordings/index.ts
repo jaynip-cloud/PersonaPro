@@ -7,9 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const CHUNK_SIZE = 8;
+const CHUNK_SIZE = 6;
 const MAX_RETRY_ATTEMPTS = 3;
 const INITIAL_RETRY_DELAY_MS = 500;
+const MEETINGS_API_LIMIT = 100;
+const MAX_CONSECUTIVE_FAILURES = 5;
 
 interface SyncRequest {
   client_id: string;
@@ -17,11 +19,35 @@ interface SyncRequest {
   recording_ids?: string[];
   team_filter?: string[];
   meeting_type_filter?: string[];
+  created_after?: string;
+  created_before?: string;
+}
+
+interface MeetingItem {
+  recording_id?: string;
+  id?: string;
+  share_url?: string;
+  url?: string;
+  folder_id?: string;
+  title?: string;
+  meeting_title?: string;
+  default_summary?: any;
+  transcript?: any;
+  recording_start_time?: string;
+  start_time?: string;
+  recording_end_time?: string;
+  end_time?: string;
+  platform?: string;
+  host?: { name?: string; email?: string };
+  team?: string;
+  meeting_type?: string;
+  [key: string]: any;
 }
 
 interface RecordingData {
   recording_id: string;
-  recording?: any;
+  source: 'meetings_api' | 'recordings_api';
+  meeting?: MeetingItem;
   transcript?: any;
   summary?: any;
   highlights?: any;
@@ -67,81 +93,68 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: SyncRequest = await req.json();
-    const { client_id, folder_link, recording_ids, team_filter, meeting_type_filter } = body;
+    const { client_id, folder_link, recording_ids, team_filter, meeting_type_filter, created_after, created_before } = body;
 
     if (!client_id) {
       throw new Error('client_id is required');
     }
 
-    console.log('Syncing Fathom recordings for client:', client_id);
-    console.log('Folder link:', folder_link);
-    console.log('Team filter:', team_filter);
-    console.log('Meeting type filter:', meeting_type_filter);
+    console.log('═══════════════════════════════════════');
+    console.log('Fathom Sync Started');
+    console.log('Client ID:', client_id);
+    console.log('Input URL:', folder_link);
+    console.log('Recording IDs:', recording_ids);
+    console.log('Filters:', { team_filter, meeting_type_filter, created_after, created_before });
+    console.log('═══════════════════════════════════════');
 
-    let recordingIdsToFetch: string[] = [];
+    let recordingsToProcess: RecordingData[] = [];
 
     if (folder_link) {
-      const folderIdMatch = folder_link.match(/folders\/([a-zA-Z0-9_-]+)/);
-      const recordingIdMatch = folder_link.match(/recordings\/([a-zA-Z0-9_-]+)/);
-      const callIdMatch = folder_link.match(/calls\/([a-zA-Z0-9_-]+)/);
+      const exactUrl = folder_link.trim();
 
-      if (recordingIdMatch || callIdMatch) {
-        const recordingId = recordingIdMatch?.[1] || callIdMatch?.[1];
-        console.log('Single recording link detected:', recordingId);
-        recordingIdsToFetch = [recordingId];
-      } else if (folderIdMatch) {
-        const folderId = folderIdMatch[1];
-        console.log('Folder link detected, folder ID:', folderId);
+      if (isShareOrCallUrl(exactUrl)) {
+        console.log('📍 Detected single share/call URL, using exact match lookup');
+        const matchedRecording = await findMeetingByExactUrl(exactUrl, apiKeys.fathom_api_key, { created_after, created_before });
 
-        const folderUrl = folder_link.startsWith('http')
-          ? folder_link
-          : `https://fathom.video/folders/${folderId}`;
-
-        console.log('Attempting to fetch public folder page:', folderUrl);
-
-        try {
-          const folderResponse = await fetch(folderUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (compatible; FathomSync/1.0)',
-            },
-          });
-
-          if (folderResponse.ok) {
-            console.log('✓ Public folder page accessible, parsing HTML...');
-            const html = await folderResponse.text();
-            recordingIdsToFetch = extractRecordingIdsFromHtml(html);
-            console.log(`✓ Extracted ${recordingIdsToFetch.length} recording IDs from public folder HTML`);
-          } else {
-            console.log(`⚠ Public folder page returned ${folderResponse.status}, falling back to API...`);
-            recordingIdsToFetch = await fetchRecordingIdsFromPrivateFolder(folderId, apiKeys.fathom_api_key);
-          }
-        } catch (htmlFetchError) {
-          console.warn('Failed to fetch public folder HTML:', htmlFetchError);
-          console.log('Falling back to API...');
-          recordingIdsToFetch = await fetchRecordingIdsFromPrivateFolder(folderId, apiKeys.fathom_api_key);
-        }
-
-        if (recordingIdsToFetch.length === 0) {
+        if (matchedRecording) {
+          console.log(`✓ Found exact match: recording_id=${matchedRecording.recording_id}, source=${matchedRecording.source}`);
+          recordingsToProcess = [matchedRecording];
+        } else {
+          console.warn('⚠ No exact match found for URL:', exactUrl);
           return new Response(
             JSON.stringify({
               success: true,
-              message: 'Folder appears private or empty. No recordings found. Please share the folder publicly or provide specific recording IDs.',
+              message: `No recording found matching URL: ${exactUrl}. The recording may be private or not yet available.`,
               recordings_synced: 0,
             }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+      } else if (isFolderUrl(exactUrl)) {
+        console.log('📁 Detected folder URL, using API-first lookup with scraping fallback');
+        const folderId = extractFolderId(exactUrl);
+
+        if (folderId) {
+          recordingsToProcess = await findRecordingsInFolder(
+            folderId,
+            apiKeys.fathom_api_key,
+            { created_after, created_before, team_filter, meeting_type_filter }
+          );
+          console.log(`✓ Found ${recordingsToProcess.length} recordings in folder ${folderId}`);
+        } else {
+          throw new Error('Invalid folder URL format');
+        }
       } else {
-        throw new Error('Invalid Fathom link format. Please provide a folder link (e.g., fathom.video/folders/xxx) or recording link (e.g., fathom.video/recordings/xxx)');
+        throw new Error('Invalid URL format. Provide a share link, call link, or folder link.');
       }
     } else if (recording_ids && recording_ids.length > 0) {
-      console.log(`Syncing ${recording_ids.length} specific recording IDs`);
-      recordingIdsToFetch = recording_ids;
+      console.log(`📋 Processing ${recording_ids.length} specific recording IDs`);
+      recordingsToProcess = await fetchRecordingsByIds(recording_ids, apiKeys.fathom_api_key);
     } else {
       throw new Error('Either folder_link or recording_ids must be provided');
     }
 
-    if (recordingIdsToFetch.length === 0) {
+    if (recordingsToProcess.length === 0) {
       return new Response(
         JSON.stringify({
           success: true,
@@ -152,20 +165,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log(`📦 Total recordings to fetch: ${recordingIdsToFetch.length}`);
-
-    const recordingsData = await fetchRecordingsInChunks(recordingIdsToFetch, apiKeys.fathom_api_key);
-
-    console.log(`📊 Fetch complete: ${recordingsData.length} recordings retrieved`);
+    console.log(`\n📦 Total recordings to process: ${recordingsToProcess.length}`);
 
     const processedRecordings = [];
     const skippedRecordings = [];
     const errors = [];
 
-    for (const recData of recordingsData) {
+    for (const recData of recordingsToProcess) {
       try {
         const recordingId = recData.recording_id;
-        console.log(`Processing recording ${recordingId}...`);
+        console.log(`\n→ Processing recording ${recordingId} (source: ${recData.source})...`);
 
         const { data: existingRecording } = await supabaseClient
           .from('fathom_recordings')
@@ -174,14 +183,14 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
 
         if (existingRecording) {
-          console.log(`Recording ${recordingId} already exists, skipping`);
+          console.log(`  ⊚ Already synced: "${existingRecording.title}"`);
           skippedRecordings.push({ id: recordingId, title: existingRecording.title, reason: 'already_synced' });
           continue;
         }
 
-        const recording = recData.recording;
-        const transcript = recData.transcript;
-        const summary = recData.summary;
+        const recording = recData.meeting || {};
+        let transcript = recData.transcript;
+        let summary = recData.summary;
         const highlights = recData.highlights;
         const actions = recData.actions;
         const participantsData = recData.participants;
@@ -190,13 +199,13 @@ Deno.serve(async (req: Request) => {
         const meetingType = recording?.meeting_type || null;
 
         if (team_filter && team_filter.length > 0 && teamName && !team_filter.includes(teamName)) {
-          console.log(`Recording ${recordingId} filtered out by team: ${teamName}`);
+          console.log(`  ⊚ Filtered by team: ${teamName}`);
           skippedRecordings.push({ id: recordingId, title: recording?.title, reason: 'team_filter', team: teamName });
           continue;
         }
 
         if (meeting_type_filter && meeting_type_filter.length > 0 && meetingType && !meeting_type_filter.includes(meetingType)) {
-          console.log(`Recording ${recordingId} filtered out by meeting type: ${meetingType}`);
+          console.log(`  ⊚ Filtered by meeting type: ${meetingType}`);
           skippedRecordings.push({ id: recordingId, title: recording?.title, reason: 'meeting_type_filter', meeting_type: meetingType });
           continue;
         }
@@ -217,7 +226,7 @@ Deno.serve(async (req: Request) => {
         fullTranscript = cleanTranscript(fullTranscript);
 
         if (!fullTranscript) {
-          console.log(`Recording ${recordingId} has no transcript, skipping`);
+          console.log(`  ⊚ No transcript available`);
           skippedRecordings.push({ id: recordingId, title: recording?.title || 'Unknown', reason: 'no_transcript' });
           continue;
         }
@@ -292,11 +301,12 @@ Deno.serve(async (req: Request) => {
           .single();
 
         if (insertError) {
-          console.error(`Error inserting recording ${recordingId}:`, insertError);
+          console.error(`  ✗ Insert error:`, insertError.message);
           errors.push({ recording_id: recordingId, error: insertError.message });
           continue;
         }
 
+        console.log(`  ✓ Synced: "${insertedRecording.title}"`);
         processedRecordings.push(insertedRecording);
 
         fetch(
@@ -314,12 +324,17 @@ Deno.serve(async (req: Request) => {
         ).catch(err => console.error('Error triggering embeddings:', err));
 
       } catch (error) {
-        console.error(`Error processing recording ${recData.recording_id}:`, error);
+        console.error(`  ✗ Processing error:`, error instanceof Error ? error.message : error);
         errors.push({ recording_id: recData.recording_id, error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
 
-    console.log(`✅ Sync complete: ${processedRecordings.length} recordings synced, ${skippedRecordings.length} skipped, ${errors.length} errors`);
+    console.log('\n═══════════════════════════════════════');
+    console.log(`✅ Sync Complete`);
+    console.log(`   Synced: ${processedRecordings.length}`);
+    console.log(`   Skipped: ${skippedRecordings.length}`);
+    console.log(`   Errors: ${errors.length}`);
+    console.log('═══════════════════════════════════════\n');
 
     let message = '';
     if (processedRecordings.length === 0 && skippedRecordings.length > 0) {
@@ -338,7 +353,7 @@ Deno.serve(async (req: Request) => {
         })
         .join(', ');
 
-      message = `No new recordings synced. ${recordingIdsToFetch.length} found: ${reasonText}.`;
+      message = `No new recordings synced. ${recordingsToProcess.length} found: ${reasonText}.`;
     }
 
     return new Response(
@@ -347,7 +362,7 @@ Deno.serve(async (req: Request) => {
         recordings_synced: processedRecordings.length,
         recordings: processedRecordings.map(r => ({ id: r.id, title: r.title })),
         skipped: skippedRecordings,
-        total_found: recordingIdsToFetch.length,
+        total_found: recordingsToProcess.length,
         message: message || undefined,
         errors: errors.length > 0 ? errors : undefined,
       }),
@@ -357,7 +372,7 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error) {
-    console.error('Error in sync-fathom-recordings:', error);
+    console.error('✗ Fatal error in sync-fathom-recordings:', error);
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : "Internal server error",
@@ -370,239 +385,316 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function extractRecordingIdsFromHtml(html: string): string[] {
-  const idSet = new Set<string>();
-  let m: RegExpExecArray | null;
-
-  console.log('Extracting recording IDs from folder HTML...');
-
-  const numericRegex = /\/(?:calls|recordings)\/(\d{6,})/g;
-  let numericCount = 0;
-  while ((m = numericRegex.exec(html)) !== null) {
-    idSet.add(m[1]);
-    numericCount++;
-  }
-  if (numericCount > 0) console.log(`  Found ${numericCount} numeric recording IDs`);
-
-  const hashRegex = /\/(?:calls|recordings)\/([A-Za-z0-9_-]{8,})/g;
-  let hashCount = 0;
-  while ((m = hashRegex.exec(html)) !== null) {
-    idSet.add(m[1]);
-    hashCount++;
-  }
-  if (hashCount > 0) console.log(`  Found ${hashCount} alphanumeric recording hashes`);
-
-  const shareRegex = /\/share\/([A-Za-z0-9_-]{8,})/g;
-  let shareCount = 0;
-  while ((m = shareRegex.exec(html)) !== null) {
-    idSet.add(m[1]);
-    shareCount++;
-  }
-  if (shareCount > 0) console.log(`  Found ${shareCount} share links`);
-
-  const jsonStringIdRegex = /"id"\s*:\s*"([A-Za-z0-9_-]{6,})"/g;
-  let jsonStringCount = 0;
-  while ((m = jsonStringIdRegex.exec(html)) !== null) {
-    idSet.add(m[1]);
-    jsonStringCount++;
-  }
-  if (jsonStringCount > 0) console.log(`  Found ${jsonStringCount} JSON string IDs`);
-
-  const jsonNumericIdRegex = /"recording_id"\s*:\s*(\d{6,})/g;
-  let jsonNumericCount = 0;
-  while ((m = jsonNumericIdRegex.exec(html)) !== null) {
-    idSet.add(String(m[1]));
-    jsonNumericCount++;
-  }
-  if (jsonNumericCount > 0) console.log(`  Found ${jsonNumericCount} JSON numeric recording IDs`);
-
-  const queryParamRegex = /(?:recordingId|callId|recording_id)=([A-Za-z0-9_-]{6,})/g;
-  let queryParamCount = 0;
-  while ((m = queryParamRegex.exec(html)) !== null) {
-    idSet.add(m[1]);
-    queryParamCount++;
-  }
-  if (queryParamCount > 0) console.log(`  Found ${queryParamCount} query parameter IDs`);
-
-  const garbageTokens = new Set([
-    'search', 'folder', 'page', 'null', 'undefined', 'true', 'false', 'query',
-    'filter', 'sort', 'view', 'edit', 'delete', 'create', 'new', 'add',
-    'settings', 'profile', 'dashboard', 'home', 'index', 'main', 'app',
-    'recording', 'recordings', 'call', 'calls', 'meeting', 'meetings'
-  ]);
-
-  const cleanedIds = Array.from(idSet).filter(id => {
-    if (!id) return false;
-    const trimmed = id.trim();
-
-    if (garbageTokens.has(trimmed.toLowerCase())) {
-      console.log(`  Skipped garbage token: "${trimmed}"`);
-      return false;
-    }
-
-    if (/^\d{6,}$/.test(trimmed)) {
-      return true;
-    }
-
-    if (/^[A-Za-z0-9_-]{8,}$/.test(trimmed)) {
-      return true;
-    }
-
-    console.log(`  Skipped invalid format: "${trimmed}" (too short or invalid characters)`);
-    return false;
-  });
-
-  console.log(`Extractor found ${idSet.size} raw IDs; ${cleanedIds.length} passed validation.`);
-
-  if (cleanedIds.length === 0) {
-    console.warn('No valid recording IDs found in folder page. Folder may be empty or use unexpected markup.');
-  }
-
-  return cleanedIds;
+function isShareOrCallUrl(url: string): boolean {
+  return /\/(share|calls|recordings)\/[A-Za-z0-9_-]+/.test(url);
 }
 
-async function fetchRecordingIdsFromPrivateFolder(folderId: string, apiKey: string): Promise<string[]> {
-  console.log('Fetching recordings from private folder via API...');
-
-  try {
-    const apiUrl = new URL('https://api.fathom.ai/external/v1/meetings');
-    apiUrl.searchParams.set('limit', '1000');
-
-    const response = await fetch(apiUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'X-Api-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Fathom API error (${response.status}):`, errorText);
-      return [];
-    }
-
-    const data = await response.json();
-    const allMeetings = data.items || [];
-
-    console.log(`API returned ${allMeetings.length} total meetings`);
-
-    const folderMeetings = allMeetings.filter((meeting: any) => {
-      const meetingFolderId = meeting.folder_id || meeting.folderId || '';
-      return meetingFolderId.toString() === folderId.toString();
-    });
-
-    console.log(`Filtered to ${folderMeetings.length} meetings in folder ${folderId}`);
-
-    const recordingIds = folderMeetings
-      .map((meeting: any) => meeting.recording_id || meeting.recordingId || meeting.id)
-      .filter((id: any) => id)
-      .map((id: any) => String(id));
-
-    return recordingIds;
-  } catch (error) {
-    console.error('Error fetching from private folder API:', error);
-    return [];
-  }
+function isFolderUrl(url: string): boolean {
+  return /\/folders\/[A-Za-z0-9_-]+/.test(url);
 }
 
-async function fetchRecordingsInChunks(recordingIds: string[], apiKey: string): Promise<RecordingData[]> {
-  const results: RecordingData[] = [];
+function extractFolderId(url: string): string | null {
+  const match = url.match(/\/folders\/([A-Za-z0-9_-]+)/);
+  return match ? match[1] : null;
+}
+
+async function findMeetingByExactUrl(
+  inputUrl: string,
+  apiKey: string,
+  filters: { created_after?: string; created_before?: string }
+): Promise<RecordingData | null> {
+  console.log('  → Searching for exact URL match via meetings API...');
+
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    try {
+      const apiUrl = new URL('https://api.fathom.ai/external/v1/meetings');
+      apiUrl.searchParams.set('limit', String(MEETINGS_API_LIMIT));
+      apiUrl.searchParams.set('page', String(page));
+
+      if (filters.created_after) apiUrl.searchParams.set('created_after', filters.created_after);
+      if (filters.created_before) apiUrl.searchParams.set('created_before', filters.created_before);
+
+      const response = await fetchWithRetry(apiUrl.toString(), apiKey, 'meetings list');
+
+      if (!response) {
+        console.error('  ✗ Failed to fetch meetings list');
+        return null;
+      }
+
+      const items: MeetingItem[] = response.items || [];
+      console.log(`  → Page ${page}: checking ${items.length} meetings`);
+
+      for (const item of items) {
+        const shareUrl = item.share_url || '';
+        const meetingUrl = item.url || '';
+
+        if (shareUrl === inputUrl || meetingUrl === inputUrl) {
+          const recordingId = String(item.recording_id || item.id || '');
+          console.log(`  ✓ Exact match found: recording_id=${recordingId}`);
+
+          const hasTranscript = item.transcript && (typeof item.transcript === 'string' || item.transcript.segments || item.transcript.text);
+          const hasSummary = item.default_summary && (typeof item.default_summary === 'string' || item.default_summary.summary_text || item.default_summary.text);
+
+          const recordingData: RecordingData = {
+            recording_id: recordingId,
+            source: 'meetings_api',
+            meeting: item,
+            transcript: hasTranscript ? item.transcript : null,
+            summary: hasSummary ? item.default_summary : null,
+          };
+
+          if (!hasTranscript || !hasSummary) {
+            console.log(`  → Missing data in meetings object, fetching from recordings endpoints...`);
+            await enrichRecordingData(recordingData, apiKey);
+          }
+
+          return recordingData;
+        }
+      }
+
+      hasMore = items.length === MEETINGS_API_LIMIT;
+      page++;
+
+      if (hasMore) {
+        await sleep(200);
+      }
+    } catch (error) {
+      console.error(`  ✗ Error in page ${page}:`, error instanceof Error ? error.message : error);
+      return null;
+    }
+  }
+
+  console.log('  ⊚ No exact match found after scanning all pages');
+  return null;
+}
+
+async function findRecordingsInFolder(
+  folderId: string,
+  apiKey: string,
+  filters: { created_after?: string; created_before?: string; team_filter?: string[]; meeting_type_filter?: string[] }
+): Promise<RecordingData[]> {
+  console.log(`  → Fetching recordings for folder ${folderId} via API...`);
+
+  const recordings: RecordingData[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    try {
+      const apiUrl = new URL('https://api.fathom.ai/external/v1/meetings');
+      apiUrl.searchParams.set('limit', String(MEETINGS_API_LIMIT));
+      apiUrl.searchParams.set('page', String(page));
+
+      if (filters.created_after) apiUrl.searchParams.set('created_after', filters.created_after);
+      if (filters.created_before) apiUrl.searchParams.set('created_before', filters.created_before);
+
+      const response = await fetchWithRetry(apiUrl.toString(), apiKey, `meetings list page ${page}`);
+
+      if (!response) break;
+
+      const items: MeetingItem[] = response.items || [];
+      console.log(`  → Page ${page}: ${items.length} meetings`);
+
+      const folderItems = items.filter(item => {
+        const itemFolderId = String(item.folder_id || '');
+        return itemFolderId === folderId;
+      });
+
+      console.log(`    → ${folderItems.length} matches folder ${folderId}`);
+
+      for (const item of folderItems) {
+        const recordingId = String(item.recording_id || item.id || '');
+
+        if (!recordingId) continue;
+
+        const hasTranscript = item.transcript && (typeof item.transcript === 'string' || item.transcript.segments || item.transcript.text);
+        const hasSummary = item.default_summary && (typeof item.default_summary === 'string' || item.default_summary.summary_text || item.default_summary.text);
+
+        const recordingData: RecordingData = {
+          recording_id: recordingId,
+          source: 'meetings_api',
+          meeting: item,
+          transcript: hasTranscript ? item.transcript : null,
+          summary: hasSummary ? item.default_summary : null,
+        };
+
+        recordings.push(recordingData);
+      }
+
+      hasMore = items.length === MEETINGS_API_LIMIT;
+      page++;
+
+      if (hasMore) {
+        await sleep(200);
+      }
+    } catch (error) {
+      console.error(`  ✗ Error in page ${page}:`, error instanceof Error ? error.message : error);
+      break;
+    }
+  }
+
+  if (recordings.length > 0) {
+    console.log(`  → Enriching ${recordings.length} recordings with missing data...`);
+    const chunks = chunkArray(recordings, CHUNK_SIZE);
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`    → Chunk ${i + 1}/${chunks.length} (${chunk.length} recordings)`);
+
+      await Promise.all(
+        chunk.map(async (recData) => {
+          const needsTranscript = !recData.transcript;
+          const needsSummary = !recData.summary;
+
+          if (needsTranscript || needsSummary) {
+            await enrichRecordingData(recData, apiKey);
+          }
+        })
+      );
+
+      if (i < chunks.length - 1) {
+        await sleep(300);
+      }
+    }
+  }
+
+  return recordings;
+}
+
+async function fetchRecordingsByIds(
+  recordingIds: string[],
+  apiKey: string
+): Promise<RecordingData[]> {
+  console.log(`  → Fetching ${recordingIds.length} recordings by ID...`);
+
+  const recordings: RecordingData[] = [];
   const chunks = chunkArray(recordingIds, CHUNK_SIZE);
-
-  console.log(`Fetching ${recordingIds.length} recordings in ${chunks.length} chunks of ${CHUNK_SIZE}`);
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
-    console.log(`Processing chunk ${i + 1}/${chunks.length} (${chunk.length} recordings)...`);
+    console.log(`    → Chunk ${i + 1}/${chunks.length} (${chunk.length} IDs)`);
 
     const chunkResults = await Promise.all(
-      chunk.map(recordingId => fetchSingleRecordingWithRetry(recordingId, apiKey))
+      chunk.map(async (recordingId) => {
+        const recData: RecordingData = {
+          recording_id: recordingId,
+          source: 'recordings_api',
+        };
+        await enrichRecordingData(recData, apiKey);
+        return recData;
+      })
     );
 
-    results.push(...chunkResults);
+    recordings.push(...chunkResults);
 
     if (i < chunks.length - 1) {
-      await sleep(200);
+      await sleep(300);
     }
   }
 
-  return results;
+  return recordings;
 }
 
-async function fetchSingleRecordingWithRetry(recordingId: string, apiKey: string): Promise<RecordingData> {
-  const result: RecordingData = {
-    recording_id: recordingId,
-  };
+async function enrichRecordingData(recData: RecordingData, apiKey: string): Promise<void> {
+  const recordingId = recData.recording_id;
+  let consecutiveFailures = 0;
 
-  const endpoints = [
-    { name: 'recording', fetcher: () => fetchRecordingDetails(recordingId, apiKey) },
-    { name: 'transcript', fetcher: () => fetchTranscript(recordingId, apiKey) },
-    { name: 'summary', fetcher: () => fetchSummary(recordingId, apiKey) },
-    { name: 'highlights', fetcher: () => fetchHighlights(recordingId, apiKey) },
-    { name: 'actions', fetcher: () => fetchActions(recordingId, apiKey) },
-    { name: 'participants', fetcher: () => fetchParticipants(recordingId, apiKey) },
-  ];
-
-  for (const endpoint of endpoints) {
+  if (!recData.meeting) {
     try {
-      const data = await endpoint.fetcher();
-      (result as any)[endpoint.name] = data;
+      const details = await fetchWithRetry(
+        `https://api.fathom.ai/external/v1/recordings/${recordingId}`,
+        apiKey,
+        'recording details'
+      );
+      if (details) {
+        recData.meeting = details;
+      } else {
+        consecutiveFailures++;
+      }
     } catch (error) {
-      console.warn(`Failed to fetch ${endpoint.name} for ${recordingId}:`, error instanceof Error ? error.message : error);
-      (result as any)[endpoint.name] = null;
+      console.warn(`    ⚠ Failed to fetch details for ${recordingId}`);
+      consecutiveFailures++;
     }
   }
 
-  return result;
-}
+  if (!recData.transcript) {
+    try {
+      const transcript = await fetchWithRetry(
+        `https://api.fathom.ai/external/v1/recordings/${recordingId}/transcript`,
+        apiKey,
+        'transcript'
+      );
+      if (transcript) {
+        recData.transcript = transcript;
+      } else {
+        consecutiveFailures++;
+      }
+    } catch (error) {
+      console.warn(`    ⚠ Failed to fetch transcript for ${recordingId}`);
+      consecutiveFailures++;
+    }
+  }
 
-async function fetchRecordingDetails(recordingId: string, apiKey: string): Promise<any> {
-  return await fetchWithRetry(
-    `https://api.fathom.ai/external/v1/recordings/${recordingId}`,
-    apiKey,
-    'recording details'
-  );
-}
+  if (!recData.summary) {
+    try {
+      const summary = await fetchWithRetry(
+        `https://api.fathom.ai/external/v1/recordings/${recordingId}/summary`,
+        apiKey,
+        'summary'
+      );
+      if (summary) {
+        recData.summary = summary;
+      } else {
+        consecutiveFailures++;
+      }
+    } catch (error) {
+      console.warn(`    ⚠ Failed to fetch summary for ${recordingId}`);
+      consecutiveFailures++;
+    }
+  }
 
-async function fetchTranscript(recordingId: string, apiKey: string): Promise<any> {
-  return await fetchWithRetry(
-    `https://api.fathom.ai/external/v1/recordings/${recordingId}/transcript`,
-    apiKey,
-    'transcript'
-  );
-}
+  if (!recData.highlights) {
+    try {
+      recData.highlights = await fetchWithRetry(
+        `https://api.fathom.ai/external/v1/recordings/${recordingId}/highlights`,
+        apiKey,
+        'highlights'
+      );
+    } catch (error) {
+      consecutiveFailures++;
+    }
+  }
 
-async function fetchSummary(recordingId: string, apiKey: string): Promise<any> {
-  return await fetchWithRetry(
-    `https://api.fathom.ai/external/v1/recordings/${recordingId}/summary`,
-    apiKey,
-    'summary'
-  );
-}
+  if (!recData.actions) {
+    try {
+      recData.actions = await fetchWithRetry(
+        `https://api.fathom.ai/external/v1/recordings/${recordingId}/actions`,
+        apiKey,
+        'actions'
+      );
+    } catch (error) {
+      consecutiveFailures++;
+    }
+  }
 
-async function fetchHighlights(recordingId: string, apiKey: string): Promise<any> {
-  return await fetchWithRetry(
-    `https://api.fathom.ai/external/v1/recordings/${recordingId}/highlights`,
-    apiKey,
-    'highlights'
-  );
-}
+  if (!recData.participants) {
+    try {
+      recData.participants = await fetchWithRetry(
+        `https://api.fathom.ai/external/v1/recordings/${recordingId}/participants`,
+        apiKey,
+        'participants'
+      );
+    } catch (error) {
+      consecutiveFailures++;
+    }
+  }
 
-async function fetchActions(recordingId: string, apiKey: string): Promise<any> {
-  return await fetchWithRetry(
-    `https://api.fathom.ai/external/v1/recordings/${recordingId}/actions`,
-    apiKey,
-    'actions'
-  );
-}
-
-async function fetchParticipants(recordingId: string, apiKey: string): Promise<any> {
-  return await fetchWithRetry(
-    `https://api.fathom.ai/external/v1/recordings/${recordingId}/participants`,
-    apiKey,
-    'participants'
-  );
+  if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+    console.error(`    ⚠ Circuit breaker: ${consecutiveFailures} consecutive failures for recording ${recordingId}`);
+  }
 }
 
 async function fetchWithRetry(url: string, apiKey: string, label: string): Promise<any> {
@@ -620,13 +712,13 @@ async function fetchWithRetry(url: string, apiKey: string, label: string): Promi
 
       if (response.status === 429) {
         const retryDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
-        console.warn(`Rate limited (429) fetching ${label}, retry ${attempt + 1}/${MAX_RETRY_ATTEMPTS} after ${retryDelay}ms`);
+        console.warn(`    ⚠ Rate limited (429) fetching ${label}, retry ${attempt + 1}/${MAX_RETRY_ATTEMPTS} after ${retryDelay}ms`);
         await sleep(retryDelay);
         continue;
       }
 
       if (!response.ok) {
-        if (response.status === 404 || response.status >= 400) {
+        if (response.status === 404) {
           return null;
         }
         const errorText = await response.text();
@@ -638,13 +730,13 @@ async function fetchWithRetry(url: string, apiKey: string, label: string): Promi
       lastError = error instanceof Error ? error : new Error(String(error));
       if (attempt < MAX_RETRY_ATTEMPTS - 1) {
         const retryDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt);
-        console.warn(`Error fetching ${label}, retry ${attempt + 1}/${MAX_RETRY_ATTEMPTS} after ${retryDelay}ms:`, lastError.message);
+        console.warn(`    ⚠ Error fetching ${label}, retry ${attempt + 1}/${MAX_RETRY_ATTEMPTS} after ${retryDelay}ms`);
         await sleep(retryDelay);
       }
     }
   }
 
-  console.error(`Failed to fetch ${label} after ${MAX_RETRY_ATTEMPTS} attempts:`, lastError?.message);
+  console.error(`    ✗ Failed to fetch ${label} after ${MAX_RETRY_ATTEMPTS} attempts`);
   return null;
 }
 
