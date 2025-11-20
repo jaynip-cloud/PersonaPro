@@ -2010,7 +2010,139 @@ export const ClientDetailNew: React.FC = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {meetingInputMode === 'manual' && (
+                    <div className="space-y-4">
+                      {(meetingTranscripts.length === 0 && fathomRecordings.length === 0) ? (
+                        <div className="text-center py-12">
+                          <MessageSquare className="mx-auto text-gray-400 mb-4" size={48} />
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">No meetings yet</h3>
+                          <p className="text-sm text-gray-500 mb-4">
+                            Add manual notes or sync from Fathom to get started
+                          </p>
+                          <div className="flex gap-2 justify-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowAddMeetingModal(true)}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Add Meeting
+                            </Button>
+                          </div>
+                          <div className="mt-4 hidden">
+                            <FathomSync
+                              clientId={client.id}
+                              onSyncComplete={() => {
+                                showToast('Fathom recordings synced successfully', 'success');
+                                loadMeetingTranscripts();
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          <FathomRecordingsList
+                            clientId={client.id}
+                            onRefresh={() => {
+                              loadMeetingTranscripts();
+                            }}
+                          />
+
+                          {meetingTranscripts.length > 0 && (
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-3">Manual Notes ({meetingTranscripts.length})</h4>
+                              <div className="space-y-3">
+                                {meetingTranscripts.map((transcript) => (
+                                  <div
+                                    key={transcript.id}
+                                    className="p-4 border border-border rounded-lg hover:bg-accent transition-colors"
+                                  >
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <h4 className="font-semibold text-foreground">{transcript.title}</h4>
+                                          <Badge variant="secondary" className="text-xs">Manually Added</Badge>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                          {new Date(transcript.meeting_date).toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
+                                          })}
+                                        </p>
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => {
+                                            setMeetingNotes(transcript.transcript_text);
+                                            setMeetingTitle(transcript.title);
+                                            setMeetingDate(transcript.meeting_date.split('T')[0]);
+                                            setEditingTranscriptId(transcript.id);
+                                            setShowAddMeetingModal(true);
+                                          }}
+                                          className="p-1 text-muted-foreground hover:text-primary transition-colors"
+                                          title="Edit note"
+                                        >
+                                          <Edit2 className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setSelectedMeeting(transcript);
+                                            setShowMeetingModal(true);
+                                          }}
+                                          className="p-1 text-muted-foreground hover:text-purple-600 transition-colors"
+                                          title="View details"
+                                        >
+                                          <Eye className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteTranscript(transcript.id)}
+                                          className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
+                                          title="Delete note"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-3">
+                                      {transcript.transcript_text}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="hidden">
+                      <FathomSync
+                        clientId={client.id}
+                        onSyncComplete={() => {
+                          showToast('Fathom recordings synced successfully', 'success');
+                          loadMeetingTranscripts();
+                        }}
+                      />
+                    </div>
+
+                    <MeetingDetailModal
+                      isOpen={showMeetingModal}
+                      onClose={() => {
+                        setShowMeetingModal(false);
+                        setSelectedMeeting(null);
+                      }}
+                      meeting={selectedMeeting}
+                    />
+
+                    <Modal isOpen={showAddMeetingModal} onClose={() => {
+                      setShowAddMeetingModal(false);
+                      setMeetingNotes('');
+                      setMeetingTitle('');
+                      setMeetingDate(new Date().toISOString().split('T')[0]);
+                      setEditingTranscriptId(null);
+                    }}>
+                      <div className="space-y-4">
+                        <h2 className="text-xl font-semibold">{editingTranscriptId ? 'Edit Meeting Note' : 'Add Meeting Note'}</h2>
                       <div className="space-y-3">
                         <Input
                           value={meetingTitle}
@@ -2045,7 +2177,7 @@ export const ClientDetailNew: React.FC = () => {
                                 setMeetingTitle('');
                                 setMeetingDate(new Date().toISOString().split('T')[0]);
                                 setEditingTranscriptId(null);
-                                setMeetingInputMode('list');
+                                setShowAddMeetingModal(false);
                               }}
                               disabled={(!meetingNotes && !meetingTitle) || savingNotes}
                             >
@@ -2072,118 +2204,8 @@ export const ClientDetailNew: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                    )}
-
-                    {meetingInputMode === 'fathom' && (
-                      <div className="space-y-4">
-                        <FathomSync
-                          clientId={client.id}
-                          onSyncComplete={() => {
-                            showToast('Fathom recordings synced successfully', 'success');
-                            loadMeetingTranscripts();
-                            setMeetingInputMode('list');
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {meetingInputMode === 'list' && (
-                      <div className="space-y-4">
-                        {(meetingTranscripts.length === 0 && fathomRecordings.length === 0) ? (
-                          <div className="text-center py-12">
-                            <MessageSquare className="mx-auto text-gray-400 mb-4" size={48} />
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">No meetings yet</h3>
-                            <p className="text-sm text-gray-500 mb-4">
-                              Add manual notes or sync from Fathom to get started
-                            </p>
-                            <div className="flex gap-2 justify-center">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setMeetingInputMode('manual')}
-                              >
-                                <Edit2 className="h-4 w-4 mr-2" />
-                                Add Manual Note
-                              </Button>
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => setMeetingInputMode('fathom')}
-                              >
-                                <LinkIcon className="h-4 w-4 mr-2" />
-                                Sync from Fathom
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {fathomRecordings.length > 0 && (
-                              <div>
-                                <h4 className="text-sm font-semibold text-gray-700 mb-3">Fathom Recordings ({fathomRecordings.length})</h4>
-                                <FathomRecordingsList
-                                  clientId={client.id}
-                                  onRefresh={() => {
-                                    loadMeetingTranscripts();
-                                  }}
-                                />
-                              </div>
-                            )}
-
-                            {meetingTranscripts.length > 0 && (
-                              <div>
-                                <h4 className="text-sm font-semibold text-gray-700 mb-3">Manual Notes ({meetingTranscripts.length})</h4>
-                                <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                                  {meetingTranscripts.map((transcript) => (
-                                    <div
-                                      key={transcript.id}
-                                      className="p-4 border border-border rounded-lg hover:bg-accent transition-colors"
-                                    >
-                                      <div className="flex items-start justify-between mb-2">
-                                        <div className="flex-1">
-                                          <h4 className="font-semibold text-foreground">{transcript.title}</h4>
-                                          <p className="text-xs text-muted-foreground">
-                                            {new Date(transcript.meeting_date).toLocaleDateString('en-US', {
-                                              year: 'numeric',
-                                              month: 'long',
-                                              day: 'numeric'
-                                            })}
-                                          </p>
-                                        </div>
-                                        <div className="flex gap-2">
-                                          <button
-                                            onClick={() => {
-                                              setMeetingNotes(transcript.transcript_text);
-                                              setMeetingTitle(transcript.title);
-                                              setMeetingDate(transcript.meeting_date.split('T')[0]);
-                                              setEditingTranscriptId(transcript.id);
-                                              setMeetingInputMode('manual');
-                                            }}
-                                            className="p-1 text-muted-foreground hover:text-primary transition-colors"
-                                            title="Edit note"
-                                          >
-                                            <Edit2 className="h-4 w-4" />
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteTranscript(transcript.id)}
-                                            className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
-                                            title="Delete note"
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </button>
-                                        </div>
-                                      </div>
-                                      <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-3">
-                                        {transcript.transcript_text}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    </div>
+                    </Modal>
                   </CardContent>
                 </Card>
 
