@@ -31,7 +31,7 @@ export function MeetingDetailModal({ isOpen, onClose, meeting }: MeetingDetailMo
   const wordCount = transcript ? transcript.split(/\s+/).length : 0;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} maxWidth="4xl">
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth="6xl">
       <div className="relative">
         <div className="flex items-start justify-between border-b border-gray-200 pb-4 mb-6">
           <div className="flex-1">

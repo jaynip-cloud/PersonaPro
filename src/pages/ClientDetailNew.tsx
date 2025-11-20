@@ -17,6 +17,7 @@ import { Input } from '../components/ui/Input';
 import { DocumentUpload } from '../components/data-sources/DocumentUpload';
 import { FathomSync } from '../components/data-sources/FathomSync';
 import { FathomRecordingsList } from '../components/data-sources/FathomRecordingsList';
+import { MeetingDetailModal } from '../components/data-sources/MeetingDetailModal';
 import { ProjectDetailPanel } from '../components/project/ProjectDetailPanel';
 import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight, Eye, Link as LinkIcon } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
@@ -96,7 +97,9 @@ export const ClientDetailNew: React.FC = () => {
   const [savingProject, setSavingProject] = useState(false);
   const [fathomRecordings, setFathomRecordings] = useState<any[]>([]);
   const [showFathomRecordings, setShowFathomRecordings] = useState(false);
-  const [meetingInputMode, setMeetingInputMode] = useState<'manual' | 'fathom' | 'list'>('list');
+  const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
+  const [selectedMeeting, setSelectedMeeting] = useState<any | null>(null);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [fathomLinkInput, setFathomLinkInput] = useState('');
 
   const relationshipMetrics = mockRelationshipMetrics.find(r => r.clientId === id);
@@ -1981,34 +1984,27 @@ export const ClientDetailNew: React.FC = () => {
                       </CardTitle>
                       <div className="flex gap-2">
                         <Button
-                          variant={meetingInputMode === 'manual' ? 'primary' : 'outline'}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowAddMeetingModal(true)}
+                          title="Add manual meeting"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Meeting
+                        </Button>
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => {
-                            setMeetingInputMode('manual');
-                            setMeetingNotes('');
-                            setMeetingTitle('');
-                            setMeetingDate(new Date().toISOString().split('T')[0]);
-                            setEditingTranscriptId(null);
+                            const fathomButton = document.querySelector('[data-fathom-sync]');
+                            if (fathomButton) {
+                              (fathomButton as HTMLElement).click();
+                            }
                           }}
-                          title="Add manual meeting note"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant={meetingInputMode === 'fathom' ? 'primary' : 'outline'}
-                          size="sm"
-                          onClick={() => setMeetingInputMode('fathom')}
                           title="Sync from Fathom"
                         >
-                          <LinkIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant={meetingInputMode === 'list' ? 'primary' : 'outline'}
-                          size="sm"
-                          onClick={() => setMeetingInputMode('list')}
-                          title="View all meetings"
-                        >
-                          <FileText className="h-4 w-4" />
+                          <LinkIcon className="h-4 w-4 mr-1" />
+                          Sync Fathom
                         </Button>
                       </div>
                     </div>
