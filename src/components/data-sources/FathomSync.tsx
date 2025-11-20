@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RefreshCw, FolderOpen, Settings } from 'lucide-react';
+import { RefreshCw, FolderOpen, Settings, Link2, Calendar, Info } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { supabase } from '../../lib/supabase';
@@ -25,12 +25,16 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
   const [folderLink, setFolderLink] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [teamFilters, setTeamFilters] = useState<string[]>([]);
   const [meetingTypeFilters, setMeetingTypeFilters] = useState<string[]>([]);
+  const [createdAfter, setCreatedAfter] = useState('');
+  const [createdBefore, setCreatedBefore] = useState('');
   const [syncResult, setSyncResult] = useState<{
     success: boolean;
     count: number;
     message?: string;
+    source?: string;
   } | null>(null);
 
   const handleSync = async () => {
@@ -61,6 +65,8 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
           folder_link: folderLink,
           team_filter: teamFilters.length > 0 ? teamFilters : undefined,
           meeting_type_filter: meetingTypeFilters.length > 0 ? meetingTypeFilters : undefined,
+          created_after: createdAfter || undefined,
+          created_before: createdBefore || undefined,
         }),
       });
 
@@ -177,7 +183,8 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
     <div className="space-y-4">
       <div className="flex items-start gap-3">
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+            <Link2 size={16} />
             Fathom Link
           </label>
           <div className="flex gap-2">
@@ -187,7 +194,7 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
                 type="text"
                 value={folderLink}
                 onChange={(e) => setFolderLink(e.target.value)}
-                placeholder="Paste folder or recording link (e.g., fathom.video/folders/xxx or /recordings/xxx)"
+                placeholder="https://fathom.video/share/... or /folders/... or /recordings/..."
                 disabled={syncing}
                 className="pl-10"
               />
@@ -201,9 +208,12 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
               <Settings size={18} />
             </Button>
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Paste a Fathom folder link to sync all recordings in that folder
-          </p>
+          <div className="flex items-start gap-1 mt-1">
+            <Info size={12} className="text-blue-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-gray-600">
+              Share links use exact API matching • Folder links sync all recordings • Supports date filters
+            </p>
+          </div>
         </div>
 
         <Button
@@ -219,7 +229,7 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
           ) : (
             <>
               <RefreshCw size={18} />
-              Sync Fathom
+              Sync
             </>
           )}
         </Button>
@@ -279,6 +289,43 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
                 : `Syncing only: ${meetingTypeFilters.join(', ')}`}
             </p>
           </div>
+
+          <div>
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <Calendar size={14} />
+              {showAdvanced ? 'Hide' : 'Show'} Date Range Filters
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Created After
+                  </label>
+                  <Input
+                    type="date"
+                    value={createdAfter}
+                    onChange={(e) => setCreatedAfter(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Created Before
+                  </label>
+                  <Input
+                    type="date"
+                    value={createdBefore}
+                    onChange={(e) => setCreatedBefore(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -317,13 +364,17 @@ export function FathomSync({ clientId, onSyncComplete }: FathomSyncProps) {
 
       {/* Info Box */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <p className="text-sm text-blue-800 font-medium mb-1">How it works:</p>
+        <p className="text-sm text-blue-800 font-medium mb-1 flex items-center gap-2">
+          <Info size={16} />
+          How it works:
+        </p>
         <ul className="text-xs text-blue-700 space-y-1 ml-4 list-disc">
-          <li>Paste a Fathom folder link to sync all recordings in that folder</li>
-          <li>Apply team and meeting type filters to sync only relevant recordings</li>
-          <li>Transcripts are automatically processed and chunked for AI analysis</li>
-          <li>Vector embeddings enable semantic search across all meeting content</li>
-          <li>AI insights are generated using meeting context for better pitch generation</li>
+          <li><strong>Share links:</strong> Exact API matching finds specific recordings instantly</li>
+          <li><strong>Folder links:</strong> API-first approach syncs all recordings in folder</li>
+          <li><strong>Smart filtering:</strong> Team, meeting type, and date range filters</li>
+          <li><strong>Conditional fetching:</strong> Only calls endpoints when data is missing</li>
+          <li><strong>Auto-processing:</strong> Transcripts chunked and vectorized for semantic search</li>
+          <li><strong>AI insights:</strong> Embeddings power intelligent pitch generation and analysis</li>
         </ul>
       </div>
     </div>

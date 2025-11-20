@@ -16,6 +16,7 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { DocumentUpload } from '../components/data-sources/DocumentUpload';
 import { FathomSync } from '../components/data-sources/FathomSync';
+import { FathomRecordingsList } from '../components/data-sources/FathomRecordingsList';
 import { ProjectDetailPanel } from '../components/project/ProjectDetailPanel';
 import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight, Eye } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
@@ -2233,120 +2234,20 @@ export const ClientDetailNew: React.FC = () => {
                         }}
                       />
                     ) : (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setShowFathomRecordings(false)}
-                          className="mb-4"
                         >
                           ← Back to Sync
                         </Button>
-                        {fathomRecordings.map((recording) => (
-                          <div
-                            key={recording.id}
-                            className="p-4 border border-border rounded-lg hover:bg-accent transition-colors"
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-foreground">{recording.title}</h4>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(recording.start_time).toLocaleDateString('en-US', {
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                  {recording.duration_minutes && ` • ${recording.duration_minutes} min`}
-                                </p>
-                              </div>
-                              <div className="flex gap-2">
-                                {recording.team_name && (
-                                  <Badge variant="secondary">{recording.team_name}</Badge>
-                                )}
-                                {recording.meeting_type && (
-                                  <Badge variant="secondary">{recording.meeting_type}</Badge>
-                                )}
-                                {recording.embeddings_generated && (
-                                  <Badge variant="success">Indexed</Badge>
-                                )}
-                              </div>
-                            </div>
-
-                            {recording.summary && (
-                              <div className="mb-3">
-                                <p className="text-sm text-foreground">{recording.summary}</p>
-                              </div>
-                            )}
-
-                            {recording.participants && recording.participants.length > 0 && (
-                              <div className="flex items-center gap-2 mb-2">
-                                <Users className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-xs text-muted-foreground">
-                                  {recording.participants.map((p: any) => p.name).join(', ')}
-                                </span>
-                              </div>
-                            )}
-
-                            {recording.action_items && recording.action_items.length > 0 && (
-                              <div className="mb-2">
-                                <p className="text-xs font-medium text-foreground mb-1">Action Items:</p>
-                                <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                  {recording.action_items.slice(0, 3).map((item: any, idx: number) => (
-                                    <li key={idx}>{item.text}</li>
-                                  ))}
-                                  {recording.action_items.length > 3 && (
-                                    <li className="text-primary">+{recording.action_items.length - 3} more</li>
-                                  )}
-                                </ul>
-                              </div>
-                            )}
-
-                            {recording.topics && recording.topics.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mb-2">
-                                {recording.topics.slice(0, 5).map((topic: any, idx: number) => (
-                                  <Badge key={idx} variant="secondary" size="sm">
-                                    {topic.name}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-
-                            {recording.sentiment_score !== null && (
-                              <div className="flex items-center gap-2 text-xs">
-                                <span className="text-muted-foreground">Sentiment:</span>
-                                <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-xs">
-                                  <div
-                                    className={`h-2 rounded-full ${
-                                      recording.sentiment_score > 0.6 ? 'bg-green-500' :
-                                      recording.sentiment_score > 0.4 ? 'bg-yellow-500' :
-                                      'bg-red-500'
-                                    }`}
-                                    style={{ width: `${recording.sentiment_score * 100}%` }}
-                                  />
-                                </div>
-                                <span className="text-muted-foreground">
-                                  {Math.round(recording.sentiment_score * 100)}%
-                                </span>
-                              </div>
-                            )}
-
-                            {recording.playback_url && (
-                              <div className="mt-3 pt-3 border-t border-border">
-                                <a
-                                  href={recording.playback_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                                >
-                                  <Eye className="h-3 w-3" />
-                                  View in Fathom
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                        <FathomRecordingsList
+                          clientId={client.id}
+                          onRefresh={() => {
+                            loadMeetingTranscripts();
+                          }}
+                        />
                       </div>
                     )}
                   </CardContent>
