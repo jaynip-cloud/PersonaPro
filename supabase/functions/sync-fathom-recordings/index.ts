@@ -226,10 +226,16 @@ Deno.serve(async (req: Request) => {
 
         fullTranscript = cleanTranscript(fullTranscript);
 
-        if (!fullTranscript) {
-          console.log(`  ⊚ No transcript available`);
-          skippedRecordings.push({ id: recordingId, title: recording?.title || 'Unknown', reason: 'no_transcript' });
+        const summaryText = typeof summary === 'string' ? summary : (summary?.summary_text || summary?.text || '');
+
+        if (!fullTranscript && !summaryText) {
+          console.log(`  ⊚ No transcript or summary available - recording may not be processed yet`);
+          skippedRecordings.push({ id: recordingId, title: recording?.title || 'Unknown', reason: 'no_content' });
           continue;
+        }
+
+        if (!fullTranscript) {
+          console.log(`  ⚠ No transcript available, but summary exists - syncing anyway`);
         }
 
         const startTime = recording?.recording_start_time || recording?.start_time || recording?.scheduled_start_time;
@@ -258,7 +264,6 @@ Deno.serve(async (req: Request) => {
           selected_by: h.selected_by || '',
         }));
 
-        const summaryText = typeof summary === 'string' ? summary : (summary?.summary_text || summary?.text || '');
         const summarySections = summary?.summary_sections || summary?.sections || [];
         const topics = (summary?.topics || []).map((t: any) => ({
           name: typeof t === 'string' ? t : t.name || t.topic || '',
@@ -348,6 +353,7 @@ Deno.serve(async (req: Request) => {
         .map(([reason, count]) => {
           if (reason === 'already_synced') return `${count} already synced`;
           if (reason === 'no_transcript') return `${count} missing transcript`;
+          if (reason === 'no_content') return `${count} no transcript or summary (not processed yet)`;
           if (reason === 'team_filter') return `${count} filtered by team`;
           if (reason === 'meeting_type_filter') return `${count} filtered by type`;
           return `${count} ${reason}`;
@@ -580,9 +586,9 @@ async function fetchTranscriptAndSummary(recData: RecordingData, apiKey: string)
     );
     if (transcript) {
       recData.transcript = transcript;
-      console.log(`    ✓ Transcript fetched successfully`);
+      console.log(`    ✓ Transcript fetched successfully (${transcript.segments?.length || 'N/A'} segments)`);
     } else {
-      console.warn(`    ⚠ No transcript available for recording ${recordingId}`);
+      console.warn(`    ⚠ No transcript available for recording ${recordingId} (API returned null or 404)`);
     }
   } catch (error) {
     console.warn(`    ⚠ Failed to fetch transcript:`, error instanceof Error ? error.message : error);
@@ -598,9 +604,10 @@ async function fetchTranscriptAndSummary(recData: RecordingData, apiKey: string)
     );
     if (summary) {
       recData.summary = summary;
-      console.log(`    ✓ Summary fetched successfully`);
+      const summaryLength = typeof summary === 'string' ? summary.length : (summary.summary_text?.length || summary.text?.length || 0);
+      console.log(`    ✓ Summary fetched successfully (${summaryLength} chars)`);
     } else {
-      console.warn(`    ⚠ No summary available for recording ${recordingId}`);
+      console.warn(`    ⚠ No summary available for recording ${recordingId} (API returned null or 404)`);
     }
   } catch (error) {
     console.warn(`    ⚠ Failed to fetch summary:`, error instanceof Error ? error.message : error);
