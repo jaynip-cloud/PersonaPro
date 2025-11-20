@@ -19,9 +19,9 @@ interface TranscriptChunk {
   speaker_email: string;
 }
 
-const CHUNK_SIZE = 1500; // tokens (~2000 chars)
-const CHUNK_OVERLAP = 200; // tokens for context continuity
-const CHARS_PER_TOKEN = 4; // rough estimate
+const CHUNK_SIZE = 1500;
+const CHUNK_OVERLAP = 200;
+const CHARS_PER_TOKEN = 4;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -47,7 +47,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unauthorized');
     }
 
-    // Get OpenAI API key
     const { data: apiKeys, error: keysError } = await supabaseClient
       .from('api_keys')
       .select('openai_api_key')
@@ -72,7 +71,6 @@ Deno.serve(async (req: Request) => {
 
     console.log('Processing embeddings for recording:', recording_id);
 
-    // Fetch recording from database
     const { data: recording, error: recordingError } = await supabaseClient
       .from('fathom_recordings')
       .select('*')
@@ -91,22 +89,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Parse transcript into speaker-tagged segments
     const segments = parseTranscriptSegments(recording.transcript);
-    
-    // Create overlapping chunks
     const chunks = createOverlappingChunks(segments);
 
     console.log(`Created ${chunks.length} chunks from transcript`);
 
-    // Generate embeddings for each chunk
     const embeddings = [];
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       
       try {
-        // Call OpenAI API for embedding
         const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
           method: 'POST',
           headers: {
@@ -128,7 +121,6 @@ Deno.serve(async (req: Request) => {
         const embeddingData = await embeddingResponse.json();
         const embedding = embeddingData.data[0].embedding;
 
-        // Insert embedding into database
         const { error: insertError } = await supabaseClient
           .from('fathom_embeddings')
           .insert({
@@ -153,7 +145,6 @@ Deno.serve(async (req: Request) => {
 
         embeddings.push({ chunk_index: i, success: true });
 
-        // Rate limiting: small delay between requests
         if (i < chunks.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
@@ -162,7 +153,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Only mark recording as embeddings generated if we actually created embeddings
     if (embeddings.length > 0) {
       const { error: updateError } = await supabaseClient
         .from('fathom_recordings')
@@ -187,7 +177,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     } else {
-      // No embeddings were created - return error
       console.error('Failed to create any embeddings');
       return new Response(
         JSON.stringify({
@@ -216,7 +205,6 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-// Parse transcript into structured segments with speaker and timing
 function parseTranscriptSegments(transcript: string): Array<{
   speaker: string;
   text: string;
@@ -228,14 +216,12 @@ function parseTranscriptSegments(transcript: string): Array<{
   let currentTimestamp = 0;
 
   for (const line of lines) {
-    // Match pattern: "Speaker Name: text"
     const match = line.match(/^([^:]+):\s*(.+)$/);
     if (match) {
       const speaker = match[1].trim();
       const text = match[2].trim();
       
-      // Estimate timestamp based on text length (very rough)
-      const speakingTime = Math.ceil(text.split(' ').length * 0.5); // ~0.5 seconds per word
+      const speakingTime = Math.ceil(text.split(' ').length * 0.5);
       
       segments.push({
         speaker,
@@ -250,7 +236,6 @@ function parseTranscriptSegments(transcript: string): Array<{
   return segments;
 }
 
-// Create overlapping chunks from segments
 function createOverlappingChunks(segments: Array<{
   speaker: string;
   text: string;
@@ -271,11 +256,9 @@ function createOverlappingChunks(segments: Array<{
     const segment = segments[segmentIndex];
     const segmentText = `${segment.speaker}: ${segment.text}`;
 
-    // Check if adding this segment would exceed chunk size
     const wouldExceedLimit = currentChunk && (currentChunk.length + segmentText.length + 2) > chunkSizeChars;
 
     if (wouldExceedLimit) {
-      // Save current chunk before adding this segment
       chunks.push({
         text: currentChunk.trim(),
         start_timestamp: chunkStartTimestamp,
@@ -284,7 +267,6 @@ function createOverlappingChunks(segments: Array<{
         speaker_email: '',
       });
 
-      // Create overlap: go back a few segments
       const overlapSegments = [];
       let overlapSize = 0;
       let backtrack = segmentIndex - 1;
@@ -297,7 +279,6 @@ function createOverlappingChunks(segments: Array<{
         backtrack--;
       }
 
-      // Start new chunk with overlap
       if (overlapSegments.length > 0) {
         currentChunk = overlapSegments
           .map(s => `${s.speaker}: ${s.text}`)
@@ -309,11 +290,8 @@ function createOverlappingChunks(segments: Array<{
         chunkStartTimestamp = segment.timestamp;
         currentSpeaker = segment.speaker;
       }
-
-      // Don't skip the current segment, continue to add it below
     }
 
-    // Add current segment to chunk
     if (currentChunk) {
       currentChunk += '\n\n';
     }
@@ -328,7 +306,6 @@ function createOverlappingChunks(segments: Array<{
     segmentIndex++;
   }
 
-  // Add final chunk
   if (currentChunk) {
     chunks.push({
       text: currentChunk.trim(),
