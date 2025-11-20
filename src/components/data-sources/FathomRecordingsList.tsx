@@ -426,19 +426,18 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
               ) : (
                 <div>
                   {selectedRecording.transcript ? (
-                    <div className="bg-white rounded-lg border border-gray-200 p-6">
-                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                        <h4 className="text-sm font-semibold text-gray-900">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                          <MessageSquare size={16} />
                           Full Transcript
                         </h4>
                         <span className="text-xs text-gray-500 font-medium">
                           {selectedRecording.transcript.split(/\s+/).length.toLocaleString()} words
                         </span>
                       </div>
-                      <div className="prose prose-sm max-w-none">
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                          {selectedRecording.transcript}
-                        </p>
+                      <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-100">
+                        <MarkdownRenderer content={selectedRecording.transcript} />
                       </div>
                     </div>
                   ) : (
