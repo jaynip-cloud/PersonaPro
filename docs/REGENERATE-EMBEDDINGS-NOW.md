@@ -12,33 +12,17 @@ Recording is marked `embeddings_generated: true` but `fathom_embeddings` table i
 
 ## REGENERATE NOW - Browser Console Method
 
-1. **Make sure you're logged in to the app**
-2. Open your client page in the browser
-3. Open Developer Console (F12)
-4. Paste and run this code:
+1. Open your client page in the browser
+2. Open Developer Console (F12)
+3. Paste and run this code:
 
 ```javascript
-// Import Supabase from CDN
-const script = document.createElement('script');
-script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-document.head.appendChild(script);
+const supabaseUrl = 'https://dxfagynvuqjdzbgroivu.supabase.co';
+const recordingId = 'c458871e-9fcb-4543-af9a-539dbc963529';
 
-script.onload = async () => {
-  const { createClient } = supabase;
-  const supabaseUrl = 'https://dxfagynvuqjdzbgroivu.supabase.co';
-  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4ZmFneW52dXFqZHpiZ3JvaXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5MDU2NzgsImV4cCI6MjA3NzQ4MTY3OH0.z9jxvkliQZN59mM0RCkbMnfDL-k4R13N5ezE6JB2Aig';
-  const recordingId = 'c458871e-9fcb-4543-af9a-539dbc963529';
-
-  const client = createClient(supabaseUrl, supabaseKey);
-  const { data: { session } } = await client.auth.getSession();
-
-  if (!session) {
-    console.error('❌ Not logged in! Please log in first.');
-    return;
-  }
-
-  console.log('🔄 Generating embeddings... (this may take 30 seconds)');
-
+(async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  
   const response = await fetch(`${supabaseUrl}/functions/v1/process-fathom-embeddings`, {
     method: 'POST',
     headers: {
@@ -49,24 +33,18 @@ script.onload = async () => {
   });
 
   const result = await response.json();
-
-  if (result.success) {
-    console.log('✅ SUCCESS!');
-    console.log(`   Created ${result.embeddings_created} embeddings`);
-    console.log(`   From ${result.chunks_total} chunks`);
-    console.log('\n🎉 Intelligence Agent can now read Fathom meetings!');
-  } else {
-    console.error('❌ FAILED:', result.error);
-  }
-};
+  console.log('✅ Result:', result);
+  
+  // Expected: { success: true, embeddings_created: 6-7, chunks_total: 6-7 }
+})();
 ```
 
-5. **Wait 20-30 seconds** - it's calling OpenAI to generate embeddings for 6-7 chunks
-6. Should see: `✅ SUCCESS! Created 6 embeddings`
+4. Check the console output
+5. Should see: `embeddings_created: 6` or `7`
 
 ## Verify It Worked
 
-Check the database (Settings → Database or Supabase dashboard):
+Run this SQL:
 
 ```sql
 SELECT COUNT(*) as embedding_count 
@@ -74,31 +52,15 @@ FROM fathom_embeddings
 WHERE recording_id = 'c458871e-9fcb-4543-af9a-539dbc963529';
 ```
 
-Should return: **6 or 7** (not 0!)
+Should return: `6` or `7` (not 0!)
 
 ## Test Intelligence Agent
 
-1. Go to client's **Intelligence Agent** tab
-2. Ask: **"What was discussed in recent meetings?"**
-3. Should see:
-   - ✅ Answer citing the SOS Biweekly Meeting
-   - ✅ Speaker names (Jessica Wagner, Aagna Paneri, etc.)
-   - ✅ Metadata showing `fathomTranscriptsFound: 6` or `7`
+1. Go to client's Intelligence Agent
+2. Ask: "What was discussed in recent meetings?"
+3. Should cite the SOS meeting with speaker names
+4. Metadata should show `fathomTranscriptsFound > 0`
 
-## Alternative: Re-Sync from UI (Simpler but Slower)
+## Alternative: Re-Sync from UI
 
-1. Go to **Data Sources** tab
-2. Click **Fathom Sync** section
-3. Paste the same meeting link again
-4. System will auto-regenerate embeddings
-
-This is easier but requires you to have the original link.
-
-## What Changed
-
-1. **Bug Fix**: Function returns error if NO embeddings created (was marking success before)
-2. **Chunking Fix**: Properly splits at 6000 chars (was 36K single chunk)
-3. **Status Check**: Only marks `embeddings_generated: true` if successful
-4. **Search Integration**: Intelligence Agent uses `match_all_content()` to search Fathom data
-
-All deployed and ready! Just run the console code above.
+Go to Data Sources → Fathom Sync → paste the meeting link again. It will auto-regenerate.
