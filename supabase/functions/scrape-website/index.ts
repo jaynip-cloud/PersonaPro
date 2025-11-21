@@ -66,12 +66,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unauthorized');
     }
 
-    const { data: apiKeys, error: keysError } = await supabaseClient
-      .from('api_keys')
-      .select('playwright_api_key')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
     const body: ScrapeRequest = await req.json();
     const { url, includeLinks = true, screenshot = false, waitForSelector } = body;
 
@@ -81,17 +75,9 @@ Deno.serve(async (req: Request) => {
 
     console.log('Scraping URL:', url);
 
-    let result: ScrapeResult;
-
-    if (apiKeys?.playwright_api_key) {
-      result = await scrapeWithPlaywright(url, apiKeys.playwright_api_key, {
-        includeLinks,
-        screenshot,
-        waitForSelector
-      });
-    } else {
-      result = await scrapeWithCheerio(url, { includeLinks });
-    }
+    // Always use Cheerio for now (Playwright in Deno Edge Functions requires additional setup)
+    // For JavaScript-heavy sites, users can use Firecrawl API instead
+    const result = await scrapeWithCheerio(url, { includeLinks });
 
     console.log('Scraping completed successfully');
 
@@ -118,116 +104,6 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
-
-async function scrapeWithPlaywright(
-  url: string,
-  apiKey: string,
-  options: { includeLinks?: boolean; screenshot?: boolean; waitForSelector?: string }
-): Promise<ScrapeResult> {
-  console.log('Using Playwright for scraping:', url);
-
-  const playwrightEndpoint = `https://production-sfo.browserless.io/chromium/playwright?token=${apiKey}`;
-
-  const script = `
-    const browser = await playwright.chromium.connectOverCDP('${playwrightEndpoint}');
-    const page = await browser.newPage();
-
-    try {
-      await page.goto('${url}', {
-        waitUntil: 'networkidle',
-        timeout: 30000
-      });
-
-      ${options.waitForSelector ? `await page.waitForSelector('${options.waitForSelector}', { timeout: 10000 });` : ''}
-
-      const title = await page.title();
-      const content = await page.content();
-      const text = await page.evaluate(() => document.body.innerText);
-
-      const metadata = await page.evaluate(() => {
-        const getMeta = (name) => {
-          const meta = document.querySelector(\`meta[property="\${name}"], meta[name="\${name}"]\`);
-          return meta ? meta.getAttribute('content') : null;
-        };
-
-        const getLink = (rel) => {
-          const link = document.querySelector(\`link[rel="\${rel}"]\`);
-          return link ? link.getAttribute('href') : null;
-        };
-
-        return {
-          ogTitle: getMeta('og:title'),
-          ogDescription: getMeta('og:description'),
-          ogImage: getMeta('og:image'),
-          description: getMeta('description'),
-          keywords: getMeta('keywords'),
-          author: getMeta('author'),
-          canonical: getLink('canonical'),
-        };
-      });
-
-      const links = ${options.includeLinks} ? await page.evaluate(() => {
-        return Array.from(document.querySelectorAll('a[href]')).map(a => a.href);
-      }) : [];
-
-      ${options.screenshot ? `const screenshot = await page.screenshot({ encoding: 'base64', fullPage: false });` : 'const screenshot = null;'}
-
-      await browser.close();
-
-      return {
-        title,
-        content,
-        text,
-        metadata,
-        links,
-        screenshot,
-      };
-    } catch (error) {
-      await browser.close();
-      throw error;
-    }
-  `;
-
-  const playwrightResponse = await fetch('https://production-sfo.browserless.io/function', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',
-    },
-    body: JSON.stringify({
-      token: apiKey,
-      code: script,
-    }),
-  });
-
-  if (!playwrightResponse.ok) {
-    const errorText = await playwrightResponse.text();
-    console.error('Playwright API error:', errorText);
-    throw new Error(`Playwright API error: ${playwrightResponse.status}`);
-  }
-
-  const playwrightData = await playwrightResponse.json();
-
-  const { title, content, text, metadata, links, screenshot: screenshotData } = playwrightData;
-
-  const $ = cheerio.load(content);
-  const { socialLinks, emails } = extractContactInfo($);
-  const structuredData = extractStructuredData($);
-
-  return {
-    url,
-    title,
-    content,
-    html: content,
-    text,
-    links: options.includeLinks ? links : [],
-    socialLinks,
-    emails,
-    metadata,
-    screenshot: screenshotData,
-    structuredData,
-  };
-}
 
 async function scrapeWithCheerio(
   url: string,
