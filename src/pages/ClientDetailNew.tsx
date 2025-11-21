@@ -858,8 +858,10 @@ export const ClientDetailNew: React.FC = () => {
 
         const sourcesParts = [];
         if (sources.documentsSearched > 0) sourcesParts.push(`${sources.documentsSearched} documents`);
-        if (sources.transcriptsIncluded > 0) sourcesParts.push(`${sources.transcriptsIncluded} meetings`);
-        if (sources.transcriptMatchesFound > 0) sourcesParts.push(`${sources.transcriptMatchesFound} meeting excerpts`);
+        if (sources.manualTranscriptsIncluded > 0) sourcesParts.push(`${sources.manualTranscriptsIncluded} manual notes`);
+        if (sources.fathomRecordingsAvailable > 0) sourcesParts.push(`${sources.fathomRecordingsAvailable} Fathom recordings`);
+        if (sources.fathomTranscriptsFound > 0) sourcesParts.push(`${sources.fathomTranscriptsFound} Fathom excerpts`);
+        if (sources.transcriptMatchesFound > 0 && !sources.fathomTranscriptsFound) sourcesParts.push(`${sources.transcriptMatchesFound} meeting excerpts`);
         if (sources.contactsFound > 0) sourcesParts.push(`${sources.contactsFound} contacts`);
 
         const confidenceEmoji = confidence === 'high' ? '🟢' : confidence === 'medium' ? '🟡' : '🔴';

@@ -58,7 +58,7 @@ function analyzeQueryIntent(query: string): QueryIntent {
 }
 
 function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): string {
-  const { client, companyProfile, contacts, transcripts, opportunities, documentMatches } = data;
+  const { client, companyProfile, contacts, transcripts, fathomRecordings, opportunities, documentMatches } = data;
   const contextParts = [];
 
   // Strategic context based on intent
@@ -231,7 +231,7 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
 
   // Meeting transcripts - Prioritize by timeframe and relevance
   if (transcripts && transcripts.length > 0) {
-    const transcriptsSection = ['\n=== MEETING HISTORY ==='];
+    const transcriptsSection = ['\n=== MEETING HISTORY (Manual Notes) ==='];
 
     transcripts.forEach((t: any, i: number) => {
       const date = new Date(t.meeting_date).toLocaleDateString('en-US', {
@@ -256,6 +256,25 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     });
 
     contextParts.push(transcriptsSection.join('\n'));
+  }
+
+  // Fathom Recordings - Show summary
+  if (fathomRecordings && fathomRecordings.length > 0) {
+    const fathomSection = ['\n=== FATHOM RECORDINGS AVAILABLE ==='];
+    fathomSection.push(`Found ${fathomRecordings.length} Fathom-recorded meetings for this client.`);
+    fathomSection.push('Note: Detailed excerpts from these recordings appear in the "RELEVANT MEETING EXCERPTS" section below when semantically relevant to your query.\n');
+
+    fathomRecordings.forEach((recording: any, i: number) => {
+      const date = new Date(recording.start_time).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+      const duration = recording.duration ? ` (${Math.round(recording.duration / 60)} min)` : '';
+      fathomSection.push(`${i + 1}. ${recording.title} - ${date}${duration}`);
+    });
+
+    contextParts.push(fathomSection.join('\n'));
   }
 
   // Document matches - Semantic search results
@@ -395,12 +414,14 @@ Deno.serve(async (req: Request) => {
       companyProfileResult,
       contactsResult,
       transcriptsResult,
+      fathomRecordingsResult,
       opportunitiesResult,
     ] = await Promise.all([
       supabaseClient.from('clients').select('*').eq('id', clientId).eq('user_id', user.id).single(),
       supabaseClient.from('company_profiles').select('*').eq('user_id', user.id).single(),
       supabaseClient.from('contacts').select('*').eq('client_id', clientId).eq('user_id', user.id),
       supabaseClient.from('meeting_transcripts').select('*').eq('client_id', clientId).eq('user_id', user.id).order('meeting_date', { ascending: false }).limit(mode === 'deep' ? 5 : 3),
+      supabaseClient.from('fathom_recordings').select('id, title, start_time, duration, playback_url').eq('client_id', clientId).eq('user_id', user.id).order('start_time', { ascending: false }).limit(mode === 'deep' ? 5 : 3),
       supabaseClient.from('opportunities').select('*').eq('client_id', clientId).eq('user_id', user.id),
     ]);
 
@@ -412,6 +433,7 @@ Deno.serve(async (req: Request) => {
     const companyProfile = companyProfileResult.data;
     const contacts = contactsResult.data || [];
     const transcripts = transcriptsResult.data || [];
+    const fathomRecordings = fathomRecordingsResult.data || [];
     const opportunities = opportunitiesResult.data || [];
 
     // Generate embedding for semantic search
@@ -435,8 +457,9 @@ Deno.serve(async (req: Request) => {
     const queryEmbedding = embeddingData.data[0].embedding;
 
     // Perform semantic search with adaptive threshold
-    const searchLimit = mode === 'deep' ? 15 : 8;
-    const similarityThreshold = intent.type === 'factual' ? 0.75 : 0.65; // Higher threshold for factual queries
+    const searchLimit = mode === 'deep' ? 20 : 12;
+    // Lower threshold to include more meeting data - meetings contain valuable context
+    const similarityThreshold = intent.type === 'factual' ? 0.70 : 0.60;
 
     // Use unified search that includes both document and Fathom embeddings
     const { data: documentMatches } = await supabaseClient.rpc('match_all_content', {
@@ -453,6 +476,7 @@ Deno.serve(async (req: Request) => {
       companyProfile,
       contacts,
       transcripts,
+      fathomRecordings,
       opportunities,
       documentMatches: documentMatches || [],
     };
@@ -529,7 +553,8 @@ Deno.serve(async (req: Request) => {
             documentsSearched: documentMatches?.filter((d: any) =>
               d.source_type !== 'meeting_transcript' && d.source_type !== 'fathom_transcript'
             ).length || 0,
-            transcriptsIncluded: transcripts.length,
+            manualTranscriptsIncluded: transcripts.length,
+            fathomRecordingsAvailable: fathomRecordings.length,
             transcriptMatchesFound: documentMatches?.filter((d: any) =>
               d.source_type === 'meeting_transcript' || d.source_type === 'fathom_transcript'
             ).length || 0,
