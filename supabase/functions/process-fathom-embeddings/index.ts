@@ -226,16 +226,21 @@ function parseTranscriptSegments(transcript: string): Array<{
 }> {
   const segments = [];
 
-  const speakerPattern = /([^:]+):\s*([^]*?)(?=\s+[^:]+:|$)/g;
+  const parts = transcript.split(/(?=[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*:\s)/);
 
   let currentTimestamp = 0;
   let currentSpeaker = '';
   let currentText = '';
-  let match;
 
-  while ((match = speakerPattern.exec(transcript)) !== null) {
-    const speaker = match[1].trim();
-    const text = match[2].trim();
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+
+    const colonIndex = trimmed.indexOf(':');
+    if (colonIndex === -1) continue;
+
+    const speaker = trimmed.substring(0, colonIndex).trim();
+    const text = trimmed.substring(colonIndex + 1).trim();
 
     if (!speaker || !text) continue;
 
