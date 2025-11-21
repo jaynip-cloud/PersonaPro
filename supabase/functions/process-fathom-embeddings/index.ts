@@ -19,12 +19,9 @@ interface TranscriptChunk {
   speaker_email: string;
 }
 
-// Chunking Configuration
-const CHUNK_TOKENS = 1500; // Target chunk size in tokens
-const CHUNK_OVERLAP = 200; // Overlap between chunks in tokens for context continuity
-const SPEAKER_AWARE_CHUNKING = true; // Preserve speaker boundaries
-const MAX_CHUNK_CHARS = 20000; // Safety cap to prevent oversized chunks
-const CHARS_PER_TOKEN = 4; // Rough estimate for token-to-char conversion
+const CHUNK_SIZE = 1500; // tokens (~2000 chars)
+const CHUNK_OVERLAP = 200; // tokens for context continuity
+const CHARS_PER_TOKEN = 4; // rough estimate
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -74,13 +71,6 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log('Processing embeddings for recording:', recording_id);
-    console.log('Chunking config:', {
-      CHUNK_TOKENS,
-      CHUNK_OVERLAP,
-      SPEAKER_AWARE_CHUNKING,
-      MAX_CHUNK_CHARS,
-      CHARS_PER_TOKEN
-    });
 
     // Fetch recording from database
     const { data: recording, error: recordingError } = await supabaseClient
@@ -267,8 +257,8 @@ function createOverlappingChunks(segments: Array<{
   timestamp: number;
 }>): TranscriptChunk[] {
   const chunks: TranscriptChunk[] = [];
-
-  const chunkSizeChars = Math.min(CHUNK_TOKENS * CHARS_PER_TOKEN, MAX_CHUNK_CHARS);
+  
+  const chunkSizeChars = CHUNK_SIZE * CHARS_PER_TOKEN;
   const overlapSizeChars = CHUNK_OVERLAP * CHARS_PER_TOKEN;
   
   let currentChunk = '';
@@ -286,16 +276,8 @@ function createOverlappingChunks(segments: Array<{
 
     if (wouldExceedLimit) {
       // Save current chunk before adding this segment
-      let chunkText = currentChunk.trim();
-
-      // Apply safety cap if chunk exceeds MAX_CHUNK_CHARS
-      if (chunkText.length > MAX_CHUNK_CHARS) {
-        console.warn(`Chunk exceeds MAX_CHUNK_CHARS (${chunkText.length} > ${MAX_CHUNK_CHARS}), truncating`);
-        chunkText = chunkText.substring(0, MAX_CHUNK_CHARS);
-      }
-
       chunks.push({
-        text: chunkText,
+        text: currentChunk.trim(),
         start_timestamp: chunkStartTimestamp,
         end_timestamp: chunkEndTimestamp,
         speaker_name: currentSpeaker,
@@ -348,16 +330,8 @@ function createOverlappingChunks(segments: Array<{
 
   // Add final chunk
   if (currentChunk) {
-    let chunkText = currentChunk.trim();
-
-    // Apply safety cap if chunk exceeds MAX_CHUNK_CHARS
-    if (chunkText.length > MAX_CHUNK_CHARS) {
-      console.warn(`Final chunk exceeds MAX_CHUNK_CHARS (${chunkText.length} > ${MAX_CHUNK_CHARS}), truncating`);
-      chunkText = chunkText.substring(0, MAX_CHUNK_CHARS);
-    }
-
     chunks.push({
-      text: chunkText,
+      text: currentChunk.trim(),
       start_timestamp: chunkStartTimestamp,
       end_timestamp: chunkEndTimestamp,
       speaker_name: currentSpeaker,
