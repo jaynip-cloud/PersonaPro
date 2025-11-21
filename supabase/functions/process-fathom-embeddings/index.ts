@@ -227,13 +227,54 @@ function cleanAndNormalizeTranscript(transcript: string): string {
 
   let cleaned = transcript;
 
-  // Remove multiple spaces
+  // STEP 1: Remove emojis and emoticons (all unicode emoji ranges)
+  // Remove all emoji characters including symbols, pictographs, flags, etc.
+  cleaned = cleaned.replace(/[\u{1F600}-\u{1F64F}]/gu, ''); // Emoticons
+  cleaned = cleaned.replace(/[\u{1F300}-\u{1F5FF}]/gu, ''); // Misc Symbols and Pictographs
+  cleaned = cleaned.replace(/[\u{1F680}-\u{1F6FF}]/gu, ''); // Transport and Map
+  cleaned = cleaned.replace(/[\u{1F700}-\u{1F77F}]/gu, ''); // Alchemical Symbols
+  cleaned = cleaned.replace(/[\u{1F780}-\u{1F7FF}]/gu, ''); // Geometric Shapes Extended
+  cleaned = cleaned.replace(/[\u{1F800}-\u{1F8FF}]/gu, ''); // Supplemental Arrows-C
+  cleaned = cleaned.replace(/[\u{1F900}-\u{1F9FF}]/gu, ''); // Supplemental Symbols and Pictographs
+  cleaned = cleaned.replace(/[\u{1FA00}-\u{1FA6F}]/gu, ''); // Chess Symbols
+  cleaned = cleaned.replace(/[\u{1FA70}-\u{1FAFF}]/gu, ''); // Symbols and Pictographs Extended-A
+  cleaned = cleaned.replace(/[\u{2600}-\u{26FF}]/gu, '');   // Misc symbols
+  cleaned = cleaned.replace(/[\u{2700}-\u{27BF}]/gu, '');   // Dingbats
+  cleaned = cleaned.replace(/[\u{231A}-\u{231B}]/gu, '');   // Watch, Hourglass
+  cleaned = cleaned.replace(/[\u{23E9}-\u{23FA}]/gu, '');   // Media controls
+  cleaned = cleaned.replace(/[\u{25AA}-\u{25AB}]/gu, '');   // Squares
+  cleaned = cleaned.replace(/[\u{25B6}]/gu, '');            // Play button
+  cleaned = cleaned.replace(/[\u{25C0}]/gu, '');            // Reverse button
+  cleaned = cleaned.replace(/[\u{2934}-\u{2935}]/gu, '');   // Arrows
+
+  // Text-based emoticons :) :( :D etc.
+  cleaned = cleaned.replace(/[:;=][-']?[()DPpO\[\]{}|\\\/]/g, '');
+
+  // STEP 2: Remove currency symbols
+  cleaned = cleaned.replace(/[$€£¥₹₽₩₪₱₦₴₨₵₸₺₼₾]/g, '');
+
+  // STEP 3: Remove math symbols (but keep hyphens for compound words)
+  cleaned = cleaned.replace(/[+×÷=≠≈≤≥±∞√∑∏∫∂∆]/g, '');
+
+  // STEP 4: Remove brackets and parentheses with their content (annotations)
+  cleaned = cleaned.replace(/\[[^\]]*\]/g, ''); // Remove [annotations]
+  cleaned = cleaned.replace(/\([^)]*\)/g, '');  // Remove (annotations)
+  cleaned = cleaned.replace(/\{[^}]*\}/g, '');  // Remove {annotations}
+
+  // STEP 5: Remove URLs
+  cleaned = cleaned.replace(/https?:\/\/[^\s]+/gi, '');
+  cleaned = cleaned.replace(/www\.[^\s]+/gi, '');
+
+  // STEP 6: Remove email addresses
+  cleaned = cleaned.replace(/[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+/gi, '');
+
+  // STEP 7: Remove multiple spaces
   cleaned = cleaned.replace(/\s+/g, ' ');
 
-  // Fix spacing around speaker tags (ensure "Name: " format)
+  // STEP 8: Fix spacing around speaker tags (ensure "Name: " format)
   cleaned = cleaned.replace(/\s*:\s*/g, ': ');
 
-  // Remove filler words and verbal tics (common in transcripts)
+  // STEP 9: Remove filler words and verbal tics (common in transcripts)
   const fillerWords = [
     /\b(um+|uh+|er+|ah+)\b/gi,
     /\b(like|you know|I mean|kind of|sort of),?\s*/gi,
@@ -244,7 +285,7 @@ function cleanAndNormalizeTranscript(transcript: string): string {
     cleaned = cleaned.replace(pattern, '');
   }
 
-  // Clean up incomplete sentences and fragments
+  // STEP 10: Clean up incomplete sentences and fragments
   // Remove standalone punctuation with no content
   cleaned = cleaned.replace(/\s+[.,!?]+\s+/g, '. ');
 
@@ -253,12 +294,12 @@ function cleanAndNormalizeTranscript(transcript: string): string {
   cleaned = cleaned.replace(/\?{2,}/g, '?');
   cleaned = cleaned.replace(/!{2,}/g, '!');
 
-  // Normalize speaker names - ensure consistent capitalization
+  // STEP 11: Normalize speaker names - ensure consistent capitalization
   cleaned = cleaned.replace(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*):/, (match, name) => {
     return name.trim() + ':';
   });
 
-  // Remove very short utterances (less than 3 characters after speaker name)
+  // STEP 12: Remove very short utterances (less than 3 characters after speaker name)
   const lines = [];
   const parts = cleaned.split(/(?=[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*:\s)/);
 
@@ -280,10 +321,10 @@ function cleanAndNormalizeTranscript(transcript: string): string {
 
   cleaned = lines.join(' ');
 
-  // Clean up whitespace again
+  // STEP 13: Clean up whitespace again
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
-  // Ensure sentences end with punctuation
+  // STEP 14: Ensure sentences end with punctuation
   cleaned = cleaned.replace(/([a-z0-9])\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*:)/g, '$1. $2');
 
   return cleaned;
