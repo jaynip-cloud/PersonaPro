@@ -8,6 +8,7 @@ const corsHeaders = {
 
 interface RequestBody {
   url: string;
+  openaiKey?: string;
 }
 
 interface CrawlResult {
@@ -42,7 +43,12 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { url }: RequestBody = await req.json();
+    const { url, openaiKey }: RequestBody = await req.json();
+
+    if (openaiKey) {
+      Deno.env.set('OPENAI_API_KEY', openaiKey);
+      console.log('Using OpenAI API key from request body');
+    }
 
     if (!url) {
       return new Response(
@@ -54,7 +60,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const hasApiKey = !!Deno.env.get('OPENAI_API_KEY');
     console.log(`Starting extraction for: ${url}`);
+    console.log('OpenAI API Key configured:', hasApiKey);
+
+    if (!hasApiKey) {
+      console.warn('⚠️ No OpenAI API key found. Will use basic Cheerio extraction only.');
+      console.warn('For better results, set OPENAI_API_KEY as a Supabase secret or pass it in the request body.');
+    }
 
     const authHeader = req.headers.get("Authorization");
 
@@ -138,6 +151,8 @@ Deno.serve(async (req: Request) => {
       emails: simplifiedData.data.contactInfo.primaryEmail,
       services: simplifiedData.data.services.length,
       blogs: simplifiedData.data.blogs.length,
+      technology: simplifiedData.data.technology.stack.length,
+      contacts: simplifiedData.data.contacts.length,
     });
 
     return new Response(
@@ -707,8 +722,8 @@ async function extractServicesWithLLM(servicesPage: CrawlResult | undefined, hom
   if (!page) return [];
 
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiApiKey) {
-    console.warn('OpenAI API key not configured, falling back to basic extraction');
+  if (!openaiApiKey || openaiApiKey.trim() === '') {
+    console.warn('OpenAI API key not configured in Supabase secrets, using basic extraction');
     return extractServices(servicesPage, homePage);
   }
 
@@ -763,8 +778,8 @@ async function extractTeamInfoWithLLM(teamPage: CrawlResult | undefined, aboutPa
   if (!page) return { contacts: [], leadership: {} };
 
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiApiKey) {
-    console.warn('OpenAI API key not configured, falling back to basic extraction');
+  if (!openaiApiKey || openaiApiKey.trim() === '') {
+    console.warn('OpenAI API key not configured in Supabase secrets, using basic extraction');
     return extractTeamInfo(teamPage, aboutPage);
   }
 
@@ -821,8 +836,8 @@ async function extractBlogsWithLLM(blogPages: CrawlResult[], rootUrl: string) {
   if (blogPages.length === 0) return [];
 
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiApiKey) {
-    console.warn('OpenAI API key not configured, falling back to basic extraction');
+  if (!openaiApiKey || openaiApiKey.trim() === '') {
+    console.warn('OpenAI API key not configured in Supabase secrets, using basic extraction');
     return extractBlogs(blogPages);
   }
 
@@ -873,8 +888,8 @@ async function extractBlogsWithLLM(blogPages: CrawlResult[], rootUrl: string) {
 
 async function extractTechnologyWithLLM(pages: CrawlResult[]) {
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiApiKey) {
-    console.warn('OpenAI API key not configured, falling back to basic extraction');
+  if (!openaiApiKey || openaiApiKey.trim() === '') {
+    console.warn('OpenAI API key not configured in Supabase secrets, using basic extraction');
     return extractTechnology(pages);
   }
 
@@ -927,8 +942,8 @@ async function extractTechnologyWithLLM(pages: CrawlResult[]) {
 
 async function extractTestimonialsWithLLM(pages: CrawlResult[]) {
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiApiKey) {
-    console.warn('OpenAI API key not configured, falling back to basic extraction');
+  if (!openaiApiKey || openaiApiKey.trim() === '') {
+    console.warn('OpenAI API key not configured in Supabase secrets, using basic extraction');
     return extractTestimonials(pages);
   }
 

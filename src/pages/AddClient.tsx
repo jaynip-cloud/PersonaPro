@@ -310,6 +310,16 @@ export const AddClient: React.FC = () => {
 
     setAiPrefilling(true);
     try {
+      const openaiKey = localStorage.getItem('openai_key');
+      const requestBody: any = { url: urlToExtract };
+
+      if (openaiKey) {
+        requestBody.openaiKey = openaiKey;
+        console.log('Using OpenAI key from localStorage for extraction');
+      } else {
+        console.warn('No OpenAI key in localStorage - will use Supabase secret or fallback to basic extraction');
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-company-data`,
         {
@@ -318,7 +328,7 @@ export const AddClient: React.FC = () => {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ url: urlToExtract })
+          body: JSON.stringify(requestBody)
         }
       );
 
