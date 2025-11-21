@@ -76,8 +76,8 @@ Deno.serve(async (req: Request) => {
 
     console.log(`Successfully crawled ${crawledData.length} pages`);
 
-    // Extract company information from crawled data
-    const extractedInfo = extractCompanyInfoFromPages(crawledData, url);
+    // Extract company information from crawled data using hybrid approach
+    const extractedInfo = await extractCompanyInfoFromPages(crawledData, url);
 
     const simplifiedData = {
       success: true,
@@ -159,8 +159,8 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-async function crawlWebsiteWithCheerio(startUrl: string, authHeader: string): Promise<CrawlResult[]> {
-  console.log('Calling crawl-website function with Cheerio:', startUrl);
+async function crawlWebsiteWithCheerio(startUrl: string, authHeader: string | null): Promise<CrawlResult[]> {
+  console.log('Calling scrape-website function via crawl-website:', startUrl);
 
   try {
     const crawlerUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/crawl-website`;
@@ -168,7 +168,7 @@ async function crawlWebsiteWithCheerio(startUrl: string, authHeader: string): Pr
     const response = await fetch(crawlerUrl, {
       method: 'POST',
       headers: {
-        'Authorization': authHeader,
+        'Authorization': authHeader || `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -196,7 +196,6 @@ async function crawlWebsiteWithCheerio(startUrl: string, authHeader: string): Pr
     console.log(`Total emails found: ${data.data.summary.totalEmails}`);
     console.log(`Total social links found: ${data.data.summary.totalSocialLinks}`);
 
-    // Convert crawler response to CrawlResult format
     const results: CrawlResult[] = data.data.pages.map((page: any) => ({
       url: page.url,
       title: page.title || '',
@@ -213,7 +212,6 @@ async function crawlWebsiteWithCheerio(startUrl: string, authHeader: string): Pr
     return results;
   } catch (error) {
     console.error('Error in crawlWebsiteWithCheerio:', error);
-    // Fallback to basic fetch if crawler fails
     console.log('Falling back to basic fetch...');
     return await fallbackCrawl(startUrl);
   }
@@ -292,7 +290,7 @@ async function fallbackCrawl(startUrl: string): Promise<CrawlResult[]> {
   }
 }
 
-function extractCompanyInfoFromPages(pages: CrawlResult[], rootUrl: string) {
+async function extractCompanyInfoFromPages(pages: CrawlResult[], rootUrl: string) {
   console.log(`\n${'='.repeat(60)}`);
   console.log('Extracting company information from crawled pages');
   console.log(`Total pages: ${pages.length}`);
@@ -358,20 +356,20 @@ function extractCompanyInfoFromPages(pages: CrawlResult[], rootUrl: string) {
   // Extract social profiles
   const socialProfiles = extractSocialProfiles(socialLinks);
 
-  // Extract services
-  const services = extractServices(servicesPage, homePage);
+  // Use LLM to extract services with structured data from Cheerio
+  const services = await extractServicesWithLLM(servicesPage, homePage);
 
-  // Extract team/contacts
-  const { contacts, leadership } = extractTeamInfo(teamPage, aboutPage);
+  // Use LLM to extract team/contacts with structured data
+  const { contacts, leadership } = await extractTeamInfoWithLLM(teamPage, aboutPage);
 
-  // Extract blogs
-  const blogs = extractBlogs(blogPages);
+  // Use LLM to extract blogs with structured data
+  const blogs = await extractBlogsWithLLM(blogPages, rootUrl);
 
-  // Extract technology mentions
-  const technology = extractTechnology(pages);
+  // Use LLM to extract technology with structured data
+  const technology = await extractTechnologyWithLLM(pages);
 
-  // Extract testimonials
-  const testimonials = extractTestimonials(pages);
+  // Use LLM to extract testimonials with structured data
+  const testimonials = await extractTestimonialsWithLLM(pages);
 
   // Find logo
   const logo = findLogoUrl(pages);
@@ -704,14 +702,285 @@ function extractTestimonials(pages: CrawlResult[]) {
   return testimonials.slice(0, 10);
 }
 
+async function extractServicesWithLLM(servicesPage: CrawlResult | undefined, homePage: CrawlResult) {
+  const page = servicesPage || homePage;
+  if (!page) return [];
+
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiApiKey) {
+    console.warn('OpenAI API key not configured, falling back to basic extraction');
+    return extractServices(servicesPage, homePage);
+  }
+
+  try {
+    const structuredData = {
+      pageTitle: page.title,
+      headings: page.structuredData?.headings || [],
+      paragraphs: page.structuredData?.paragraphs?.slice(0, 30) || [],
+      lists: page.structuredData?.lists || [],
+      url: page.url,
+    };
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a service extraction specialist. Extract all services from the structured webpage data provided. Return only valid JSON with a "services" array containing objects with "name" and "description" fields. Be comprehensive but accurate.'
+          },
+          {
+            role: 'user',
+            content: `Extract all services from this structured webpage data:\n\n${JSON.stringify(structuredData, null, 2)}`
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 2000,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const result = JSON.parse(data.choices[0]?.message?.content || '{}');
+    return result.services || [];
+  } catch (error) {
+    console.error('LLM extraction failed, using fallback:', error);
+    return extractServices(servicesPage, homePage);
+  }
+}
+
+async function extractTeamInfoWithLLM(teamPage: CrawlResult | undefined, aboutPage: CrawlResult | undefined) {
+  const page = teamPage || aboutPage;
+  if (!page) return { contacts: [], leadership: {} };
+
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiApiKey) {
+    console.warn('OpenAI API key not configured, falling back to basic extraction');
+    return extractTeamInfo(teamPage, aboutPage);
+  }
+
+  try {
+    const structuredData = {
+      pageTitle: page.title,
+      headings: page.structuredData?.headings || [],
+      paragraphs: page.structuredData?.paragraphs?.slice(0, 30) || [],
+      lists: page.structuredData?.lists || [],
+      text: page.text.substring(0, 10000),
+    };
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a team information extractor. Extract leadership and team member info from structured data. Return JSON with "contacts" array (name, title, isDecisionMaker, influenceLevel) and "leadership" object (ceo, founder, owner). Only extract real people explicitly mentioned.'
+          },
+          {
+            role: 'user',
+            content: `Extract team and leadership from this data:\n\n${JSON.stringify(structuredData, null, 2)}`
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 1500,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const result = JSON.parse(data.choices[0]?.message?.content || '{}');
+    return {
+      contacts: result.contacts || [],
+      leadership: result.leadership || {}
+    };
+  } catch (error) {
+    console.error('LLM extraction failed, using fallback:', error);
+    return extractTeamInfo(teamPage, aboutPage);
+  }
+}
+
+async function extractBlogsWithLLM(blogPages: CrawlResult[], rootUrl: string) {
+  if (blogPages.length === 0) return [];
+
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiApiKey) {
+    console.warn('OpenAI API key not configured, falling back to basic extraction');
+    return extractBlogs(blogPages);
+  }
+
+  try {
+    const structuredPages = blogPages.slice(0, 5).map(page => ({
+      url: page.url,
+      title: page.title,
+      headings: page.structuredData?.headings?.slice(0, 10) || [],
+      paragraphs: page.structuredData?.paragraphs?.slice(0, 5) || [],
+    }));
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a blog article extractor. Extract blog articles from structured data. Return JSON with "blogs" array containing title, url (use exact URL from data), date, summary. Only extract real articles present in the data.'
+          },
+          {
+            role: 'user',
+            content: `Extract blog articles from these pages:\n\n${JSON.stringify(structuredPages, null, 2)}`
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 2000,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const result = JSON.parse(data.choices[0]?.message?.content || '{}');
+    return result.blogs || [];
+  } catch (error) {
+    console.error('LLM extraction failed, using fallback:', error);
+    return extractBlogs(blogPages);
+  }
+}
+
+async function extractTechnologyWithLLM(pages: CrawlResult[]) {
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiApiKey) {
+    console.warn('OpenAI API key not configured, falling back to basic extraction');
+    return extractTechnology(pages);
+  }
+
+  try {
+    const combinedText = pages
+      .map(p => `${p.title} ${p.text}`)
+      .join(' ')
+      .substring(0, 20000);
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'Extract all technologies, partners, and integrations mentioned in the text. Return JSON with "stack" (array of technologies), "partners" (array), "integrations" (array). Only include explicitly mentioned items.'
+          },
+          {
+            role: 'user',
+            content: `Extract technologies from this text:\n\n${combinedText}`
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 1000,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const result = JSON.parse(data.choices[0]?.message?.content || '{}');
+    return {
+      stack: result.stack || [],
+      partners: result.partners || [],
+      integrations: result.integrations || []
+    };
+  } catch (error) {
+    console.error('LLM extraction failed, using fallback:', error);
+    return extractTechnology(pages);
+  }
+}
+
+async function extractTestimonialsWithLLM(pages: CrawlResult[]) {
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiApiKey) {
+    console.warn('OpenAI API key not configured, falling back to basic extraction');
+    return extractTestimonials(pages);
+  }
+
+  try {
+    const structuredPages = pages.slice(0, 5).map(page => ({
+      title: page.title,
+      paragraphs: page.structuredData?.paragraphs?.slice(0, 20) || [],
+    }));
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'Extract testimonials and client feedback from structured data. Return JSON with "testimonials" array containing clientName, feedback, satisfactionIndicators. Only extract real testimonials found in the data.'
+          },
+          {
+            role: 'user',
+            content: `Extract testimonials from this data:\n\n${JSON.stringify(structuredPages, null, 2)}`
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 1500,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const result = JSON.parse(data.choices[0]?.message?.content || '{}');
+    return result.testimonials || [];
+  } catch (error) {
+    console.error('LLM extraction failed, using fallback:', error);
+    return extractTestimonials(pages);
+  }
+}
+
 function findLogoUrl(pages: CrawlResult[]): string {
   for (const page of pages) {
-    // Try OG image first
     if (page.metadata?.ogImage) {
       return page.metadata.ogImage;
     }
 
-    // Try to find logo in HTML
     if (page.html) {
       const logoPatterns = [
         /<meta[^>]+property=[\"']og:image[\"'][^>]+content=[\"']([^\"']+)[\"']/i,

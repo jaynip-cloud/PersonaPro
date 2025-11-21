@@ -34,32 +34,49 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Fetch the webpage content
-    const webpageResponse = await fetch(url, {
+    console.log('Extracting technology from:', url);
+
+    const authHeader = req.headers.get("Authorization");
+    const scrapeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-website`;
+
+    const scrapeResponse = await fetch(scrapeUrl, {
+      method: 'POST',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Authorization': authHeader || `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({ url, includeLinks: false }),
     });
 
-    if (!webpageResponse.ok) {
-      throw new Error(`Failed to fetch webpage: ${webpageResponse.statusText}`);
+    if (!scrapeResponse.ok) {
+      throw new Error(`Failed to scrape webpage: ${scrapeResponse.status}`);
     }
 
-    const html = await webpageResponse.text();
+    const scrapeData = await scrapeResponse.json();
+    if (!scrapeData.success) {
+      throw new Error('Scraping failed');
+    }
 
-    // Get OpenAI API key from environment
+    const pageData = scrapeData.data;
+
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Extract visible text from HTML for better processing
-    const textContent = html
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const structuredData = {
+      pageTitle: pageData.title,
+      headings: pageData.structuredData?.headings || [],
+      paragraphs: pageData.structuredData?.paragraphs?.slice(0, 50) || [],
+      lists: pageData.structuredData?.lists || [],
+      text: pageData.text?.substring(0, 20000) || '',
+    };
+
+    console.log('Structured data prepared:', {
+      headings: structuredData.headings.length,
+      paragraphs: structuredData.paragraphs.length,
+      lists: structuredData.lists.length
+    });
 
     // Use OpenAI to extract technology information
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -73,60 +90,25 @@ Deno.serve(async (req: Request) => {
         messages: [
           {
             role: 'system',
-            content: `You are an expert technology stack analyzer. Extract ALL technologies, partners, and integrations from the provided webpage content with PERFECT accuracy.
+            content: `You are a technology stack analyzer. Extract technologies, partners, and integrations from structured webpage data.
 
-EXTRACTION RULES:
+CATEGORIES:
+1. techStack: Programming languages, frameworks, databases, cloud providers, DevOps tools
+2. partners: Technology partners, business partners, certifications
+3. integrations: Third-party tools and services they integrate with
 
-1. TECHNOLOGY STACK (techStack):
-   - Programming Languages: JavaScript, TypeScript, Python, Java, Go, Ruby, PHP, C#, C++, Rust, Swift, Kotlin, etc.
-   - Frontend: React, Vue.js, Angular, Svelte, Next.js, Nuxt.js, Gatsby, etc.
-   - Backend: Node.js, Express, Django, Flask, FastAPI, Spring Boot, Ruby on Rails, Laravel, .NET, etc.
-   - Databases: PostgreSQL, MySQL, MongoDB, Redis, Elasticsearch, DynamoDB, Cassandra, Neo4j, etc.
-   - Cloud Providers: AWS, Google Cloud (GCP), Microsoft Azure, DigitalOcean, Heroku, Vercel, Netlify, etc.
-   - DevOps/Infrastructure: Docker, Kubernetes, Jenkins, GitLab CI, GitHub Actions, Terraform, Ansible, etc.
-   - Mobile: React Native, Flutter, SwiftUI, Jetpack Compose, Xamarin, etc.
-   - AI/ML: TensorFlow, PyTorch, scikit-learn, Keras, OpenAI API, Hugging Face, etc.
-   - Data Processing: Apache Spark, Kafka, Airflow, Hadoop, etc.
+EXTRACTION:
+- Look for technology mentions in headings, lists, and paragraphs
+- Extract clean names ("React" not "React.js")
+- Remove version numbers
+- Avoid duplicates
+- Only extract explicitly mentioned items
 
-2. PARTNERS (partners):
-   - Technology/Platform Partners: AWS Partner, Microsoft Partner, Google Cloud Partner, Salesforce Partner, etc.
-   - Strategic Business Partners: Major companies they collaborate with
-   - Certified Partnerships: Official certifications and partner programs
-   - Reseller/Distribution Partners: Companies they work with for distribution
-
-3. INTEGRATIONS (integrations):
-   - Business Tools: Slack, Microsoft Teams, Zoom, Google Workspace, etc.
-   - CRM/Sales: Salesforce, HubSpot, Pipedrive, Zoho CRM, etc.
-   - Marketing: Mailchimp, SendGrid, Marketo, ActiveCampaign, etc.
-   - Payment: Stripe, PayPal, Square, Braintree, etc.
-   - Analytics: Google Analytics, Mixpanel, Amplitude, Segment, etc.
-   - Communication: Twilio, SendGrid, Postmark, etc.
-   - Automation: Zapier, Make (Integromat), n8n, etc.
-   - Project Management: Jira, Asana, Trello, Monday.com, etc.
-
-CRITICAL INSTRUCTIONS:
-- Look for explicit mentions of technologies in text, lists, badges, and descriptions
-- Check for technology keywords in alt text, class names, and data attributes
-- Extract clean, standardized names (e.g., "React" not "React.js" or "ReactJS")
-- Remove version numbers (e.g., "Python 3.11" → "Python")
-- Avoid duplicates - each technology should appear once
-- If uncertain about categorization, prefer techStack for technical tools
-- Include technologies mentioned in job listings, tech blog posts, and about sections
-- Look for cloud provider logos, certification badges, and partnership mentions
-
-OUTPUT FORMAT:
-Return ONLY valid JSON with no extra text, markdown, or formatting:
-{
-  "techStack": ["Technology1", "Technology2", ...],
-  "partners": ["Partner1", "Partner2", ...],
-  "integrations": ["Integration1", "Integration2", ...]
-}
-
-Be exhaustive and thorough - extract EVERY technology, partner, and integration mentioned.`
+Return JSON: {"techStack": [...], "partners": [...], "integrations": [...]}`
           },
           {
             role: 'user',
-            content: `Analyze this webpage and extract ALL technologies, partners, and integrations with perfect accuracy:\n\n${textContent.substring(0, 40000)}`
+            content: `Extract technologies from this structured webpage data:\n\n${JSON.stringify(structuredData, null, 2)}`
           }
         ],
         temperature: 0.1,
@@ -178,6 +160,7 @@ Be exhaustive and thorough - extract EVERY technology, partner, and integration 
 
     return new Response(
       JSON.stringify({
+        success: true,
         techStack,
         partners,
         integrations,
