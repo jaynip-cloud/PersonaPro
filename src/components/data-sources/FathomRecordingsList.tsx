@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Video, Clock, Users, Calendar, TrendingUp, ExternalLink, Trash2, RefreshCw, Search, Eye, MessageSquare } from 'lucide-react';
+import { Video, Clock, Users, Calendar, TrendingUp, ExternalLink, Trash2, RefreshCw, Search, Eye, MessageSquare, Zap } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 import { Modal } from '../ui/Modal';
 import { supabase } from '../../lib/supabase';
+import { regenerateFathomEmbeddings } from '../../utils/regenerateEmbeddings';
 
 interface FathomRecordingsListProps {
   clientId: string;
@@ -42,6 +43,7 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
   const [selectedRecording, setSelectedRecording] = useState<FathomRecording | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'summary' | 'transcript'>('summary');
 
   useEffect(() => {
@@ -87,6 +89,31 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
       alert('Failed to delete recording');
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleRegenerateEmbeddings = async (recordingId: string, recordingTitle: string) => {
+    if (!confirm(`Regenerate embeddings for "${recordingTitle}"?\n\nThis will recreate vector embeddings with improved chunking for better search results.`)) {
+      return;
+    }
+
+    setRegenerating(recordingId);
+    try {
+      const result = await regenerateFathomEmbeddings(recordingId, true);
+
+      if (result.success) {
+        alert(`Successfully generated ${result.embeddings_created} embeddings in ${result.chunks_total} chunks!`);
+        // Refresh the recordings list
+        await loadRecordings();
+        if (onRefresh) onRefresh();
+      } else {
+        alert(`Failed to regenerate embeddings: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error regenerating embeddings:', error);
+      alert('Failed to regenerate embeddings');
+    } finally {
+      setRegenerating(null);
     }
   };
 
@@ -237,6 +264,23 @@ export function FathomRecordingsList({ clientId, onRefresh }: FathomRecordingsLi
                       title="View details"
                     >
                       <Eye size={18} />
+                    </button>
+
+                    <button
+                      onClick={() => handleRegenerateEmbeddings(recording.id, recording.title)}
+                      disabled={regenerating === recording.id}
+                      className={`p-2 rounded transition-colors disabled:opacity-50 ${
+                        !recording.embeddings_generated
+                          ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50'
+                          : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'
+                      }`}
+                      title={recording.embeddings_generated ? 'Regenerate embeddings' : 'Generate embeddings (not yet created)'}
+                    >
+                      {regenerating === recording.id ? (
+                        <RefreshCw className="animate-spin" size={18} />
+                      ) : (
+                        <Zap size={18} />
+                      )}
                     </button>
 
                     <button

@@ -76,9 +76,16 @@ export const IntelligenceAgent: React.FC<IntelligenceAgentProps> = ({
 
   const saveChatMessage = async (message: Message) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('User not authenticated');
+        return;
+      }
+
       const { error } = await supabase
         .from('chat_history')
         .insert({
+          user_id: user.id,
           client_id: clientId,
           role: message.role,
           content: message.content,
