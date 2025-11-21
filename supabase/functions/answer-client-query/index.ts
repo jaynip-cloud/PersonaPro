@@ -55,7 +55,7 @@ function analyzeQueryIntent(query: string): QueryIntent {
 }
 
 function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): string {
-  const { client, companyProfile, contacts, transcripts, fathomRecordings, opportunities, documentMatches } = data;
+  const { client, companyProfile, contacts, transcripts, fathomRecordings, opportunities, documentMatches, additionalFathomContext } = data;
   const contextParts = [];
 
   if (intent.type === 'recommendation' || intent.type === 'analytical') {
@@ -259,6 +259,15 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
       fathomSection.push(`${i + 1}. ${recording.title} - ${date}${duration}`);
     });
 
+    // Add sample excerpts for meeting queries if semantic search didn't find much
+    if (additionalFathomContext && additionalFathomContext.length > 0) {
+      fathomSection.push('\nRecent Discussion Samples:');
+      additionalFathomContext.slice(0, 3).forEach((excerpt: any, i: number) => {
+        fathomSection.push(`\nExcerpt ${i + 1} (${excerpt.speaker_name || 'Unknown'}):`);
+        fathomSection.push(excerpt.chunk_text.substring(0, 500));
+      });
+    }
+
     contextParts.push(fathomSection.join('\n'));
   }
 
@@ -435,7 +444,8 @@ Deno.serve(async (req: Request) => {
     const queryEmbedding = embeddingData.data[0].embedding;
 
     const searchLimit = mode === 'deep' ? 20 : 12;
-    const similarityThreshold = intent.type === 'factual' ? 0.70 : 0.60;
+    // Lower threshold for meeting queries to capture more conversational context
+    const similarityThreshold = intent.topics.includes('meetings') ? 0.50 : (intent.type === 'factual' ? 0.70 : 0.60);
 
     const { data: documentMatches } = await supabaseClient.rpc('match_all_content', {
       query_embedding: queryEmbedding,
@@ -445,6 +455,19 @@ Deno.serve(async (req: Request) => {
       filter_client_id: clientId,
     });
 
+    // For meeting-related queries with few results, fetch recent Fathom excerpts directly
+    let additionalFathomContext = null;
+    const fathomMatches = documentMatches?.filter((d: any) => d.source_type === 'fathom_transcript') || [];
+    if (intent.topics.includes('meetings') && fathomMatches.length < 3 && fathomRecordings.length > 0) {
+      const { data: directFathomData } = await supabaseClient
+        .from('fathom_embeddings')
+        .select('chunk_text, speaker_name, recording_id')
+        .eq('client_id', clientId)
+        .eq('user_id', user.id)
+        .limit(5);
+      additionalFathomContext = directFathomData;
+    }
+
     const contextData = {
       client,
       companyProfile,
@@ -453,6 +476,7 @@ Deno.serve(async (req: Request) => {
       fathomRecordings,
       opportunities,
       documentMatches: documentMatches || [],
+      additionalFathomContext,
     };
 
     const fullContext = buildEnhancedContext(contextData, intent, mode);
