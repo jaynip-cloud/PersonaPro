@@ -18,7 +18,6 @@ import { DocumentUpload } from '../components/data-sources/DocumentUpload';
 import { FathomSync } from '../components/data-sources/FathomSync';
 import { FathomRecordingsList } from '../components/data-sources/FathomRecordingsList';
 import { ProjectDetailPanel } from '../components/project/ProjectDetailPanel';
-import { WebsiteScraper } from '../components/client/WebsiteScraper';
 import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight, Eye } from 'lucide-react';
 import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
@@ -2309,17 +2308,6 @@ export const ClientDetailNew: React.FC = () => {
 
         {activeTab === 'settings' && (
           <div className="space-y-6">
-            {client && client.website && (
-              <WebsiteScraper
-                clientId={client.id}
-                initialUrl={client.website}
-                onDataScraped={(data) => {
-                  showToast('Website data saved successfully', 'success');
-                  loadClient();
-                }}
-              />
-            )}
-
             <Card>
               <CardHeader>
                 <CardTitle>Data Management</CardTitle>
