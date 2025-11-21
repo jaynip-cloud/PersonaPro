@@ -34,50 +34,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Extracting services from:', url);
-
-    const authHeader = req.headers.get("Authorization");
-    const scrapeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-website`;
-
-    const scrapeResponse = await fetch(scrapeUrl, {
-      method: 'POST',
+    // Fetch the webpage content
+    const webpageResponse = await fetch(url, {
       headers: {
-        'Authorization': authHeader || `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
-        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
-      body: JSON.stringify({ url, includeLinks: false }),
     });
 
-    if (!scrapeResponse.ok) {
-      throw new Error(`Failed to scrape webpage: ${scrapeResponse.status}`);
+    if (!webpageResponse.ok) {
+      throw new Error(`Failed to fetch webpage: ${webpageResponse.statusText}`);
     }
 
-    const scrapeData = await scrapeResponse.json();
-    if (!scrapeData.success) {
-      throw new Error('Scraping failed');
-    }
+    const html = await webpageResponse.text();
 
-    const pageData = scrapeData.data;
-
+    // Get OpenAI API key from environment
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
-    const structuredData = {
-      pageTitle: pageData.title,
-      metadata: pageData.metadata,
-      headings: pageData.structuredData?.headings || [],
-      paragraphs: pageData.structuredData?.paragraphs?.slice(0, 40) || [],
-      lists: pageData.structuredData?.lists || [],
-    };
-
-    console.log('Structured data prepared:', {
-      headings: structuredData.headings.length,
-      paragraphs: structuredData.paragraphs.length,
-      lists: structuredData.lists.length
-    });
-
+    // Use OpenAI to extract services from the HTML
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -85,36 +61,65 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: `You are a comprehensive service information extractor. Analyze the structured webpage data and extract ALL services comprehensively.
+            content: `You are a comprehensive service information extractor. Your task is to analyze HTML content and extract EVERY service, sub-service, offering, and product mentioned on the page.
 
-EXTRACTION RULES:
-1. Extract services from headings (especially H2, H3), lists, and paragraphs
-2. Create separate entries for parent services and sub-services
-3. If a heading looks like a service, use the next paragraph as description
-4. Combine related information to create detailed descriptions
-5. Look for pricing information in surrounding text
-6. Extract tags based on content, technology mentions, and categories
+CRITICAL REQUIREMENTS:
+1. Extract ALL services mentioned - main services, sub-services, nested offerings, and related products
+2. If a service has sub-services or variations, create separate entries for each
+3. Look for services in all sections: headers, cards, lists, descriptions, menus, pricing tables, feature lists, etc.
+4. Don't skip minor services or complementary offerings
+5. Extract services from navigation menus, sidebars, footer sections, and all content areas
+6. Include service categories, specializations, and industry-specific offerings
+7. Capture both parent services and their child services as separate entries
 
-For each service:
-- name: Clear, specific service name (include parent context for sub-services)
-- description: 2-4 sentences combining all relevant information
-- pricing: Any pricing/cost info found (or empty string)
-- tags: 5-7 relevant tags (category, technology, industry)
+For each service/sub-service, extract:
+- name: The exact service name or title (be specific, include parent context if it's a sub-service)
+- description: A detailed description (2-4 sentences) combining all information found about this service
+- pricing: Any pricing information, plans, or cost indicators mentioned
+- tags: Relevant tags including: category, type, technology, industry (max 7 tags)
 
-Return JSON: {"services": [...]}`
+Format service names clearly:
+- Main service: "Web Development"
+- Sub-service: "Web Development - E-commerce Solutions"
+- Nested sub-service: "Web Development - E-commerce - Shopify Integration"
+
+Return a JSON object with a "services" array. Extract EVERYTHING - err on the side of including more rather than less.
+
+Example format:
+{
+  "services": [
+    {
+      "name": "Web Development",
+      "description": "Custom web application development using modern frameworks and technologies. We build scalable, responsive websites tailored to your business needs with cutting-edge tools and best practices.",
+      "pricing": "Starting at $5,000",
+      "tags": ["web", "development", "custom", "full-stack", "responsive"]
+    },
+    {
+      "name": "Web Development - E-commerce Solutions",
+      "description": "Specialized e-commerce platform development including shopping cart integration, payment processing, and inventory management. We create secure and user-friendly online stores.",
+      "pricing": "Starting at $8,000",
+      "tags": ["web", "ecommerce", "shopify", "woocommerce", "online-store"]
+    },
+    {
+      "name": "Web Development - Custom CMS",
+      "description": "Build custom content management systems tailored to your workflow. Easy-to-use admin panels for managing your website content without technical knowledge.",
+      "pricing": "Custom quote",
+      "tags": ["web", "cms", "custom", "content-management"]
+    }
+  ]
+}`
           },
           {
             role: 'user',
-            content: `Extract all services from this structured webpage data:\n\n${JSON.stringify(structuredData, null, 2)}`
+            content: `Extract ALL services and sub-services from this webpage HTML. Be thorough and comprehensive:\n\n${html.substring(0, 30000)}`
           }
         ],
-        temperature: 0.2,
+        temperature: 0.3,
         max_tokens: 4000,
-        response_format: { type: "json_object" }
       }),
     });
 
@@ -131,19 +136,23 @@ Return JSON: {"services": [...]}`
       throw new Error('No content returned from AI');
     }
 
+    // Parse the JSON response
     let extractedData;
     try {
-      extractedData = JSON.parse(content);
+      // Try to extract JSON from markdown code blocks if present
+      const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+      if (jsonMatch) {
+        extractedData = JSON.parse(jsonMatch[1]);
+      } else {
+        extractedData = JSON.parse(content);
+      }
     } catch (parseError) {
       console.error('Failed to parse AI response:', content);
       throw new Error('Failed to parse AI response');
     }
 
-    console.log('Extracted services count:', extractedData.services?.length || 0);
-
     return new Response(
       JSON.stringify({
-        success: true,
         services: extractedData.services || [],
         url: url,
       }),

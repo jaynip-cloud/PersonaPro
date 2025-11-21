@@ -34,53 +34,53 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Extracting blogs from:', url);
-
-    const authHeader = req.headers.get("Authorization");
-    const scrapeUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-website`;
-
-    const scrapeResponse = await fetch(scrapeUrl, {
-      method: 'POST',
+    // Fetch the webpage content
+    const webpageResponse = await fetch(url, {
       headers: {
-        'Authorization': authHeader || `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
-        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
-      body: JSON.stringify({ url, includeLinks: true }),
     });
 
-    if (!scrapeResponse.ok) {
-      throw new Error(`Failed to scrape webpage: ${scrapeResponse.status}`);
+    if (!webpageResponse.ok) {
+      throw new Error(`Failed to fetch webpage: ${webpageResponse.statusText}`);
     }
 
-    const scrapeData = await scrapeResponse.json();
-    if (!scrapeData.success) {
-      throw new Error('Scraping failed');
-    }
+    const html = await webpageResponse.text();
 
-    const pageData = scrapeData.data;
+    // Parse base URL for converting relative links
     const baseUrl = new URL(url);
     const baseOrigin = baseUrl.origin;
 
-    console.log(`Found ${pageData.links?.length || 0} links on page`);
+    // Extract ALL links with their anchor text and context from HTML
+    const linkPattern = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    const links: Array<{ href: string; text: string }> = [];
+    let match;
 
+    while ((match = linkPattern.exec(html)) !== null) {
+      const href = match[1].trim();
+      const text = match[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+
+      // Only include links with meaningful text
+      if (text && href && text.length > 3) {
+        links.push({ href, text });
+      }
+    }
+
+    console.log(`Found ${links.length} total links on the page`);
+
+    // Clean HTML while preserving structure for context
+    const cleanedHtml = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .substring(0, 50000);
+
+    // Get OpenAI API key from environment
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
-    const structuredData = {
-      pageTitle: pageData.title,
-      headings: pageData.structuredData?.headings || [],
-      paragraphs: pageData.structuredData?.paragraphs?.slice(0, 40) || [],
-      links: pageData.links?.slice(0, 200) || [],
-    };
-
-    console.log('Structured data prepared:', {
-      headings: structuredData.headings.length,
-      paragraphs: structuredData.paragraphs.length,
-      links: structuredData.links.length
-    });
-
+    // Use OpenAI to extract blogs from the HTML
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -88,37 +88,87 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: `You are a blog article extractor. Extract ONLY real blog articles from the structured data.
+            content: `You are a precise blog article extractor. Extract ONLY real blog articles that actually exist on the provided webpage.
+
+CRITICAL URL RULE:
+You MUST use the EXACT href value from the links list. DO NOT modify, clean, or change the href in any way. Copy it character-by-character as it appears in the links list.
 
 EXTRACTION RULES:
-1. Look for article titles in headings
-2. Match titles to URLs from the links array
-3. Use EXACT URLs from the links array (do not modify)
-4. Extract dates, authors, excerpts from nearby text
-5. Only extract articles explicitly present in the data
-6. Return empty array if no blogs found
+1. ONLY extract blog articles explicitly present in the HTML
+2. DO NOT generate, invent, or hallucinate any articles
+3. Each article MUST have a matching link in the provided links list
+4. Use the EXACT href value from the links - do not modify it at all
+5. If no blog articles are found, return {"blogs": []}
 
-For each blog:
-- title: Article title from headings
-- url: EXACT URL from links array matching the title
-- date: Publication date if found
-- author: Author name if found
-- excerpt: Brief description from paragraphs
-- tags: Relevant categories (max 5)
+PROCESS:
+1. Look for blog article titles in the HTML
+2. For each title, find the matching link in the links list (by matching the anchor text to the title)
+3. Copy the exact "href" value from that link - DO NOT CHANGE IT
+4. If a title has no matching link, skip that article
 
-Return JSON: {"blogs": [...]}`
+For each blog article:
+- title: Exact title from HTML
+- url: EXACT href value from links list (copy it verbatim, no modifications)
+- date: Date if visible
+- author: Author if visible
+- excerpt: Description if available
+- tags: Categories if shown
+
+CRITICAL: The "url" field must be the exact, unmodified href value from the links list.
+
+Examples of what to do:
+✓ href="/blog/my-post" → url: "/blog/my-post" (exact copy)
+✓ href="https://example.com/blog/post" → url: "https://example.com/blog/post" (exact copy)
+✓ href="../posts/article.html" → url: "../posts/article.html" (exact copy)
+
+Examples of what NOT to do:
+✗ DO NOT change relative to absolute URLs
+✗ DO NOT clean or normalize the URL
+✗ DO NOT add or remove slashes
+✗ DO NOT modify the URL in any way
+
+OUTPUT FORMAT:
+{
+  "blogs": [
+    {
+      "title": "Exact title",
+      "url": "Exact href from links list - NO MODIFICATIONS",
+      "date": "Date",
+      "author": "Author",
+      "excerpt": "Excerpt",
+      "tags": ["tag1", "tag2"]
+    }
+  ]
+}
+
+REMEMBER: Copy the href value exactly as it appears. The backend will handle URL normalization.`
           },
           {
             role: 'user',
-            content: `Extract blog articles from this structured webpage data. Base URL: ${baseOrigin}\n\n${JSON.stringify(structuredData, null, 2)}`
+            content: `Extract blog articles from this webpage. Base URL: ${baseOrigin}
+
+CRITICAL: You MUST use the EXACT href values from the links list below. DO NOT modify, guess, or create URLs.
+
+ALL LINKS ON THE PAGE (use these exact hrefs):
+${JSON.stringify(links.slice(0, 300), null, 2)}
+
+INSTRUCTIONS:
+1. Find blog article titles in the HTML below
+2. For each article, find its corresponding link in the links list above
+3. Use the EXACT href value from the links list (do not modify it)
+4. If you cannot find a matching link for an article, skip that article
+5. Return the href exactly as it appears in the links list
+
+HTML CONTENT:
+${cleanedHtml}`
           }
         ],
         temperature: 0.1,
-        max_tokens: 3000,
+        max_tokens: 4000,
         response_format: { type: "json_object" }
       }),
     });
@@ -232,7 +282,7 @@ Return JSON: {"blogs": [...]}`
           .filter((blog: any) => blog !== null)
       : [];
 
-    console.log(`Extracted and validated ${blogs.length} blog articles`);
+    console.log(`Extracted and validated ${blogs.length} blog articles from ${url}`);
 
     // Log final URLs for debugging
     if (blogs.length > 0) {
@@ -241,7 +291,6 @@ Return JSON: {"blogs": [...]}`
 
     return new Response(
       JSON.stringify({
-        success: true,
         blogs,
         url: url,
         count: blogs.length,

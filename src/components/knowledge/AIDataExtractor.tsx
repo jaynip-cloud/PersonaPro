@@ -35,10 +35,7 @@ export const AIDataExtractor: React.FC<AIDataExtractorProps> = ({ onDataExtracte
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      setCrawlStats('Starting extraction from website...');
-
-      console.log('Extracting data from:', url.trim());
-      console.log('Using OpenAI key:', !!openaiKey);
+      setCrawlStats('Starting deep crawl of website (up to 50 pages, depth 3)...');
 
       const response = await fetch(`${supabaseUrl}/functions/v1/extract-company-data`, {
         method: 'POST',
