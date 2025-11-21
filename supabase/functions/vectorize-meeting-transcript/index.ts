@@ -109,7 +109,7 @@ Deno.serve(async (req: Request) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'text-embedding-ada-002',
+          model: 'text-embedding-3-small',
           input: chunk,
         }),
       });
