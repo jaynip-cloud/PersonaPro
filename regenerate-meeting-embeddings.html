@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Regenerate Meeting Embeddings</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    .status {
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 6px;
+      background: #f0f9ff;
+      border-left: 4px solid #0ea5e9;
+    }
+    .error {
+      background: #fef2f2;
+      border-left-color: #ef4444;
+      color: #991b1b;
+    }
+    .success {
+      background: #f0fdf4;
+      border-left-color: #22c55e;
+      color: #166534;
+    }
+    button {
+      background: #0ea5e9;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover:not(:disabled) {
+      background: #0284c7;
+    }
+    button:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+    .progress {
+      margin: 20px 0;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #0ea5e9;
+      transition: width 0.3s ease;
+    }
+    .log {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+    }
+    .log-entry {
+      padding: 4px 0;
+      color: #475569;
+    }
+    .log-entry.error {
+      color: #dc2626;
+    }
+    .log-entry.success {
+      color: #16a34a;
+    }
+    .transcript-list {
+      margin: 20px 0;
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+    }
+    .transcript-item {
+      padding: 12px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .transcript-item:last-child {
+      border-bottom: none;
+    }
+    .transcript-info {
+      flex: 1;
+    }
+    .transcript-title {
+      font-weight: 500;
+      color: #1e293b;
+    }
+    .transcript-meta {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .transcript-status {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .transcript-status.pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .transcript-status.processing {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+    .transcript-status.completed {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .transcript-status.failed {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Regenerate Meeting Embeddings</h1>
+    <p class="subtitle">This will regenerate all meeting transcript embeddings using text-embedding-3-small</p>
+
+    <div id="status" class="status">
+      <strong>Status:</strong> <span id="statusText">Ready to start</span>
+    </div>
+
+    <div class="progress" style="display: none;" id="progressContainer">
+      <div><strong>Progress:</strong> <span id="progressText">0 / 0</span></div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div id="transcriptList" class="transcript-list" style="display: none;"></div>
+
+    <button id="startBtn" onclick="startRegeneration()">Start Regeneration</button>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <script type="module">
+    const SUPABASE_URL = 'https://dxfagynvuqjdzbgroivu.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4ZmFneW52dXFqZHpiZ3JvaXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5MDU2NzgsImV4cCI6MjA3NzQ4MTY3OH0.z9jxvkliQZN59mM0RCkbMnfDL-k4R13N5ezE6JB2Aig';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let transcripts = [];
+    let transcriptStatuses = {};
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function updateStatus(text, type = 'info') {
+      const statusDiv = document.getElementById('status');
+      const statusText = document.getElementById('statusText');
+      statusText.textContent = text;
+      statusDiv.className = 'status';
+      if (type === 'error') statusDiv.classList.add('error');
+      if (type === 'success') statusDiv.classList.add('success');
+    }
+
+    function updateProgress(current, total) {
+      const progressText = document.getElementById('progressText');
+      const progressFill = document.getElementById('progressFill');
+      progressText.textContent = `${current} / ${total}`;
+      const percent = (current / total) * 100;
+      progressFill.style.width = `${percent}%`;
+    }
+
+    function updateTranscriptStatus(transcriptId, status) {
+      transcriptStatuses[transcriptId] = status;
+      renderTranscriptList();
+    }
+
+    function renderTranscriptList() {
+      const listDiv = document.getElementById('transcriptList');
+      listDiv.innerHTML = transcripts.map(t => `
+        <div class="transcript-item">
+          <div class="transcript-info">
+            <div class="transcript-title">${t.title}</div>
+            <div class="transcript-meta">
+              ${t.client_company} • ${new Date(t.meeting_date).toLocaleDateString()} • ${(t.text_length / 1000).toFixed(1)}k chars
+            </div>
+          </div>
+          <div class="transcript-status ${transcriptStatuses[t.transcript_id] || 'pending'}">
+            ${transcriptStatuses[t.transcript_id] || 'pending'}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function loadTranscripts() {
+      log('Loading meeting transcripts...');
+
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) {
+        updateStatus('Please log in first', 'error');
+        log('Not authenticated', 'error');
+        return false;
+      }
+
+      const { data, error } = await supabase.rpc('get_meeting_transcripts_for_regeneration');
+
+      if (error) {
+        log(`Error loading transcripts: ${error.message}`, 'error');
+        updateStatus('Error loading transcripts', 'error');
+        return false;
+      }
+
+      if (!data || data.length === 0) {
+        log('No transcripts found', 'error');
+        updateStatus('No transcripts found', 'error');
+        return false;
+      }
+
+      transcripts = data;
+      log(`Found ${transcripts.length} meeting transcripts to regenerate`);
+
+      // Initialize all as pending
+      transcripts.forEach(t => {
+        transcriptStatuses[t.transcript_id] = 'pending';
+      });
+
+      document.getElementById('transcriptList').style.display = 'block';
+      renderTranscriptList();
+
+      return true;
+    }
+
+    async function regenerateEmbedding(transcript) {
+      const { transcript_id, user_id, client_id, title } = transcript;
+
+      log(`Processing: ${title}...`);
+      updateTranscriptStatus(transcript_id, 'processing');
+
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        const token = session.session.access_token;
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/vectorize-meeting-transcript`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            transcriptId: transcript_id,
+            clientId: client_id,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Failed to vectorize');
+        }
+
+        log(`✓ ${title}: Created ${result.chunksProcessed} embeddings`, 'success');
+        updateTranscriptStatus(transcript_id, 'completed');
+        return true;
+      } catch (error) {
+        log(`✗ ${title}: ${error.message}`, 'error');
+        updateTranscriptStatus(transcript_id, 'failed');
+        return false;
+      }
+    }
+
+    window.startRegeneration = async function() {
+      const btn = document.getElementById('startBtn');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+
+      document.getElementById('progressContainer').style.display = 'block';
+      log('Starting regeneration process...', 'success');
+      updateStatus('Loading transcripts...');
+
+      // Load transcripts
+      const loaded = await loadTranscripts();
+      if (!loaded) {
+        btn.disabled = false;
+        btn.textContent = 'Start Regeneration';
+        return;
+      }
+
+      updateStatus(`Processing ${transcripts.length} transcripts...`);
+
+      let completed = 0;
+      let failed = 0;
+
+      // Process each transcript sequentially to avoid rate limits
+      for (let i = 0; i < transcripts.length; i++) {
+        const transcript = transcripts[i];
+        updateProgress(i + 1, transcripts.length);
+
+        const success = await regenerateEmbedding(transcript);
+        if (success) {
+          completed++;
+        } else {
+          failed++;
+        }
+
+        // Small delay to avoid rate limiting
+        if (i < transcripts.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      updateProgress(transcripts.length, transcripts.length);
+
+      if (failed === 0) {
+        updateStatus(`✓ Successfully regenerated all ${completed} transcripts!`, 'success');
+        log(`\n=== COMPLETE ===\nSuccessfully processed all ${completed} transcripts`, 'success');
+      } else {
+        updateStatus(`Completed with ${failed} failures (${completed} succeeded)`, 'error');
+        log(`\n=== COMPLETE ===\n${completed} succeeded, ${failed} failed`, 'error');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Regenerate Again';
+    };
+
+    // Initialize
+    log('Page loaded. Ready to regenerate embeddings.');
+    log('Click "Start Regeneration" to begin.');
+  </script>
+</body>
+</html>
