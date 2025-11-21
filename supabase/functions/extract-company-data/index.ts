@@ -126,6 +126,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const authHeader = req.headers.get("Authorization");
     const isLinkedInUrl = url.includes('linkedin.com/company/') || url.includes('linkedin.com/in/');
 
     let crawledData: CrawlResult[] = [];
@@ -134,7 +135,7 @@ Deno.serve(async (req: Request) => {
     if (isLinkedInUrl) {
       extractedInfo = await extractFromLinkedInUrl(url, perplexityKey);
     } else {
-      crawledData = await crawlWebsite(url);
+      crawledData = await crawlWebsiteWithCheerio(url, authHeader);
       extractedInfo = await extractCompanyInfo(crawledData, perplexityKey, url);
     }
 
@@ -220,164 +221,132 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-async function crawlWebsite(startUrl: string): Promise<CrawlResult[]> {
-  const results: CrawlResult[] = [];
-  const visited = new Set<string>();
-  const targetPages = [
-    '',
-    'about',
-    'about-us',
-    'contact',
-    'team',
-    'leadership',
-    'services',
-    'products',
-    'solutions',
-    'blog',
-    'news',
-    'press',
-    'press-releases',
-    'case-studies',
-    'portfolio',
-    'careers',
-    'jobs',
-    'technology',
-    'partners',
-    'investors',
-    'investor-relations',
-    'strategy',
-    'roadmap',
-    'mission',
-    'vision',
-    'goals',
-    'testimonials',
-    'reviews',
-    'clients',
-    'customers',
-    'success-stories'
-  ];
+async function crawlWebsiteWithCheerio(startUrl: string, authHeader: string): Promise<CrawlResult[]> {
+  console.log('Calling crawl-website function with Cheerio:', startUrl);
 
-  const baseUrl = new URL(startUrl);
-  const baseDomain = baseUrl.hostname;
+  try {
+    const crawlerUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/crawl-website`;
 
-  const urlsToFetch: string[] = [startUrl];
-  for (const page of targetPages) {
-    const testUrl = new URL(startUrl);
-    testUrl.pathname = `/${page}`;
-    urlsToFetch.push(testUrl.href);
+    const response = await fetch(crawlerUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: startUrl,
+        maxPages: 15,
+        followLinks: false
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Crawler function error:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.error('Error details:', errorText);
+      throw new Error(`Crawler function failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      console.error('Crawler returned error:', data.error);
+      throw new Error(`Crawler error: ${data.error}`);
+    }
+
+    console.log(`Crawler succeeded. Pages crawled: ${data.data.pages.length}`);
+    console.log(`Total emails found: ${data.data.summary.totalEmails}`);
+    console.log(`Total social links found: ${data.data.summary.totalSocialLinks}`);
+
+    // Convert crawler response to CrawlResult format
+    const results: CrawlResult[] = data.data.pages.map((page: any) => ({
+      url: page.url,
+      title: page.title || '',
+      content: page.text || page.content || '',
+      links: page.links || [],
+      socialLinks: page.socialLinks || [],
+      emails: page.emails || [],
+    }));
+
+    return results;
+  } catch (error) {
+    console.error('Error in crawlWebsiteWithCheerio:', error);
+    // Fallback to basic fetch if crawler fails
+    console.log('Falling back to basic fetch...');
+    return await fallbackCrawl(startUrl);
   }
+}
 
-  const fetchPromises = urlsToFetch.slice(0, 15).map(async (url) => {
-    if (visited.has(url)) return null;
-    visited.add(url);
+async function fallbackCrawl(startUrl: string): Promise<CrawlResult[]> {
+  console.log('Using fallback crawler for:', startUrl);
 
-    try {
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; CompanyBot/1.0)",
-        },
-        signal: AbortSignal.timeout(5000),
-      });
+  try {
+    const response = await fetch(startUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
 
-      if (!response.ok) {
-        return null;
+    if (!response.ok) {
+      return [];
+    }
+
+    const html = await response.text();
+
+    // Basic extraction
+    const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : '';
+
+    // Extract text
+    let text = html
+      .replace(/<script[^>]*>.*?<\/script>/gi, "")
+      .replace(/<style[^>]*>.*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .substring(0, 20000);
+
+    // Extract emails
+    const emailPattern = /([a-zA-Z0-9._+-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
+    const emails = new Set<string>();
+    let emailMatch;
+    while ((emailMatch = emailPattern.exec(html)) !== null) {
+      const email = emailMatch[1].toLowerCase();
+      if (!email.includes('.png') && !email.includes('.jpg') &&
+          !email.includes('example.com') && !email.includes('domain.com')) {
+        emails.add(email);
       }
-
-      const html = await response.text();
-      return parseHtml(html, url);
-    } catch (error) {
-      console.error(`Error fetching ${url}:`, error);
-      return null;
     }
-  });
 
-  const fetchedResults = await Promise.all(fetchPromises);
+    // Extract social links
+    const socialPatterns = [
+      /https?:\/\/(www\.)?(linkedin\.com\/company\/[^\s"'<>]+)/gi,
+      /https?:\/\/(www\.)?(linkedin\.com\/in\/[^\s"'<>]+)/gi,
+      /https?:\/\/(www\.)?(twitter\.com\/[^\s"'<>]+)/gi,
+      /https?:\/\/(www\.)?(x\.com\/[^\s"'<>]+)/gi,
+    ];
 
-  for (const result of fetchedResults) {
-    if (result) {
-      results.push(result);
+    const socialLinks = new Set<string>();
+    for (const pattern of socialPatterns) {
+      const matches = html.matchAll(pattern);
+      for (const match of matches) {
+        socialLinks.add(match[0]);
+      }
     }
+
+    return [{
+      url: startUrl,
+      title,
+      content: text,
+      links: [],
+      socialLinks: Array.from(socialLinks),
+      emails: Array.from(emails),
+    }];
+  } catch (error) {
+    console.error('Fallback crawl error:', error);
+    return [];
   }
-
-  return results;
-}
-
-function parseHtml(html: string, url: string): CrawlResult {
-  const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].trim() : '';
-
-  // Extract emails from HTML
-  const emailPattern = /([a-zA-Z0-9._+-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
-  const mailtoPattern = /mailto:([a-zA-Z0-9._+-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
-  const emails = new Set<string>();
-
-  // Extract from mailto links
-  let mailtoMatch;
-  while ((mailtoMatch = mailtoPattern.exec(html)) !== null) {
-    emails.add(mailtoMatch[1].toLowerCase());
-  }
-
-  // Extract from plain text email patterns
-  let emailMatch;
-  while ((emailMatch = emailPattern.exec(html)) !== null) {
-    const email = emailMatch[1].toLowerCase();
-    // Filter out common false positives
-    if (!email.includes('.png') && !email.includes('.jpg') &&
-        !email.includes('.jpeg') && !email.includes('.gif') &&
-        !email.includes('example.com') && !email.includes('domain.com')) {
-      emails.add(email);
-    }
-  }
-
-  const socialPatterns = [
-    /https?:\/\/(www\.)?(linkedin\.com\/company\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(linkedin\.com\/in\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(twitter\.com\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(x\.com\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(facebook\.com\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(instagram\.com\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(youtube\.com\/(c\/|channel\/|user\/|@)?[^\s"'<>]+)/gi,
-  ];
-
-  const socialLinks = new Set<string>();
-  for (const pattern of socialPatterns) {
-    const matches = html.matchAll(pattern);
-    for (const match of matches) {
-      socialLinks.add(match[0]);
-    }
-  }
-
-  const linkPattern = /<a[^>]+href=["']([^"']+)["']/gi;
-  const links: string[] = [];
-  let match;
-  while ((match = linkPattern.exec(html)) !== null) {
-    const href = match[1];
-    if (href && !href.startsWith('#') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
-      links.push(href);
-    }
-  }
-
-  const content = extractTextFromHtml(html);
-
-  return {
-    url,
-    title,
-    content,
-    links,
-    socialLinks: Array.from(socialLinks),
-    emails: Array.from(emails),
-  };
-}
-
-function extractTextFromHtml(html: string): string {
-  let text = html
-    .replace(/<script[^>]*>.*?<\/script>/gi, "")
-    .replace(/<style[^>]*>.*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return text.substring(0, 20000);
 }
 
 async function extractCompanyInfo(crawlResults: CrawlResult[], perplexityKey: string, rootUrl: string) {
