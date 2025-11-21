@@ -26,7 +26,6 @@ function analyzeQueryIntent(query: string): QueryIntent {
   const topics: string[] = [];
   let timeframe: QueryIntent['timeframe'] = 'all';
 
-  // Intent detection
   if (lowerQuery.match(/why|how|explain|analyze|understand|reason/)) {
     type = 'analytical';
   } else if (lowerQuery.match(/compare|versus|vs|difference|similar|contrast/)) {
@@ -37,7 +36,6 @@ function analyzeQueryIntent(query: string): QueryIntent {
     type = 'exploratory';
   }
 
-  // Topic detection
   if (lowerQuery.match(/pain point|problem|challenge|issue|concern|difficulty|struggle/)) topics.push('challenges');
   if (lowerQuery.match(/opportunity|growth|upsell|expansion/)) topics.push('opportunities');
   if (lowerQuery.match(/meeting|discussion|call|conversation/)) topics.push('meetings');
@@ -50,7 +48,6 @@ function analyzeQueryIntent(query: string): QueryIntent {
   if (lowerQuery.match(/service|solution|product|offering/)) topics.push('services');
   if (lowerQuery.match(/blog|article|content|post|publication|resource/)) topics.push('content');
 
-  // Timeframe detection
   if (lowerQuery.match(/recent|latest|last|current|now/)) timeframe = 'recent';
   if (lowerQuery.match(/historical|past|previous|history|over time/)) timeframe = 'historical';
 
@@ -61,12 +58,10 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
   const { client, companyProfile, contacts, transcripts, fathomRecordings, opportunities, documentMatches } = data;
   const contextParts = [];
 
-  // Strategic context based on intent
   if (intent.type === 'recommendation' || intent.type === 'analytical') {
     contextParts.push('=== STRATEGIC CONTEXT ===');
   }
 
-  // Company profile - Always include key info
   if (companyProfile) {
     const companySection = [];
     companySection.push('YOUR COMPANY PROFILE:');
@@ -94,7 +89,6 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     contextParts.push(companySection.join('\n'));
   }
 
-  // Client profile - Enhanced with relevant fields
   const clientSection = [];
   clientSection.push('\n=== CLIENT PROFILE ===');
   clientSection.push(`Company: ${client.company || 'N/A'}`);
@@ -110,7 +104,6 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     if (client.employee_count) clientSection.push(`Employees: ${client.employee_count}`);
   }
 
-  // Services/Products they use
   if (client.services && Array.isArray(client.services) && client.services.length > 0) {
     clientSection.push('\nServices/Products They Use:');
     client.services.forEach((service: any) => {
@@ -122,7 +115,6 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     });
   }
 
-  // Technologies
   if (client.technologies && Array.isArray(client.technologies) && client.technologies.length > 0) {
     clientSection.push('\nTechnology Stack:');
     client.technologies.forEach((tech: any) => {
@@ -134,7 +126,6 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     });
   }
 
-  // Blogs/Articles they publish
   if (intent.topics.includes('content') || mode === 'deep') {
     if (client.blogs && Array.isArray(client.blogs) && client.blogs.length > 0) {
       clientSection.push('\nRecent Blog Posts/Articles:');
@@ -149,7 +140,6 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     }
   }
 
-  // Pain Points/Challenges
   if (intent.topics.includes('challenges') || intent.type === 'analytical' || intent.type === 'recommendation') {
     if (client.pain_points && Array.isArray(client.pain_points) && client.pain_points.length > 0) {
       clientSection.push('\nKnown Pain Points/Challenges:');
@@ -161,7 +151,6 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     }
   }
 
-  // Competitors
   if (intent.topics.includes('market') || intent.topics.includes('competitors') || mode === 'deep') {
     if (client.competitors && Array.isArray(client.competitors) && client.competitors.length > 0) {
       clientSection.push('\nCompetitors/Alternatives They Consider:');
@@ -188,13 +177,11 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
         if (insights.goals) clientSection.push(`  Goals: ${Array.isArray(insights.goals) ? insights.goals.join('; ') : insights.goals}`);
       }
     } catch (e) {
-      // Ignore parsing errors
     }
   }
 
   contextParts.push(clientSection.join('\n'));
 
-  // Contacts - Prioritize decision makers
   if (contacts && contacts.length > 0 && (intent.topics.includes('contacts') || mode === 'deep')) {
     const decisionMakers = contacts.filter((c: any) => c.is_decision_maker);
     const primaryContacts = contacts.filter((c: any) => c.is_primary);
@@ -229,7 +216,6 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     contextParts.push(contactsSection.join('\n'));
   }
 
-  // Meeting transcripts - Prioritize by timeframe and relevance
   if (transcripts && transcripts.length > 0) {
     const transcriptsSection = ['\n=== MEETING HISTORY (Manual Notes) ==='];
 
@@ -258,7 +244,6 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     contextParts.push(transcriptsSection.join('\n'));
   }
 
-  // Fathom Recordings - Show summary
   if (fathomRecordings && fathomRecordings.length > 0) {
     const fathomSection = ['\n=== FATHOM RECORDINGS AVAILABLE ==='];
     fathomSection.push(`Found ${fathomRecordings.length} Fathom-recorded meetings for this client.`);
@@ -277,7 +262,6 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     contextParts.push(fathomSection.join('\n'));
   }
 
-  // Document matches - Semantic search results
   if (documentMatches && documentMatches.length > 0) {
     const docMatches = documentMatches.filter((doc: any) =>
       doc.source_type !== 'meeting_transcript' && doc.source_type !== 'fathom_transcript'
@@ -313,7 +297,6 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
     }
   }
 
-  // Opportunities - Show if relevant
   if (opportunities && opportunities.length > 0 && (intent.topics.includes('opportunities') || intent.type === 'recommendation')) {
     const oppsSection = ['\n=== IDENTIFIED OPPORTUNITIES ==='];
     opportunities.slice(0, 5).forEach((opp: any, i: number) => {
@@ -329,9 +312,7 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
 }
 
 function buildEnhancedPrompt(intent: QueryIntent, mode: string): string {
-  const basePrompt = `You are an expert business intelligence assistant analyzing client data to provide accurate, actionable insights.
-
-Your role is to help account managers understand their clients better and make informed decisions.`;
+  const basePrompt = `You are an expert business intelligence assistant analyzing client data to provide accurate, actionable insights.\n\nYour role is to help account managers understand their clients better and make informed decisions.`;
 
   const intentSpecificGuidance: Record<string, string> = {
     'factual': 'Provide clear, direct answers based on the data. Cite specific sources.',
@@ -404,11 +385,9 @@ Deno.serve(async (req: Request) => {
       throw new Error('OpenAI API key not configured. Please add it in Settings.');
     }
 
-    // Analyze query intent
     const intent = analyzeQueryIntent(query);
     console.log('Query intent:', intent);
 
-    // Fetch all data in parallel for better performance
     const [
       clientResult,
       companyProfileResult,
@@ -436,7 +415,6 @@ Deno.serve(async (req: Request) => {
     const fathomRecordings = fathomRecordingsResult.data || [];
     const opportunities = opportunitiesResult.data || [];
 
-    // Generate embedding for semantic search
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -456,12 +434,9 @@ Deno.serve(async (req: Request) => {
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
 
-    // Perform semantic search with adaptive threshold
     const searchLimit = mode === 'deep' ? 20 : 12;
-    // Lower threshold to include more meeting data - meetings contain valuable context
     const similarityThreshold = intent.type === 'factual' ? 0.70 : 0.60;
 
-    // Use unified search that includes both document and Fathom embeddings
     const { data: documentMatches } = await supabaseClient.rpc('match_all_content', {
       query_embedding: queryEmbedding,
       match_threshold: similarityThreshold,
@@ -470,7 +445,6 @@ Deno.serve(async (req: Request) => {
       filter_client_id: clientId,
     });
 
-    // Build enhanced context
     const contextData = {
       client,
       companyProfile,
@@ -484,24 +458,20 @@ Deno.serve(async (req: Request) => {
     const fullContext = buildEnhancedContext(contextData, intent, mode);
     const systemPrompt = buildEnhancedPrompt(intent, mode);
 
-    // Build conversation with context
     const messages: any[] = [
       { role: 'system', content: systemPrompt },
     ];
 
-    // Include recent conversation history for context
     if (conversationHistory.length > 0) {
-      const recentHistory = conversationHistory.slice(-4); // Last 2 exchanges
+      const recentHistory = conversationHistory.slice(-4);
       messages.push(...recentHistory);
     }
 
-    // Add current query with context
     messages.push({
       role: 'user',
       content: `CLIENT DATA:\n${fullContext}\n\n---\n\nQUESTION: ${query}\n\nProvide a thorough, accurate answer based solely on the data above.`,
     });
 
-    // Generate AI response
     const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -511,7 +481,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages,
-        temperature: intent.type === 'factual' ? 0.3 : 0.7, // Lower temp for factual queries
+        temperature: intent.type === 'factual' ? 0.3 : 0.7,
         max_tokens: mode === 'deep' ? 2000 : 1000,
       }),
     });
@@ -525,7 +495,6 @@ Deno.serve(async (req: Request) => {
     const chatData = await chatResponse.json();
     const answer = chatData.choices[0].message.content;
 
-    // Calculate confidence score based on available data
     const dataQuality = {
       hasTranscripts: transcripts.length > 0,
       hasContacts: contacts.length > 0,
