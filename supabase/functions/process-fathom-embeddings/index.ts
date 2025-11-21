@@ -229,8 +229,6 @@ function parseTranscriptSegments(transcript: string): Array<{
   const parts = transcript.split(/(?=[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*:\s)/);
 
   let currentTimestamp = 0;
-  let currentSpeaker = '';
-  let currentText = '';
 
   for (const part of parts) {
     const trimmed = part.trim();
@@ -244,30 +242,13 @@ function parseTranscriptSegments(transcript: string): Array<{
 
     if (!speaker || !text) continue;
 
-    if (speaker === currentSpeaker && currentText) {
-      currentText += ' ' + text;
-    } else {
-      if (currentText && currentSpeaker) {
-        const speakingTime = Math.ceil(currentText.split(' ').length * 0.5);
-        segments.push({
-          speaker: currentSpeaker,
-          text: currentText,
-          timestamp: currentTimestamp,
-        });
-        currentTimestamp += speakingTime;
-      }
-
-      currentSpeaker = speaker;
-      currentText = text;
-    }
-  }
-
-  if (currentText && currentSpeaker) {
+    const speakingTime = Math.ceil(text.split(' ').length * 0.5);
     segments.push({
-      speaker: currentSpeaker,
-      text: currentText,
+      speaker: speaker,
+      text: text,
       timestamp: currentTimestamp,
     });
+    currentTimestamp += speakingTime;
   }
 
   console.log(`Parsed ${segments.length} speaker segments from transcript`);
