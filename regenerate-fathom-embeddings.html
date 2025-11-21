@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Regenerate Fathom Embeddings</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    .description {
+      color: #666;
+      margin-bottom: 30px;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    button:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    .log {
+      background: #1f2937;
+      color: #d1d5db;
+      padding: 20px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .log-entry {
+      margin-bottom: 5px;
+    }
+    .log-success {
+      color: #10b981;
+    }
+    .log-error {
+      color: #ef4444;
+    }
+    .log-info {
+      color: #3b82f6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔄 Regenerate Fathom Embeddings</h1>
+    <p class="description">
+      This tool will regenerate embeddings for all Fathom recordings with improved chunking logic.
+      This will fix the issue where the Intelligence Agent couldn't properly search meeting transcripts.
+    </p>
+
+    <button id="regenerateBtn" onclick="regenerateEmbeddings()">
+      Regenerate All Embeddings
+    </button>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm';
+
+    // Initialize Supabase client
+    const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL || '';
+    const supabaseKey = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+
+    if (!supabaseUrl || !supabaseKey) {
+      log('ERROR: Supabase credentials not found. Please check your .env file.', 'error');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    window.regenerateEmbeddings = async function() {
+      const btn = document.getElementById('regenerateBtn');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+
+      try {
+        log('Starting embedding regeneration...', 'info');
+
+        // Get current session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+          log('ERROR: Not authenticated. Please log in first.', 'error');
+          btn.disabled = false;
+          btn.textContent = 'Regenerate All Embeddings';
+          return;
+        }
+
+        // Fetch all recordings
+        log('Fetching Fathom recordings...', 'info');
+        const { data: recordings, error: fetchError } = await supabase
+          .from('fathom_recordings')
+          .select('id, title, embeddings_generated')
+          .order('created_at', { ascending: false });
+
+        if (fetchError) {
+          log(`ERROR: Failed to fetch recordings: ${fetchError.message}`, 'error');
+          btn.disabled = false;
+          btn.textContent = 'Regenerate All Embeddings';
+          return;
+        }
+
+        if (!recordings || recordings.length === 0) {
+          log('No recordings found.', 'info');
+          btn.disabled = false;
+          btn.textContent = 'Regenerate All Embeddings';
+          return;
+        }
+
+        log(`Found ${recordings.length} recording(s) to process`, 'success');
+
+        // Process each recording
+        for (let i = 0; i < recordings.length; i++) {
+          const recording = recordings[i];
+          log(`\n[${i + 1}/${recordings.length}] Processing: ${recording.title}`, 'info');
+
+          try {
+            const response = await fetch(`${supabaseUrl}/functions/v1/process-fathom-embeddings`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                recording_id: recording.id,
+                force_regenerate: true,
+              }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+              log(`  ✓ Created ${result.embeddings_created} embeddings`, 'success');
+            } else {
+              log(`  ✗ Failed: ${result.error || 'Unknown error'}`, 'error');
+            }
+
+            // Rate limiting
+            if (i < recordings.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } catch (error) {
+            log(`  ✗ Error: ${error.message}`, 'error');
+          }
+        }
+
+        log('\n✅ Regeneration complete!', 'success');
+        log('You can now use the Intelligence Agent to query Fathom meeting data.', 'info');
+
+      } catch (error) {
+        log(`ERROR: ${error.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Regenerate All Embeddings';
+      }
+    };
+
+    log('Ready to regenerate embeddings. Click the button to start.', 'info');
+  </script>
+</body>
+</html>

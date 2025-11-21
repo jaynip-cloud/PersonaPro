@@ -9,6 +9,7 @@ const corsHeaders = {
 
 interface ProcessRequest {
   recording_id: string;
+  force_regenerate?: boolean;
 }
 
 interface TranscriptChunk {
@@ -64,7 +65,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: ProcessRequest = await req.json();
-    const { recording_id } = body;
+    const { recording_id, force_regenerate = false } = body;
 
     if (!recording_id) {
       throw new Error('recording_id is required');
@@ -83,7 +84,7 @@ Deno.serve(async (req: Request) => {
       throw new Error('Recording not found');
     }
 
-    if (recording.embeddings_generated) {
+    if (recording.embeddings_generated && !force_regenerate) {
       console.log('Embeddings already generated for this recording');
       return new Response(
         JSON.stringify({ success: true, message: 'Embeddings already generated' }),
@@ -91,8 +92,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // If regenerating, delete existing embeddings
+    if (force_regenerate) {
+      console.log('Force regenerate enabled - deleting existing embeddings');
+      const { error: deleteError } = await supabaseClient
+        .from('fathom_embeddings')
+        .delete()
+        .eq('recording_id', recording_id);
+      
+      if (deleteError) {
+        console.error('Error deleting old embeddings:', deleteError);
+      }
+    }
+
     // Parse transcript into speaker-tagged segments
     const segments = parseTranscriptSegments(recording.transcript);
+    
+    console.log(`Parsed ${segments.length} speaker segments from transcript`);
     
     // Create overlapping chunks
     const chunks = createOverlappingChunks(segments);
@@ -226,6 +242,8 @@ function parseTranscriptSegments(transcript: string): Array<{
   const lines = transcript.split('\n').filter(line => line.trim());
 
   let currentTimestamp = 0;
+  let currentSpeaker = '';
+  let currentText = '';
 
   for (const line of lines) {
     // Match pattern: "Speaker Name: text"
@@ -233,18 +251,36 @@ function parseTranscriptSegments(transcript: string): Array<{
     if (match) {
       const speaker = match[1].trim();
       const text = match[2].trim();
-      
-      // Estimate timestamp based on text length (very rough)
-      const speakingTime = Math.ceil(text.split(' ').length * 0.5); // ~0.5 seconds per word
-      
-      segments.push({
-        speaker,
-        text,
-        timestamp: currentTimestamp,
-      });
 
-      currentTimestamp += speakingTime;
+      // If same speaker, accumulate text
+      if (speaker === currentSpeaker && currentText) {
+        currentText += ' ' + text;
+      } else {
+        // Different speaker or first line - save previous segment if exists
+        if (currentText) {
+          const speakingTime = Math.ceil(currentText.split(' ').length * 0.5);
+          segments.push({
+            speaker: currentSpeaker,
+            text: currentText,
+            timestamp: currentTimestamp,
+          });
+          currentTimestamp += speakingTime;
+        }
+
+        // Start new segment
+        currentSpeaker = speaker;
+        currentText = text;
+      }
     }
+  }
+
+  // Add final segment
+  if (currentText) {
+    segments.push({
+      speaker: currentSpeaker,
+      text: currentText,
+      timestamp: currentTimestamp,
+    });
   }
 
   return segments;
