@@ -455,16 +455,60 @@ Deno.serve(async (req: Request) => {
       filter_client_id: clientId,
     });
 
-    // Also search new knowledge base system (Qdrant)
-    let qdrantMatches: any[] = [];
+    // Also search new knowledge base system (Qdrant or Pinecone)
+    let vectorDbMatches: any[] = [];
     try {
       const { data: apiKeys } = await supabaseClient
         .from('api_keys')
-        .select('qdrant_url, qdrant_api_key')
+        .select('qdrant_url, qdrant_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (apiKeys?.qdrant_url && apiKeys?.qdrant_api_key) {
+      // Check Pinecone first (priority if both are configured)
+      if (apiKeys?.pinecone_api_key && apiKeys?.pinecone_environment && apiKeys?.pinecone_index_name) {
+        const pineconeUrl = `https://${apiKeys.pinecone_index_name}-${apiKeys.pinecone_environment}.svc.${apiKeys.pinecone_environment}.pinecone.io`;
+
+        const pineconeResponse = await fetch(
+          `${pineconeUrl}/query`,
+          {
+            method: 'POST',
+            headers: {
+              'Api-Key': apiKeys.pinecone_api_key,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              vector: queryEmbedding,
+              topK: searchLimit,
+              includeMetadata: true,
+              filter: {
+                client_id: { '$eq': clientId },
+              },
+            }),
+          }
+        );
+
+        if (pineconeResponse.ok) {
+          const pineconeData = await pineconeResponse.json();
+          vectorDbMatches = (pineconeData.matches || [])
+            .filter((match: any) => match.score >= similarityThreshold)
+            .map((match: any) => ({
+              id: match.metadata.chunk_id,
+              user_id: user.id,
+              client_id: match.metadata.client_id,
+              document_name: match.metadata.title,
+              document_url: match.metadata.url || '',
+              content_chunk: match.metadata.text,
+              chunk_index: match.metadata.chunk_index,
+              metadata: {},
+              source_type: match.metadata.source_type || 'document',
+              created_at: match.metadata.created_at,
+              similarity: match.score,
+            }));
+          console.log(`Found ${vectorDbMatches.length} matches in Pinecone`);
+        }
+      }
+      // Fallback to Qdrant if Pinecone is not configured
+      else if (apiKeys?.qdrant_url && apiKeys?.qdrant_api_key) {
         const qdrantResponse = await fetch(
           `${apiKeys.qdrant_url}/collections/personapro_documents/points/search`,
           {
@@ -489,7 +533,7 @@ Deno.serve(async (req: Request) => {
 
         if (qdrantResponse.ok) {
           const qdrantData = await qdrantResponse.json();
-          qdrantMatches = (qdrantData.result || []).map((hit: any) => ({
+          vectorDbMatches = (qdrantData.result || []).map((hit: any) => ({
             id: hit.payload.chunk_id,
             user_id: user.id,
             client_id: hit.payload.client_id,
@@ -502,17 +546,17 @@ Deno.serve(async (req: Request) => {
             created_at: hit.payload.created_at,
             similarity: hit.score,
           }));
-          console.log(`Found ${qdrantMatches.length} matches in Qdrant`);
+          console.log(`Found ${vectorDbMatches.length} matches in Qdrant`);
         }
       }
-    } catch (qdrantError) {
-      console.warn('Failed to search Qdrant:', qdrantError);
+    } catch (vectorDbError) {
+      console.warn('Failed to search vector database:', vectorDbError);
     }
 
     // Combine results from both systems
     const allDocumentMatches = [
       ...(documentMatches || []),
-      ...qdrantMatches,
+      ...vectorDbMatches,
     ].sort((a, b) => (b.similarity || 0) - (a.similarity || 0)).slice(0, searchLimit);
 
     // For meeting-related queries with few results, fetch recent Fathom excerpts directly
@@ -583,7 +627,7 @@ Deno.serve(async (req: Request) => {
       hasTranscripts: transcripts.length > 0,
       hasContacts: contacts.length > 0,
       hasDocuments: allDocumentMatches.length > 0,
-      hasQdrantDocuments: qdrantMatches.length > 0,
+      hasVectorDbDocuments: vectorDbMatches.length > 0,
       hasOpportunities: opportunities.length > 0,
       hasAIInsights: !!client.ai_insights,
       hasServices: !!(client.services && Array.isArray(client.services) && client.services.length > 0),
@@ -661,7 +705,7 @@ Deno.serve(async (req: Request) => {
             fathomTranscriptsFound: allDocumentMatches.filter((d: any) =>
               d.source_type === 'fathom_transcript'
             ).length,
-            qdrantDocumentsFound: qdrantMatches.length,
+            vectorDbDocumentsFound: vectorDbMatches.length,
             contactsFound: contacts.length,
             opportunitiesFound: opportunities.length,
           },
