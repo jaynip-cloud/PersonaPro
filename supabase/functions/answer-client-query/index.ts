@@ -365,7 +365,9 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
 function buildEnhancedPrompt(intent: QueryIntent, mode: string): string {
   const basePrompt = `You are PersonaPro's Helpful Intelligence Assistant — a friendly, knowledgeable teammate helping sales and account managers understand their clients better.
 
-Your job is to read the retrieved context (meetings + documents + company profile) and answer questions in a warm, conversational, helpful tone — like a smart colleague who really knows this client.`;
+Your job is to read the retrieved context (meetings + documents + company profile) and answer questions in a warm, conversational, helpful tone — like a smart colleague who really knows this client.
+
+IMPORTANT: You will only receive substantive questions here. Simple greetings are handled separately.`;
 
   const intentSpecificGuidance: Record<string, string> = {
     'factual': 'Explain clearly and directly, using the data to paint a complete picture.',
@@ -439,6 +441,51 @@ Deno.serve(async (req: Request) => {
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured. Please add it in Settings.');
+    }
+
+    // Check if this is just a greeting
+    const greetingPattern = /^(hi|hello|hey|good morning|good afternoon|good evening|what's up|how are you|howdy|sup|yo)[\s!?.]*$/i;
+    const isGreeting = greetingPattern.test(query.trim());
+
+    if (isGreeting) {
+      console.log('Detected greeting, returning friendly response');
+      const greetingResponses = [
+        "Hey! 👋 How can I help you today?",
+        "Hi there! What would you like to know?",
+        "Hello! What can I help you with?",
+        "Hey! Ready to dive into some client insights?",
+        "Hi! What would you like to explore?",
+      ];
+      const randomGreeting = greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          answer: randomGreeting,
+          sources: [],
+          metadata: {
+            intent: 'greeting',
+            confidence: 'high',
+            sources: {
+              documentsSearched: 0,
+              manualTranscriptsIncluded: 0,
+              fathomRecordingsAvailable: 0,
+              transcriptMatchesFound: 0,
+              fathomTranscriptsFound: 0,
+              pineconeDocumentsFound: 0,
+              contactsFound: 0,
+              opportunitiesFound: 0,
+            },
+            dataQuality: {},
+          },
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
     }
 
     const intent = analyzeQueryIntent(query);
@@ -662,11 +709,107 @@ Deno.serve(async (req: Request) => {
     const chatData = await chatResponse.json();
     const answer = chatData.choices[0].message.content;
 
+    // Build comprehensive sources list from intelligence context
+    const sourcesList = [];
+    let totalIntelligenceChunks = 0;
+    let meetingChunks = 0;
+    let documentChunks = 0;
+    let companyKBChunks = 0;
+
+    if (intelligenceContext) {
+      // Add sources from intelligence context
+      if (intelligenceContext.meetings && intelligenceContext.meetings.length > 0) {
+        meetingChunks = intelligenceContext.meetings.length;
+        totalIntelligenceChunks += meetingChunks;
+
+        const meetingTitles = new Set();
+        intelligenceContext.meetings.forEach((meeting: any) => {
+          const title = meeting.recording_title || 'Unknown Meeting';
+          if (!meetingTitles.has(title)) {
+            meetingTitles.add(title);
+            sourcesList.push({
+              name: title,
+              similarity: meeting.similarity_score,
+              type: 'Fathom Recording',
+            });
+          }
+        });
+      }
+
+      if (intelligenceContext.documents && intelligenceContext.documents.length > 0) {
+        documentChunks = intelligenceContext.documents.length;
+        totalIntelligenceChunks += documentChunks;
+
+        const docTitles = new Set();
+        intelligenceContext.documents.forEach((doc: any) => {
+          const title = doc.title || 'Unknown Document';
+          if (!docTitles.has(title)) {
+            docTitles.add(title);
+            sourcesList.push({
+              name: title,
+              similarity: doc.similarity_score,
+              type: 'Knowledge Base Document',
+              url: doc.url,
+            });
+          }
+        });
+      }
+
+      if (intelligenceContext.company_kb && intelligenceContext.company_kb.length > 0) {
+        companyKBChunks = intelligenceContext.company_kb.length;
+        totalIntelligenceChunks += companyKBChunks;
+
+        const kbTitles = new Set();
+        intelligenceContext.company_kb.forEach((kb: any) => {
+          const title = kb.title || 'Unknown Resource';
+          if (!kbTitles.has(title)) {
+            kbTitles.add(title);
+            sourcesList.push({
+              name: title,
+              similarity: kb.similarity_score,
+              type: kb.source_type === 'service' ? 'Service' :
+                    kb.source_type === 'case_study' ? 'Case Study' :
+                    kb.source_type === 'technology' ? 'Technology' :
+                    kb.source_type === 'blog' ? 'Blog Post' : 'Company Knowledge',
+              url: kb.url,
+            });
+          }
+        });
+      }
+    }
+
+    // Also add legacy document matches if any
+    if (allDocumentMatches && allDocumentMatches.length > 0) {
+      allDocumentMatches.forEach((doc: any) => {
+        const name = doc.document_name || 'Unknown source';
+        const alreadyAdded = sourcesList.some((s: any) => s.name === name);
+
+        if (!alreadyAdded) {
+          let sourceType = 'Document';
+          if (doc.source_type === 'fathom_transcript') {
+            sourceType = 'Fathom Recording';
+          } else if (doc.source_type === 'meeting_transcript') {
+            sourceType = 'Manual Meeting Note';
+          } else if (doc.source_type === 'document') {
+            sourceType = 'Knowledge Base Document';
+          }
+
+          sourcesList.push({
+            name,
+            similarity: doc.similarity,
+            type: sourceType,
+          });
+        }
+      });
+    }
+
     const dataQuality = {
       hasTranscripts: transcripts.length > 0,
       hasContacts: contacts.length > 0,
-      hasDocuments: allDocumentMatches.length > 0,
-      hasPineconeDocuments: pineconeMatches.length > 0,
+      hasDocuments: documentChunks > 0 || allDocumentMatches.length > 0,
+      hasPineconeDocuments: totalIntelligenceChunks > 0 || pineconeMatches.length > 0,
+      hasMeetingContext: meetingChunks > 0,
+      hasCompanyKnowledge: companyKBChunks > 0,
       hasOpportunities: opportunities.length > 0,
       hasAIInsights: !!client.ai_insights,
       hasServices: !!(client.services && Array.isArray(client.services) && client.services.length > 0),
@@ -679,51 +822,6 @@ Deno.serve(async (req: Request) => {
     const qualityScore = Object.values(dataQuality).filter(Boolean).length;
     const confidence = qualityScore >= 6 ? 'high' : qualityScore >= 3 ? 'medium' : 'low';
 
-    const sourcesList = [];
-
-    if (allDocumentMatches && allDocumentMatches.length > 0) {
-      allDocumentMatches.forEach((doc: any) => {
-        let sourceType = 'Document';
-        if (doc.source_type === 'fathom_transcript') {
-          sourceType = 'Fathom Recording';
-        } else if (doc.source_type === 'meeting_transcript') {
-          sourceType = 'Manual Meeting Note';
-        } else if (doc.source_type === 'document') {
-          sourceType = 'Knowledge Base Document';
-        }
-
-        sourcesList.push({
-          name: doc.document_name || 'Unknown source',
-          similarity: doc.similarity,
-          type: sourceType,
-        });
-      });
-    }
-
-    if (transcripts && transcripts.length > 0) {
-      transcripts.forEach((t: any) => {
-        const alreadyAdded = sourcesList.some((s: any) => s.name === t.title);
-        if (!alreadyAdded) {
-          sourcesList.push({
-            name: t.title,
-            type: 'Manual Meeting Note',
-          });
-        }
-      });
-    }
-
-    if (fathomRecordings && fathomRecordings.length > 0) {
-      fathomRecordings.forEach((rec: any) => {
-        const alreadyAdded = sourcesList.some((s: any) => s.name === rec.title);
-        if (!alreadyAdded) {
-          sourcesList.push({
-            name: rec.title,
-            type: 'Fathom Recording',
-          });
-        }
-      });
-    }
-
     return new Response(
       JSON.stringify({
         success: true,
@@ -733,20 +831,18 @@ Deno.serve(async (req: Request) => {
           intent: intent.type,
           confidence,
           sources: {
-            documentsSearched: allDocumentMatches.filter((d: any) =>
+            intelligenceChunksRetrieved: totalIntelligenceChunks,
+            meetingChunksFound: meetingChunks,
+            documentChunksFound: documentChunks,
+            companyKBChunksFound: companyKBChunks,
+            legacyDocumentsSearched: allDocumentMatches.filter((d: any) =>
               d.source_type !== 'meeting_transcript' && d.source_type !== 'fathom_transcript'
             ).length,
             manualTranscriptsIncluded: transcripts.length,
             fathomRecordingsAvailable: fathomRecordings.length,
-            transcriptMatchesFound: allDocumentMatches.filter((d: any) =>
-              d.source_type === 'meeting_transcript' || d.source_type === 'fathom_transcript'
-            ).length,
-            fathomTranscriptsFound: allDocumentMatches.filter((d: any) =>
-              d.source_type === 'fathom_transcript'
-            ).length,
-            pineconeDocumentsFound: pineconeMatches.length,
             contactsFound: contacts.length,
             opportunitiesFound: opportunities.length,
+            totalSourcesUsed: sourcesList.length,
           },
           dataQuality,
         },
