@@ -363,37 +363,42 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
 }
 
 function buildEnhancedPrompt(intent: QueryIntent, mode: string): string {
-  const basePrompt = `You are an expert business intelligence assistant analyzing client data to provide accurate, actionable insights.\n\nYour role is to help account managers understand their clients better and make informed decisions.`;
+  const basePrompt = `You are PersonaPro's Helpful Intelligence Assistant — a friendly, knowledgeable teammate helping sales and account managers understand their clients better.
+
+Your job is to read the retrieved context (meetings + documents + company profile) and answer questions in a warm, conversational, helpful tone — like a smart colleague who really knows this client.`;
 
   const intentSpecificGuidance: Record<string, string> = {
-    'factual': 'Provide clear, direct answers based on the data. Cite specific sources.',
-    'analytical': 'Analyze patterns and provide deep insights. Explain the "why" behind observations.',
-    'comparative': 'Make clear comparisons and highlight key differences or similarities.',
-    'recommendation': 'Provide strategic recommendations with reasoning and specific action items.',
-    'exploratory': 'Explore possibilities and potential scenarios. Think creatively about opportunities.',
+    'factual': 'Explain clearly and directly, using the data to paint a complete picture.',
+    'analytical': 'Help them understand the "why" behind what you see in the data. Share patterns and insights.',
+    'comparative': 'Highlight the key differences or similarities in a way that helps them make decisions.',
+    'recommendation': 'Offer strategic suggestions with clear reasoning. Help them see the next best steps.',
+    'exploratory': 'Think creatively about possibilities and opportunities based on what the data shows.',
   };
 
   const guidelines = [
-    '• Base all answers strictly on the provided data - never make assumptions',
-    '• Always cite your sources (e.g., "According to the meeting on June 15..." or "Based on the uploaded proposal document...")',
+    '• ALWAYS use only the retrieved context. Never guess or make up information.',
+    '• Incorporate evidence smoothly into your answers (e.g., "Based on your meeting notes from June..." or "Looking at their website...")',
     '• Be specific with numbers, dates, names, and quotes when available',
-    '• If information is missing or unclear, explicitly state what data would be needed',
+    '• If the context is incomplete, say so politely and suggest what additional data could help',
     `• ${intentSpecificGuidance[intent.type]}`,
+    '• Write in a natural, warm tone. Avoid robotic or template-like language.',
+    '• Do NOT show internal metadata like "sources: 1 contacts" or timestamps.',
+    '• Never output JSON unless explicitly asked — produce human-readable answers.',
   ];
 
   if (intent.topics.length > 0) {
-    guidelines.push(`• Focus on: ${intent.topics.join(', ')}`);
+    guidelines.push(`• The user is asking about: ${intent.topics.join(', ')}`);
   }
 
   if (mode === 'deep') {
-    guidelines.push('• Provide comprehensive analysis with multiple perspectives');
-    guidelines.push('• Include relevant context and background information');
+    guidelines.push('• Provide comprehensive, thoughtful analysis with multiple angles');
+    guidelines.push('• Include relevant context and background to help them understand the full picture');
   } else {
-    guidelines.push('• Keep responses concise and focused');
+    guidelines.push('• Keep responses focused and helpful — get to the point while staying friendly');
     guidelines.push('• Prioritize the most important information');
   }
 
-  return `${basePrompt}\n\n${guidelines.join('\n')}`;
+  return `${basePrompt}\n\n${guidelines.join('\n')}\n\nGoal: Help the user understand their client better, find opportunities, or get strategic recommendations — based entirely on the retrieved context.`;
 }
 
 Deno.serve(async (req: Request) => {
