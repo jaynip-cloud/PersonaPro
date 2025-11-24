@@ -39,7 +39,7 @@ function analyzeQueryIntent(query: string): QueryIntent {
   if (lowerQuery.match(/pain point|problem|challenge|issue|concern|difficulty|struggle/)) topics.push('challenges');
   if (lowerQuery.match(/opportunity|growth|upsell|expansion/)) topics.push('opportunities');
   if (lowerQuery.match(/meeting|discussion|call|conversation/)) topics.push('meetings');
-  if (lowerQuery.match(/contact|person|people|team|who/)) topics.push('contacts');
+  if (lowerQuery.match(/contact|person|people|team|who|ceo|chief executive|founder|leadership|executive/)) topics.push('contacts');
   if (lowerQuery.match(/technology|tech stack|tools|software|platform|framework/)) topics.push('technology');
   if (lowerQuery.match(/budget|cost|price|revenue|financial/)) topics.push('financial');
   if (lowerQuery.match(/timeline|when|schedule|deadline/)) topics.push('timeline');
@@ -224,35 +224,59 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
 
   contextParts.push(clientSection.join('\n'));
 
-  if (contacts && contacts.length > 0 && (intent.topics.includes('contacts') || mode === 'deep')) {
+  // Always include contacts section if they exist (not just when explicitly requested)
+  if (contacts && contacts.length > 0) {
     const decisionMakers = contacts.filter((c: any) => c.is_decision_maker);
+    const ceo = contacts.find((c: any) => c.role && (
+      c.role.toLowerCase().includes('ceo') ||
+      c.role.toLowerCase().includes('chief executive')
+    ));
     const primaryContacts = contacts.filter((c: any) => c.is_primary);
     const otherContacts = contacts.filter((c: any) => !c.is_decision_maker && !c.is_primary);
 
     const contactsSection = ['\n=== KEY CONTACTS ==='];
 
+    // Always show CEO if exists
+    if (ceo) {
+      contactsSection.push('Chief Executive Officer (CEO):');
+      contactsSection.push(`  • ${ceo.name} - ${ceo.role}`);
+      contactsSection.push(`    Email: ${ceo.email}${ceo.phone ? ` | Phone: ${ceo.phone}` : ''}`);
+      if (ceo.linkedin_url) contactsSection.push(`    LinkedIn: ${ceo.linkedin_url}`);
+      contactsSection.push('');
+    }
+
     if (decisionMakers.length > 0) {
       contactsSection.push('Decision Makers:');
       decisionMakers.forEach((c: any) => {
+        // Skip if already shown as CEO
+        if (c.id === ceo?.id) return;
+
         contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
         contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
         if (c.influence_level) contactsSection.push(`    Influence: ${c.influence_level}`);
       });
+      contactsSection.push('');
     }
 
-    if (primaryContacts.length > 0) {
-      contactsSection.push('\nPrimary Contacts:');
-      primaryContacts.forEach((c: any) => {
-        contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
-        contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
-      });
-    }
+    if (intent.topics.includes('contacts') || mode === 'deep') {
+      if (primaryContacts.length > 0) {
+        contactsSection.push('Primary Contacts:');
+        primaryContacts.forEach((c: any) => {
+          // Skip if already shown as CEO or decision maker
+          if (c.id === ceo?.id || c.is_decision_maker) return;
 
-    if (mode === 'deep' && otherContacts.length > 0) {
-      contactsSection.push('\nOther Contacts:');
-      otherContacts.slice(0, 3).forEach((c: any) => {
-        contactsSection.push(`  • ${c.name} - ${c.role}${c.email ? ` (${c.email})` : ''}`);
-      });
+          contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
+          contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
+        });
+        contactsSection.push('');
+      }
+
+      if (mode === 'deep' && otherContacts.length > 0) {
+        contactsSection.push('Other Contacts:');
+        otherContacts.slice(0, 3).forEach((c: any) => {
+          contactsSection.push(`  • ${c.name} - ${c.role}${c.email ? ` (${c.email})` : ''}`);
+        });
+      }
     }
 
     contextParts.push(contactsSection.join('\n'));
