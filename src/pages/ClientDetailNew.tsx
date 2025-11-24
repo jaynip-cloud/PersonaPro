@@ -851,7 +851,7 @@ export const ClientDetailNew: React.FC = () => {
 
       setIsProcessingQuery(false);
 
-      // Build enhanced sources info with metadata
+      // Build enhanced sources info with metadata and actual sources
       let sourcesInfo = '';
       if (data.metadata) {
         const { sources, confidence, intent } = data.metadata;
@@ -868,6 +868,16 @@ export const ClientDetailNew: React.FC = () => {
 
         sourcesInfo = `\n\n---\n📊 Sources: ${sourcesParts.join(', ') || 'None'}\n${confidenceEmoji} Confidence: ${confidence}`;
         if (intent) sourcesInfo += ` | Query type: ${intent}`;
+      }
+
+      // Add actual source details if available
+      if (data.sources && data.sources.length > 0) {
+        sourcesInfo += '\n\n📄 Specific sources used:\n';
+        data.sources.forEach((source: any, index: number) => {
+          const relevance = source.similarity ? `${(source.similarity * 100).toFixed(0)}%` : '';
+          sourcesInfo += `\n${index + 1}. ${source.name || 'Unknown'}${relevance ? ` (${relevance} match)` : ''}`;
+          if (source.type) sourcesInfo += ` [${source.type}]`;
+        });
       }
 
       return data.answer + sourcesInfo;

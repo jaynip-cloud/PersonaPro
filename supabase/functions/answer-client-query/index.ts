@@ -535,10 +535,59 @@ Deno.serve(async (req: Request) => {
     const qualityScore = Object.values(dataQuality).filter(Boolean).length;
     const confidence = qualityScore >= 6 ? 'high' : qualityScore >= 3 ? 'medium' : 'low';
 
+    // Build detailed sources list
+    const sourcesList = [];
+
+    // Add document sources
+    if (documentMatches && documentMatches.length > 0) {
+      documentMatches.forEach((doc: any) => {
+        let sourceType = 'Document';
+        if (doc.source_type === 'fathom_transcript') {
+          sourceType = 'Fathom Recording';
+        } else if (doc.source_type === 'meeting_transcript') {
+          sourceType = 'Manual Meeting Note';
+        }
+
+        sourcesList.push({
+          name: doc.document_name || 'Unknown source',
+          similarity: doc.similarity,
+          type: sourceType,
+        });
+      });
+    }
+
+    // Add manual transcripts that were included in context
+    if (transcripts && transcripts.length > 0) {
+      transcripts.forEach((t: any) => {
+        // Only add if not already in documentMatches
+        const alreadyAdded = sourcesList.some((s: any) => s.name === t.title);
+        if (!alreadyAdded) {
+          sourcesList.push({
+            name: t.title,
+            type: 'Manual Meeting Note',
+          });
+        }
+      });
+    }
+
+    // Add Fathom recordings that were available
+    if (fathomRecordings && fathomRecordings.length > 0) {
+      fathomRecordings.forEach((rec: any) => {
+        const alreadyAdded = sourcesList.some((s: any) => s.name === rec.title);
+        if (!alreadyAdded) {
+          sourcesList.push({
+            name: rec.title,
+            type: 'Fathom Recording',
+          });
+        }
+      });
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         answer,
+        sources: sourcesList,
         metadata: {
           intent: intent.type,
           confidence,
