@@ -56,20 +56,31 @@ Deno.serve(async (req: Request) => {
 
     const openaiApiKey = apiKeys?.openai_api_key || Deno.env.get('OPENAI_API_KEY');
     const pineconeKey = apiKeys?.pinecone_api_key;
-    const pineconeEnvironment = apiKeys?.pinecone_environment;
-    const pineconeIndexName = apiKeys?.pinecone_index_name;
+    let pineconeEnvironment = apiKeys?.pinecone_environment;
+    let pineconeIndexName = apiKeys?.pinecone_index_name;
 
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
-    if (!pineconeKey || !pineconeEnvironment || !pineconeIndexName) {
+    if (!pineconeKey) {
+      throw new Error('Pinecone API key not configured');
+    }
+
+    // Handle case where user stores full Pinecone host URL in pinecone_index_name field
+    let pineconeUrl = '';
+    if (pineconeIndexName && pineconeIndexName.startsWith('https://')) {
+      pineconeUrl = pineconeIndexName;
+    } else if (pineconeEnvironment && pineconeEnvironment.startsWith('https://')) {
+      pineconeUrl = pineconeEnvironment;
+    } else if (pineconeIndexName && pineconeEnvironment) {
+      pineconeUrl = `https://${pineconeIndexName}-${pineconeEnvironment}.svc.${pineconeEnvironment}.pinecone.io`;
+    } else {
       throw new Error('Pinecone credentials not fully configured');
     }
 
-    const pineconeUrl = `https://${pineconeIndexName}-${pineconeEnvironment}.svc.${pineconeEnvironment}.pinecone.io`;
-
     console.log(`Searching for: "${query}" (client: ${clientId || 'all'})`);
+    console.log(`Pinecone URL: ${pineconeUrl}`);
 
     // Generate embedding for the search query
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {

@@ -333,6 +333,8 @@ Deno.serve(async (req: Request) => {
         console.log(`  ✓ Synced: "${insertedRecording.title}"`);
         processedRecordings.push(insertedRecording);
 
+        // Automatically trigger embeddings generation in the background
+        console.log(`  → Triggering embeddings generation for recording ${insertedRecording.id}`);
         fetch(
           `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-fathom-embeddings`,
           {
@@ -345,7 +347,18 @@ Deno.serve(async (req: Request) => {
               recording_id: insertedRecording.id,
             }),
           }
-        ).catch(err => console.error('Error triggering embeddings:', err));
+        )
+          .then(async (response) => {
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error(`  ⚠ Embeddings generation failed for ${insertedRecording.title}:`, errorText);
+            } else {
+              console.log(`  ✓ Embeddings generation started for ${insertedRecording.title}`);
+            }
+          })
+          .catch(err => {
+            console.error(`  ✗ Error triggering embeddings for ${insertedRecording.title}:`, err);
+          });
 
       } catch (error) {
         console.error(`  ✗ Processing error:`, error instanceof Error ? error.message : error);

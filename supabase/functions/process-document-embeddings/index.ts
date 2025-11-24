@@ -278,7 +278,19 @@ async function uploadToPinecone(
   embeddings: Array<{ chunk: any; embedding: number[] }>,
   document: any
 ): Promise<void> {
-  const pineconeUrl = `https://${indexName}-${environment}.svc.${environment}.pinecone.io`;
+  // Handle case where user stores full Pinecone host URL
+  let pineconeUrl = '';
+  if (indexName && indexName.startsWith('https://')) {
+    pineconeUrl = indexName;
+  } else if (environment && environment.startsWith('https://')) {
+    pineconeUrl = environment;
+  } else if (indexName && environment) {
+    pineconeUrl = `https://${indexName}-${environment}.svc.${environment}.pinecone.io`;
+  } else {
+    throw new Error('Pinecone URL configuration is invalid');
+  }
+
+  console.log(`Uploading to Pinecone URL: ${pineconeUrl}`);
 
   // Prepare vectors for Pinecone
   const vectors = embeddings.map(({ chunk, embedding }) => ({

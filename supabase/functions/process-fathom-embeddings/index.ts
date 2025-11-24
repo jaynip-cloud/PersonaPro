@@ -56,8 +56,8 @@ Deno.serve(async (req: Request) => {
 
     const openaiKey = apiKeys?.openai_api_key || Deno.env.get('OPENAI_API_KEY');
     const pineconeKey = apiKeys?.pinecone_api_key;
-    const pineconeEnvironment = apiKeys?.pinecone_environment;
-    const pineconeIndexName = apiKeys?.pinecone_index_name;
+    let pineconeEnvironment = apiKeys?.pinecone_environment;
+    let pineconeIndexName = apiKeys?.pinecone_index_name;
 
     if (!openaiKey) {
       return new Response(
@@ -66,12 +66,35 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!pineconeKey || !pineconeEnvironment || !pineconeIndexName) {
+    if (!pineconeKey) {
       return new Response(
-        JSON.stringify({ error: 'Pinecone credentials not fully configured' }),
+        JSON.stringify({ error: 'Pinecone API key not configured' }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Handle case where user stores full Pinecone host URL in pinecone_index_name field
+    let pineconeUrl = '';
+    if (pineconeIndexName && pineconeIndexName.startsWith('https://')) {
+      // User stored full URL in index_name field
+      pineconeUrl = pineconeIndexName;
+      console.log('Using full Pinecone URL from pinecone_index_name field');
+    } else if (pineconeEnvironment && pineconeEnvironment.startsWith('https://')) {
+      // User stored full URL in environment field
+      pineconeUrl = pineconeEnvironment;
+      console.log('Using full Pinecone URL from pinecone_environment field');
+    } else if (pineconeIndexName && pineconeEnvironment) {
+      // Standard format: construct URL from index and environment
+      pineconeUrl = `https://${pineconeIndexName}-${pineconeEnvironment}.svc.${pineconeEnvironment}.pinecone.io`;
+      console.log('Constructed Pinecone URL from index and environment');
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Pinecone credentials not fully configured. Please provide either the full Pinecone host URL or both index name and environment.' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Pinecone URL: ${pineconeUrl}`);
 
     const body: ProcessRequest = await req.json();
     const { recording_id, force_regenerate = false } = body;
@@ -99,8 +122,6 @@ Deno.serve(async (req: Request) => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const pineconeUrl = `https://${pineconeIndexName}-${pineconeEnvironment}.svc.${pineconeEnvironment}.pinecone.io`;
 
     if (force_regenerate) {
       console.log('Force regenerate enabled - deleting existing embeddings from Pinecone');
