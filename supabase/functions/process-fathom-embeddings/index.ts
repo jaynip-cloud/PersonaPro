@@ -50,15 +50,24 @@ Deno.serve(async (req: Request) => {
 
     const { data: apiKeys, error: keysError } = await supabaseClient
       .from('api_keys')
-      .select('openai_api_key')
+      .select('openai_api_key, pinecone_api_key, pinecone_host')
       .eq('user_id', user.id)
       .maybeSingle();
 
     const openaiKey = apiKeys?.openai_api_key || Deno.env.get('OPENAI_API_KEY');
+    const pineconeKey = apiKeys?.pinecone_api_key;
+    const pineconeHost = apiKeys?.pinecone_host;
 
     if (!openaiKey) {
       return new Response(
         JSON.stringify({ error: 'OpenAI API key not configured' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!pineconeKey || !pineconeHost) {
+      return new Response(
+        JSON.stringify({ error: 'Pinecone API key or host not configured' }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -91,14 +100,28 @@ Deno.serve(async (req: Request) => {
     }
 
     if (force_regenerate) {
-      console.log('Force regenerate enabled - deleting existing embeddings');
-      const { error: deleteError } = await supabaseClient
-        .from('fathom_embeddings')
-        .delete()
-        .eq('recording_id', recording_id);
-      
-      if (deleteError) {
-        console.error('Error deleting old embeddings:', deleteError);
+      console.log('Force regenerate enabled - deleting existing embeddings from Pinecone');
+
+      try {
+        const deleteResponse = await fetch(`${pineconeHost}/vectors/delete`, {
+          method: 'POST',
+          headers: {
+            'Api-Key': pineconeKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            filter: {
+              recording_id: recording_id,
+              source_type: 'fathom_transcript'
+            }
+          }),
+        });
+
+        if (!deleteResponse.ok) {
+          console.error('Failed to delete old Pinecone embeddings:', await deleteResponse.text());
+        }
+      } catch (error) {
+        console.error('Error deleting old embeddings from Pinecone:', error);
       }
     }
 
@@ -111,11 +134,11 @@ Deno.serve(async (req: Request) => {
     const chunks = createOverlappingChunks(segments);
     console.log(`Created ${chunks.length} chunks from transcript`);
 
-    const embeddings = [];
+    const pineconeVectors = [];
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      
+
       try {
         const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
           method: 'POST',
@@ -138,29 +161,25 @@ Deno.serve(async (req: Request) => {
         const embeddingData = await embeddingResponse.json();
         const embedding = embeddingData.data[0].embedding;
 
-        const { error: insertError } = await supabaseClient
-          .from('fathom_embeddings')
-          .insert({
+        pineconeVectors.push({
+          id: `fathom_${recording.id}_${i}_${Date.now()}`,
+          values: embedding,
+          metadata: {
             user_id: user.id,
             client_id: recording.client_id,
             recording_id: recording.id,
             chunk_index: i,
-            chunk_text: chunk.text,
+            text: chunk.text,
             chunk_tokens: Math.ceil(chunk.text.length / CHARS_PER_TOKEN),
             start_timestamp: chunk.start_timestamp,
             end_timestamp: chunk.end_timestamp,
             speaker_name: chunk.speaker_name,
             speaker_email: chunk.speaker_email,
-            embedding: embedding,
             source_type: 'fathom_transcript',
-          });
-
-        if (insertError) {
-          console.error(`Error inserting embedding for chunk ${i}:`, insertError);
-          continue;
-        }
-
-        embeddings.push({ chunk_index: i, success: true });
+            recording_title: recording.title,
+            meeting_date: recording.start_time,
+          }
+        });
 
         if (i < chunks.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -170,7 +189,34 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (embeddings.length > 0) {
+    if (pineconeVectors.length > 0) {
+      console.log(`Uploading ${pineconeVectors.length} vectors to Pinecone`);
+
+      try {
+        const upsertResponse = await fetch(`${pineconeHost}/vectors/upsert`, {
+          method: 'POST',
+          headers: {
+            'Api-Key': pineconeKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            vectors: pineconeVectors,
+          }),
+        });
+
+        if (!upsertResponse.ok) {
+          const errorText = await upsertResponse.text();
+          throw new Error(`Pinecone upsert failed: ${errorText}`);
+        }
+
+        console.log('Successfully uploaded vectors to Pinecone');
+      } catch (error) {
+        console.error('Error uploading to Pinecone:', error);
+        throw error;
+      }
+    }
+
+    if (pineconeVectors.length > 0) {
       const { error: updateError } = await supabaseClient
         .from('fathom_recordings')
         .update({ embeddings_generated: true })
@@ -180,12 +226,12 @@ Deno.serve(async (req: Request) => {
         console.error('Error updating recording status:', updateError);
       }
 
-      console.log(`Successfully generated ${embeddings.length} embeddings`);
+      console.log(`Successfully generated ${pineconeVectors.length} embeddings`);
 
       return new Response(
         JSON.stringify({
           success: true,
-          embeddings_created: embeddings.length,
+          embeddings_created: pineconeVectors.length,
           chunks_total: chunks.length,
         }),
         {

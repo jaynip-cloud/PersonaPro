@@ -48,10 +48,25 @@ Deno.serve(async (req: Request) => {
       throw new Error('query is required');
     }
 
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    const { data: apiKeys } = await supabaseClient
+      .from('api_keys')
+      .select('openai_api_key, pinecone_api_key, pinecone_host')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const openaiApiKey = apiKeys?.openai_api_key || Deno.env.get('OPENAI_API_KEY');
+    const pineconeKey = apiKeys?.pinecone_api_key;
+    const pineconeHost = apiKeys?.pinecone_host;
+
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured');
     }
+
+    if (!pineconeKey || !pineconeHost) {
+      throw new Error('Pinecone API key or host not configured');
+    }
+
+    console.log(`Searching for: "${query}" (client: ${clientId || 'all'})`);
 
     // Generate embedding for the search query
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -75,67 +90,65 @@ Deno.serve(async (req: Request) => {
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
 
-    // Perform vector similarity search
-    let query_builder = supabaseClient.rpc('match_documents', {
-      query_embedding: queryEmbedding,
-      match_threshold: similarityThreshold,
-      match_count: limit,
-      filter_user_id: user.id,
-      filter_client_id: clientId || null,
+    // Build Pinecone query filter
+    const filter: any = {
+      user_id: { $eq: user.id }
+    };
+
+    if (clientId) {
+      filter.client_id = { $eq: clientId };
+    }
+
+    // Search Pinecone
+    const pineconeQuery = {
+      vector: queryEmbedding,
+      topK: limit,
+      includeMetadata: true,
+      filter: filter,
+    };
+
+    const pineconeResponse = await fetch(`${pineconeHost}/query`, {
+      method: 'POST',
+      headers: {
+        'Api-Key': pineconeKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(pineconeQuery),
     });
 
-    const { data: matches, error: searchError } = await query_builder;
-
-    if (searchError) {
-      // If RPC function doesn't exist, fall back to manual query
-      console.log('RPC function not found, using direct query');
-      
-      let directQuery = supabaseClient
-        .from('document_embeddings')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (clientId) {
-        directQuery = directQuery.eq('client_id', clientId);
-      }
-      
-      const { data: allDocs, error: fetchError } = await directQuery;
-      
-      if (fetchError) {
-        throw new Error('Failed to fetch documents');
-      }
-
-      // Manual cosine similarity calculation
-      const resultsWithSimilarity = allDocs.map((doc: any) => {
-        const similarity = cosineSimilarity(queryEmbedding, doc.embedding);
-        return {
-          ...doc,
-          similarity,
-        };
-      }).filter((doc: any) => doc.similarity >= similarityThreshold)
-        .sort((a: any, b: any) => b.similarity - a.similarity)
-        .slice(0, limit);
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          results: resultsWithSimilarity,
-          count: resultsWithSimilarity.length,
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+    if (!pineconeResponse.ok) {
+      const errorText = await pineconeResponse.text();
+      console.error('Pinecone query error:', errorText);
+      throw new Error('Failed to search Pinecone');
     }
+
+    const pineconeData = await pineconeResponse.json();
+    const matches = pineconeData.matches || [];
+
+    const results = matches
+      .filter((match: any) => match.score >= similarityThreshold)
+      .map((match: any) => ({
+        id: match.id,
+        similarity: match.score,
+        text: match.metadata?.text || '',
+        source_type: match.metadata?.source_type || 'unknown',
+        client_id: match.metadata?.client_id,
+        document_name: match.metadata?.document_name || match.metadata?.recording_title,
+        document_url: match.metadata?.document_url,
+        chunk_index: match.metadata?.chunk_index,
+        recording_id: match.metadata?.recording_id,
+        meeting_date: match.metadata?.meeting_date,
+        speaker_name: match.metadata?.speaker_name,
+        start_timestamp: match.metadata?.start_timestamp,
+      }));
+
+    console.log(`Found ${results.length} results from Pinecone`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        results: matches || [],
-        count: matches?.length || 0,
+        results: results,
+        count: results.length,
       }),
       {
         headers: {
@@ -161,18 +174,3 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
-
-// Helper function for cosine similarity
-function cosineSimilarity(a: number[], b: number[]): number {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-  
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
