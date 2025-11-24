@@ -50,13 +50,14 @@ Deno.serve(async (req: Request) => {
 
     const { data: apiKeys, error: keysError } = await supabaseClient
       .from('api_keys')
-      .select('openai_api_key, pinecone_api_key, pinecone_host')
+      .select('openai_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
       .eq('user_id', user.id)
       .maybeSingle();
 
     const openaiKey = apiKeys?.openai_api_key || Deno.env.get('OPENAI_API_KEY');
     const pineconeKey = apiKeys?.pinecone_api_key;
-    const pineconeHost = apiKeys?.pinecone_host;
+    const pineconeEnvironment = apiKeys?.pinecone_environment;
+    const pineconeIndexName = apiKeys?.pinecone_index_name;
 
     if (!openaiKey) {
       return new Response(
@@ -65,9 +66,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!pineconeKey || !pineconeHost) {
+    if (!pineconeKey || !pineconeEnvironment || !pineconeIndexName) {
       return new Response(
-        JSON.stringify({ error: 'Pinecone API key or host not configured' }),
+        JSON.stringify({ error: 'Pinecone credentials not fully configured' }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -99,11 +100,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const pineconeUrl = `https://${pineconeIndexName}-${pineconeEnvironment}.svc.${pineconeEnvironment}.pinecone.io`;
+
     if (force_regenerate) {
       console.log('Force regenerate enabled - deleting existing embeddings from Pinecone');
 
       try {
-        const deleteResponse = await fetch(`${pineconeHost}/vectors/delete`, {
+        const deleteResponse = await fetch(`${pineconeUrl}/vectors/delete`, {
           method: 'POST',
           headers: {
             'Api-Key': pineconeKey,
@@ -149,6 +152,7 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             input: chunk.text,
             model: 'text-embedding-3-small',
+            dimensions: 512,
           }),
         });
 
@@ -191,29 +195,51 @@ Deno.serve(async (req: Request) => {
 
     if (pineconeVectors.length > 0) {
       console.log(`Uploading ${pineconeVectors.length} vectors to Pinecone`);
+      console.log(`First vector dimension: ${pineconeVectors[0].values.length}`);
+      console.log(`Pinecone URL: ${pineconeUrl}`);
 
-      try {
-        const upsertResponse = await fetch(`${pineconeHost}/vectors/upsert`, {
-          method: 'POST',
-          headers: {
-            'Api-Key': pineconeKey,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            vectors: pineconeVectors,
-          }),
-        });
+      // Upload in batches (Pinecone recommends 100 vectors per batch)
+      const batchSize = 100;
+      for (let i = 0; i < pineconeVectors.length; i += batchSize) {
+        const batch = pineconeVectors.slice(i, i + batchSize);
+        console.log(`Uploading batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(pineconeVectors.length / batchSize)}`);
 
-        if (!upsertResponse.ok) {
-          const errorText = await upsertResponse.text();
-          throw new Error(`Pinecone upsert failed: ${errorText}`);
+        try {
+          const upsertResponse = await fetch(`${pineconeUrl}/vectors/upsert`, {
+            method: 'POST',
+            headers: {
+              'Api-Key': pineconeKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              vectors: batch,
+              namespace: '',
+            }),
+          });
+
+          const responseText = await upsertResponse.text();
+          console.log('Pinecone response status:', upsertResponse.status);
+
+          if (!upsertResponse.ok) {
+            console.error('Pinecone response:', responseText);
+            throw new Error(`Pinecone upsert failed (${upsertResponse.status}): ${responseText}`);
+          }
+
+          console.log(`Successfully uploaded batch ${Math.floor(i / batchSize) + 1}`);
+
+          // Small delay between batches
+          if (i + batchSize < pineconeVectors.length) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        } catch (error) {
+          console.error('Error uploading batch to Pinecone:', error);
+          throw error;
         }
-
-        console.log('Successfully uploaded vectors to Pinecone');
-      } catch (error) {
-        console.error('Error uploading to Pinecone:', error);
-        throw error;
       }
+
+      console.log('Successfully uploaded all vectors to Pinecone');
+    } else {
+      console.log('No vectors to upload');
     }
 
     if (pineconeVectors.length > 0) {

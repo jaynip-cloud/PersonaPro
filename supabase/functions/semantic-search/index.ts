@@ -50,21 +50,24 @@ Deno.serve(async (req: Request) => {
 
     const { data: apiKeys } = await supabaseClient
       .from('api_keys')
-      .select('openai_api_key, pinecone_api_key, pinecone_host')
+      .select('openai_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
       .eq('user_id', user.id)
       .maybeSingle();
 
     const openaiApiKey = apiKeys?.openai_api_key || Deno.env.get('OPENAI_API_KEY');
     const pineconeKey = apiKeys?.pinecone_api_key;
-    const pineconeHost = apiKeys?.pinecone_host;
+    const pineconeEnvironment = apiKeys?.pinecone_environment;
+    const pineconeIndexName = apiKeys?.pinecone_index_name;
 
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
-    if (!pineconeKey || !pineconeHost) {
-      throw new Error('Pinecone API key or host not configured');
+    if (!pineconeKey || !pineconeEnvironment || !pineconeIndexName) {
+      throw new Error('Pinecone credentials not fully configured');
     }
+
+    const pineconeUrl = `https://${pineconeIndexName}-${pineconeEnvironment}.svc.${pineconeEnvironment}.pinecone.io`;
 
     console.log(`Searching for: "${query}" (client: ${clientId || 'all'})`);
 
@@ -78,6 +81,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         model: 'text-embedding-3-small',
         input: query,
+        dimensions: 512,
       }),
     });
 
@@ -107,7 +111,7 @@ Deno.serve(async (req: Request) => {
       filter: filter,
     };
 
-    const pineconeResponse = await fetch(`${pineconeHost}/query`, {
+    const pineconeResponse = await fetch(`${pineconeUrl}/query`, {
       method: 'POST',
       headers: {
         'Api-Key': pineconeKey,
