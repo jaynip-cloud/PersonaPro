@@ -259,6 +259,7 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
       fathomSection.push(`${i + 1}. ${recording.title} - ${date}${duration}`);
     });
 
+    // Add sample excerpts for meeting queries if semantic search didn't find much
     if (additionalFathomContext && additionalFathomContext.length > 0) {
       fathomSection.push('\nRecent Discussion Samples:');
       additionalFathomContext.slice(0, 3).forEach((excerpt: any, i: number) => {
@@ -443,6 +444,7 @@ Deno.serve(async (req: Request) => {
     const queryEmbedding = embeddingData.data[0].embedding;
 
     const searchLimit = mode === 'deep' ? 20 : 12;
+    // Lower threshold for meeting queries to capture more conversational context
     const similarityThreshold = intent.topics.includes('meetings') ? 0.50 : (intent.type === 'factual' ? 0.70 : 0.60);
 
     const { data: documentMatches } = await supabaseClient.rpc('match_all_content', {
@@ -453,6 +455,7 @@ Deno.serve(async (req: Request) => {
       filter_client_id: clientId,
     });
 
+    // For meeting-related queries with few results, fetch recent Fathom excerpts directly
     let additionalFathomContext = null;
     const fathomMatches = documentMatches?.filter((d: any) => d.source_type === 'fathom_transcript') || [];
     if (intent.topics.includes('meetings') && fathomMatches.length < 3 && fathomRecordings.length > 0) {
