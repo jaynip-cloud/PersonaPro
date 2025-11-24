@@ -549,9 +549,7 @@ export const AddClient: React.FC = () => {
         .from('client-documents')
         .getPublicUrl(fileName);
 
-      const documentType = file.type.includes('pdf') ? 'proposal' :
-                          file.type.includes('word') ? 'contract' :
-                          file.type.includes('image') ? 'other' : 'email';
+      const documentType = 'document';
 
       const { error: dbError } = await supabase
         .from('documents')

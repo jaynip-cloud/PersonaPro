@@ -686,9 +686,7 @@ export const ClientDetailNew: React.FC = () => {
           .from('client-documents')
           .getPublicUrl(fileName);
 
-        const documentType = file.type.includes('pdf') ? 'proposal' :
-                            file.type.includes('word') ? 'contract' :
-                            file.type.includes('image') ? 'other' : 'email';
+        const documentType = 'document';
 
         const { data: docData, error: dbError } = await supabase
           .from('documents')
