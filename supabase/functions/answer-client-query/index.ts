@@ -444,9 +444,9 @@ Deno.serve(async (req: Request) => {
     const queryEmbedding = embeddingData.data[0].embedding;
 
     const searchLimit = mode === 'deep' ? 20 : 12;
-    // Lower threshold for meeting queries to capture more conversational context
     const similarityThreshold = intent.topics.includes('meetings') ? 0.50 : (intent.type === 'factual' ? 0.70 : 0.60);
 
+    // Search old system (document_embeddings + fathom_embeddings in Postgres)
     const { data: documentMatches } = await supabaseClient.rpc('match_all_content', {
       query_embedding: queryEmbedding,
       match_threshold: similarityThreshold,
@@ -455,9 +455,69 @@ Deno.serve(async (req: Request) => {
       filter_client_id: clientId,
     });
 
+    // Also search new knowledge base system (Qdrant)
+    let qdrantMatches: any[] = [];
+    try {
+      const { data: apiKeys } = await supabaseClient
+        .from('api_keys')
+        .select('qdrant_url, qdrant_api_key')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (apiKeys?.qdrant_url && apiKeys?.qdrant_api_key) {
+        const qdrantResponse = await fetch(
+          `${apiKeys.qdrant_url}/collections/personapro_documents/points/search`,
+          {
+            method: 'POST',
+            headers: {
+              'api-key': apiKeys.qdrant_api_key,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              vector: queryEmbedding,
+              limit: searchLimit,
+              with_payload: true,
+              filter: {
+                must: [
+                  { key: 'client_id', match: { value: clientId } },
+                ],
+              },
+              score_threshold: similarityThreshold,
+            }),
+          }
+        );
+
+        if (qdrantResponse.ok) {
+          const qdrantData = await qdrantResponse.json();
+          qdrantMatches = (qdrantData.result || []).map((hit: any) => ({
+            id: hit.payload.chunk_id,
+            user_id: user.id,
+            client_id: hit.payload.client_id,
+            document_name: hit.payload.title,
+            document_url: hit.payload.url || '',
+            content_chunk: hit.payload.text,
+            chunk_index: hit.payload.chunk_index,
+            metadata: hit.payload.metadata || {},
+            source_type: hit.payload.source_type || 'document',
+            created_at: hit.payload.created_at,
+            similarity: hit.score,
+          }));
+          console.log(`Found ${qdrantMatches.length} matches in Qdrant`);
+        }
+      }
+    } catch (qdrantError) {
+      console.warn('Failed to search Qdrant:', qdrantError);
+    }
+
+    // Combine results from both systems
+    const allDocumentMatches = [
+      ...(documentMatches || []),
+      ...qdrantMatches,
+    ].sort((a, b) => (b.similarity || 0) - (a.similarity || 0)).slice(0, searchLimit);
+
     // For meeting-related queries with few results, fetch recent Fathom excerpts directly
     let additionalFathomContext = null;
-    const fathomMatches = documentMatches?.filter((d: any) => d.source_type === 'fathom_transcript') || [];
+    const fathomMatches = allDocumentMatches.filter((d: any) => d.source_type === 'fathom_transcript');
     if (intent.topics.includes('meetings') && fathomMatches.length < 3 && fathomRecordings.length > 0) {
       const { data: directFathomData } = await supabaseClient
         .from('fathom_embeddings')
@@ -475,7 +535,7 @@ Deno.serve(async (req: Request) => {
       transcripts,
       fathomRecordings,
       opportunities,
-      documentMatches: documentMatches || [],
+      documentMatches: allDocumentMatches,
       additionalFathomContext,
     };
 
@@ -522,7 +582,8 @@ Deno.serve(async (req: Request) => {
     const dataQuality = {
       hasTranscripts: transcripts.length > 0,
       hasContacts: contacts.length > 0,
-      hasDocuments: (documentMatches?.length || 0) > 0,
+      hasDocuments: allDocumentMatches.length > 0,
+      hasQdrantDocuments: qdrantMatches.length > 0,
       hasOpportunities: opportunities.length > 0,
       hasAIInsights: !!client.ai_insights,
       hasServices: !!(client.services && Array.isArray(client.services) && client.services.length > 0),
@@ -535,17 +596,17 @@ Deno.serve(async (req: Request) => {
     const qualityScore = Object.values(dataQuality).filter(Boolean).length;
     const confidence = qualityScore >= 6 ? 'high' : qualityScore >= 3 ? 'medium' : 'low';
 
-    // Build detailed sources list
     const sourcesList = [];
 
-    // Add document sources
-    if (documentMatches && documentMatches.length > 0) {
-      documentMatches.forEach((doc: any) => {
+    if (allDocumentMatches && allDocumentMatches.length > 0) {
+      allDocumentMatches.forEach((doc: any) => {
         let sourceType = 'Document';
         if (doc.source_type === 'fathom_transcript') {
           sourceType = 'Fathom Recording';
         } else if (doc.source_type === 'meeting_transcript') {
           sourceType = 'Manual Meeting Note';
+        } else if (doc.source_type === 'document') {
+          sourceType = 'Knowledge Base Document';
         }
 
         sourcesList.push({
@@ -556,10 +617,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Add manual transcripts that were included in context
     if (transcripts && transcripts.length > 0) {
       transcripts.forEach((t: any) => {
-        // Only add if not already in documentMatches
         const alreadyAdded = sourcesList.some((s: any) => s.name === t.title);
         if (!alreadyAdded) {
           sourcesList.push({
@@ -570,7 +629,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Add Fathom recordings that were available
     if (fathomRecordings && fathomRecordings.length > 0) {
       fathomRecordings.forEach((rec: any) => {
         const alreadyAdded = sourcesList.some((s: any) => s.name === rec.title);
@@ -592,17 +650,18 @@ Deno.serve(async (req: Request) => {
           intent: intent.type,
           confidence,
           sources: {
-            documentsSearched: documentMatches?.filter((d: any) =>
+            documentsSearched: allDocumentMatches.filter((d: any) =>
               d.source_type !== 'meeting_transcript' && d.source_type !== 'fathom_transcript'
-            ).length || 0,
+            ).length,
             manualTranscriptsIncluded: transcripts.length,
             fathomRecordingsAvailable: fathomRecordings.length,
-            transcriptMatchesFound: documentMatches?.filter((d: any) =>
+            transcriptMatchesFound: allDocumentMatches.filter((d: any) =>
               d.source_type === 'meeting_transcript' || d.source_type === 'fathom_transcript'
-            ).length || 0,
-            fathomTranscriptsFound: documentMatches?.filter((d: any) =>
+            ).length,
+            fathomTranscriptsFound: allDocumentMatches.filter((d: any) =>
               d.source_type === 'fathom_transcript'
-            ).length || 0,
+            ).length,
+            qdrantDocumentsFound: qdrantMatches.length,
             contactsFound: contacts.length,
             opportunitiesFound: opportunities.length,
           },
