@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
     // Get API keys
     const { data: apiKeys, error: keysError } = await supabaseClient
       .from('api_keys')
-      .select('openai_api_key, qdrant_url, qdrant_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
+      .select('openai_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -49,20 +49,11 @@ Deno.serve(async (req: Request) => {
       throw new Error('OpenAI API key not configured. Please add it in Settings.');
     }
 
-    // Determine which vector database is configured
-    const useQdrant = !!(apiKeys.qdrant_url && apiKeys.qdrant_api_key);
-    const usePinecone = !!(apiKeys.pinecone_api_key && apiKeys.pinecone_environment && apiKeys.pinecone_index_name);
-
-    if (!useQdrant && !usePinecone) {
-      throw new Error('No vector database configured. Please configure either Qdrant or Pinecone in Settings.');
+    if (!apiKeys.pinecone_api_key || !apiKeys.pinecone_environment || !apiKeys.pinecone_index_name) {
+      throw new Error('Pinecone credentials not configured. Please add them in Settings.');
     }
 
-    if (useQdrant && usePinecone) {
-      console.warn('Both Qdrant and Pinecone configured. Using Pinecone.');
-    }
-
-    const vectorDb = usePinecone ? 'pinecone' : 'qdrant';
-    console.log(`Using vector database: ${vectorDb}`);
+    console.log('Using Pinecone for vector storage');
 
     const body: ProcessRequest = await req.json();
     const { document_id, text } = body;
@@ -90,10 +81,10 @@ Deno.serve(async (req: Request) => {
     const chunks = chunkText(text, CHUNK_SIZE, CHUNK_OVERLAP);
     console.log(`Created ${chunks.length} chunks`);
 
-    // Step 2: Delete existing chunks and vector database entries for this document
+    // Step 2: Delete existing chunks and Pinecone vectors for this document
     console.log('Step 2: Cleaning up existing data...');
 
-    // Get existing chunk IDs to delete from vector database
+    // Get existing chunk IDs to delete from Pinecone
     const { data: existingChunks } = await supabaseClient
       .from('kb_document_chunks')
       .select('id')
@@ -101,22 +92,14 @@ Deno.serve(async (req: Request) => {
 
     if (existingChunks && existingChunks.length > 0) {
       const chunkIds = existingChunks.map(c => c.id);
-      console.log(`Deleting ${chunkIds.length} existing vectors from ${vectorDb}...`);
+      console.log(`Deleting ${chunkIds.length} existing vectors from Pinecone...`);
 
-      if (vectorDb === 'pinecone') {
-        await deleteFromPinecone(
-          apiKeys.pinecone_api_key!,
-          apiKeys.pinecone_environment!,
-          apiKeys.pinecone_index_name!,
-          chunkIds
-        );
-      } else {
-        await deleteFromQdrant(
-          apiKeys.qdrant_url!,
-          apiKeys.qdrant_api_key!,
-          chunkIds
-        );
-      }
+      await deleteFromPinecone(
+        apiKeys.pinecone_api_key,
+        apiKeys.pinecone_environment,
+        apiKeys.pinecone_index_name,
+        chunkIds
+      );
     }
 
     // Delete chunks from Postgres
@@ -177,24 +160,15 @@ Deno.serve(async (req: Request) => {
 
     console.log(`Generated ${allEmbeddings.length} embeddings`);
 
-    // Step 5: Upload to vector database
-    console.log(`Step 5: Uploading vectors to ${vectorDb}...`);
-    if (vectorDb === 'pinecone') {
-      await uploadToPinecone(
-        apiKeys.pinecone_api_key!,
-        apiKeys.pinecone_environment!,
-        apiKeys.pinecone_index_name!,
-        allEmbeddings,
-        document
-      );
-    } else {
-      await uploadToQdrant(
-        apiKeys.qdrant_url!,
-        apiKeys.qdrant_api_key!,
-        allEmbeddings,
-        document
-      );
-    }
+    // Step 5: Upload to Pinecone
+    console.log('Step 5: Uploading vectors to Pinecone...');
+    await uploadToPinecone(
+      apiKeys.pinecone_api_key,
+      apiKeys.pinecone_environment,
+      apiKeys.pinecone_index_name,
+      allEmbeddings,
+      document
+    );
 
     // Step 6: Update document status
     console.log('Step 6: Updating document status...');
@@ -295,113 +269,6 @@ async function generateEmbeddings(
   return data.data.map((item: any) => item.embedding);
 }
 
-// Upload embeddings to Qdrant
-async function uploadToQdrant(
-  qdrantUrl: string,
-  apiKey: string,
-  embeddings: Array<{ chunk: any; embedding: number[] }>,
-  document: any
-): Promise<void> {
-  const collectionName = 'personapro_documents';
-  
-  // Ensure collection exists
-  await ensureQdrantCollection(qdrantUrl, apiKey, collectionName);
-  
-  // Prepare points for Qdrant
-  const points = embeddings.map(({ chunk, embedding }) => ({
-    id: chunk.id,
-    vector: embedding,
-    payload: {
-      chunk_id: chunk.id,
-      document_id: document.id,
-      client_id: document.client_id,
-      source_type: document.source_type,
-      title: document.title,
-      url: document.url || '',
-      text: chunk.text,
-      chunk_index: chunk.chunk_index,
-      page_number: chunk.page_number,
-      created_at: chunk.created_at,
-      metadata: document.metadata || {},
-    },
-  }));
-  
-  // Upload in batches
-  const batchSize = 100;
-  for (let i = 0; i < points.length; i += batchSize) {
-    const batch = points.slice(i, i + batchSize);
-    
-    const response = await fetch(
-      `${qdrantUrl}/collections/${collectionName}/points?wait=true`,
-      {
-        method: 'PUT',
-        headers: {
-          'api-key': apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ points: batch }),
-      }
-    );
-    
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Qdrant upload error: ${response.status} ${error}`);
-    }
-    
-    console.log(`Uploaded batch ${Math.floor(i / batchSize) + 1} to Qdrant`);
-  }
-}
-
-// Ensure Qdrant collection exists
-async function ensureQdrantCollection(
-  qdrantUrl: string,
-  apiKey: string,
-  collectionName: string
-): Promise<void> {
-  // Check if collection exists
-  const checkResponse = await fetch(
-    `${qdrantUrl}/collections/${collectionName}`,
-    {
-      method: 'GET',
-      headers: { 'api-key': apiKey },
-    }
-  );
-  
-  if (checkResponse.ok) {
-    console.log('Qdrant collection already exists');
-    return;
-  }
-  
-  // Create collection
-  console.log('Creating Qdrant collection...');
-  const createResponse = await fetch(
-    `${qdrantUrl}/collections/${collectionName}`,
-    {
-      method: 'PUT',
-      headers: {
-        'api-key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        vectors: {
-          size: 1536,
-          distance: 'Cosine',
-        },
-        optimizers_config: {
-          indexing_threshold: 10000,
-        },
-      }),
-    }
-  );
-  
-  if (!createResponse.ok) {
-    const error = await createResponse.text();
-    throw new Error(`Failed to create Qdrant collection: ${error}`);
-  }
-  
-  console.log('Qdrant collection created successfully');
-}
-
 // Upload embeddings to Pinecone
 async function uploadToPinecone(
   apiKey: string,
@@ -489,31 +356,3 @@ async function deleteFromPinecone(
   }
 }
 
-// Delete vectors from Qdrant
-async function deleteFromQdrant(
-  qdrantUrl: string,
-  apiKey: string,
-  chunkIds: string[]
-): Promise<void> {
-  const collectionName = 'personapro_documents';
-
-  const response = await fetch(
-    `${qdrantUrl}/collections/${collectionName}/points/delete?wait=true`,
-    {
-      method: 'POST',
-      headers: {
-        'api-key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        points: chunkIds,
-      }),
-    }
-  );
-  
-  if (!response.ok) {
-    console.warn('Failed to delete from Qdrant:', await response.text());
-  } else {
-    console.log(`Deleted ${chunkIds.length} vectors from Qdrant`);
-  }
-}

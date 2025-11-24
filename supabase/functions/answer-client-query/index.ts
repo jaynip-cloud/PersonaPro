@@ -455,16 +455,15 @@ Deno.serve(async (req: Request) => {
       filter_client_id: clientId,
     });
 
-    // Also search new knowledge base system (Qdrant or Pinecone)
-    let vectorDbMatches: any[] = [];
+    // Also search knowledge base in Pinecone
+    let pineconeMatches: any[] = [];
     try {
       const { data: apiKeys } = await supabaseClient
         .from('api_keys')
-        .select('qdrant_url, qdrant_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
+        .select('pinecone_api_key, pinecone_environment, pinecone_index_name')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      // Check Pinecone first (priority if both are configured)
       if (apiKeys?.pinecone_api_key && apiKeys?.pinecone_environment && apiKeys?.pinecone_index_name) {
         const pineconeUrl = `https://${apiKeys.pinecone_index_name}-${apiKeys.pinecone_environment}.svc.${apiKeys.pinecone_environment}.pinecone.io`;
 
@@ -489,7 +488,7 @@ Deno.serve(async (req: Request) => {
 
         if (pineconeResponse.ok) {
           const pineconeData = await pineconeResponse.json();
-          vectorDbMatches = (pineconeData.matches || [])
+          pineconeMatches = (pineconeData.matches || [])
             .filter((match: any) => match.score >= similarityThreshold)
             .map((match: any) => ({
               id: match.metadata.chunk_id,
@@ -504,59 +503,17 @@ Deno.serve(async (req: Request) => {
               created_at: match.metadata.created_at,
               similarity: match.score,
             }));
-          console.log(`Found ${vectorDbMatches.length} matches in Pinecone`);
+          console.log(`Found ${pineconeMatches.length} matches in Pinecone`);
         }
       }
-      // Fallback to Qdrant if Pinecone is not configured
-      else if (apiKeys?.qdrant_url && apiKeys?.qdrant_api_key) {
-        const qdrantResponse = await fetch(
-          `${apiKeys.qdrant_url}/collections/personapro_documents/points/search`,
-          {
-            method: 'POST',
-            headers: {
-              'api-key': apiKeys.qdrant_api_key,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              vector: queryEmbedding,
-              limit: searchLimit,
-              with_payload: true,
-              filter: {
-                must: [
-                  { key: 'client_id', match: { value: clientId } },
-                ],
-              },
-              score_threshold: similarityThreshold,
-            }),
-          }
-        );
-
-        if (qdrantResponse.ok) {
-          const qdrantData = await qdrantResponse.json();
-          vectorDbMatches = (qdrantData.result || []).map((hit: any) => ({
-            id: hit.payload.chunk_id,
-            user_id: user.id,
-            client_id: hit.payload.client_id,
-            document_name: hit.payload.title,
-            document_url: hit.payload.url || '',
-            content_chunk: hit.payload.text,
-            chunk_index: hit.payload.chunk_index,
-            metadata: hit.payload.metadata || {},
-            source_type: hit.payload.source_type || 'document',
-            created_at: hit.payload.created_at,
-            similarity: hit.score,
-          }));
-          console.log(`Found ${vectorDbMatches.length} matches in Qdrant`);
-        }
-      }
-    } catch (vectorDbError) {
-      console.warn('Failed to search vector database:', vectorDbError);
+    } catch (pineconeError) {
+      console.warn('Failed to search Pinecone:', pineconeError);
     }
 
-    // Combine results from both systems
+    // Combine results from Postgres and Pinecone
     const allDocumentMatches = [
       ...(documentMatches || []),
-      ...vectorDbMatches,
+      ...pineconeMatches,
     ].sort((a, b) => (b.similarity || 0) - (a.similarity || 0)).slice(0, searchLimit);
 
     // For meeting-related queries with few results, fetch recent Fathom excerpts directly
@@ -627,7 +584,7 @@ Deno.serve(async (req: Request) => {
       hasTranscripts: transcripts.length > 0,
       hasContacts: contacts.length > 0,
       hasDocuments: allDocumentMatches.length > 0,
-      hasVectorDbDocuments: vectorDbMatches.length > 0,
+      hasPineconeDocuments: pineconeMatches.length > 0,
       hasOpportunities: opportunities.length > 0,
       hasAIInsights: !!client.ai_insights,
       hasServices: !!(client.services && Array.isArray(client.services) && client.services.length > 0),
@@ -705,7 +662,7 @@ Deno.serve(async (req: Request) => {
             fathomTranscriptsFound: allDocumentMatches.filter((d: any) =>
               d.source_type === 'fathom_transcript'
             ).length,
-            vectorDbDocumentsFound: vectorDbMatches.length,
+            pineconeDocumentsFound: pineconeMatches.length,
             contactsFound: contacts.length,
             opportunitiesFound: opportunities.length,
           },

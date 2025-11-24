@@ -31,8 +31,6 @@ export const Settings: React.FC = () => {
   const [fathomKey, setFathomKey] = useState('');
   const [firecrawlKey, setFirecrawlKey] = useState('');
   const [apolloKey, setApolloKey] = useState('');
-  const [qdrantUrl, setQdrantUrl] = useState('');
-  const [qdrantApiKey, setQdrantApiKey] = useState('');
   const [pineconeApiKey, setPineconeApiKey] = useState('');
   const [pineconeEnvironment, setPineconeEnvironment] = useState('');
   const [pineconeIndexName, setPineconeIndexName] = useState('');
@@ -41,7 +39,6 @@ export const Settings: React.FC = () => {
   const [showFathomKey, setShowFathomKey] = useState(false);
   const [showFirecrawlKey, setShowFirecrawlKey] = useState(false);
   const [showApolloKey, setShowApolloKey] = useState(false);
-  const [showQdrantKey, setShowQdrantKey] = useState(false);
   const [showPineconeKey, setShowPineconeKey] = useState(false);
   const [isLoadingKeys, setIsLoadingKeys] = useState(false);
   const [isSavingKeys, setIsSavingKeys] = useState(false);
@@ -63,14 +60,14 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     if (!user || activeTab !== 'api' || !keysLoaded) return;
-    if (!openaiKey && !perplexityKey && !fathomKey && !firecrawlKey && !apolloKey && !qdrantUrl && !qdrantApiKey && !pineconeApiKey && !pineconeEnvironment && !pineconeIndexName) return;
+    if (!openaiKey && !perplexityKey && !fathomKey && !firecrawlKey && !apolloKey && !pineconeApiKey && !pineconeEnvironment && !pineconeIndexName) return;
 
     const timeoutId = setTimeout(() => {
       saveApiKeys();
     }, 1500);
 
     return () => clearTimeout(timeoutId);
-  }, [openaiKey, perplexityKey, fathomKey, firecrawlKey, apolloKey, qdrantUrl, qdrantApiKey, pineconeApiKey, pineconeEnvironment, pineconeIndexName, keysLoaded]);
+  }, [openaiKey, perplexityKey, fathomKey, firecrawlKey, apolloKey, pineconeApiKey, pineconeEnvironment, pineconeIndexName, keysLoaded]);
 
   const loadApiKeys = async () => {
     if (!user) return;
@@ -80,7 +77,7 @@ export const Settings: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('api_keys')
-        .select('openai_api_key, perplexity_api_key, fathom_api_key, firecrawl_api_key, apollo_api_key, qdrant_url, qdrant_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
+        .select('openai_api_key, perplexity_api_key, fathom_api_key, firecrawl_api_key, apollo_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -92,8 +89,6 @@ export const Settings: React.FC = () => {
         setFathomKey(data.fathom_api_key || '');
         setFirecrawlKey(data.firecrawl_api_key || '');
         setApolloKey(data.apollo_api_key || '');
-        setQdrantUrl(data.qdrant_url || '');
-        setQdrantApiKey(data.qdrant_api_key || '');
         setPineconeApiKey(data.pinecone_api_key || '');
         setPineconeEnvironment(data.pinecone_environment || '');
         setPineconeIndexName(data.pinecone_index_name || '');
@@ -126,8 +121,6 @@ export const Settings: React.FC = () => {
             fathom_api_key: fathomKey || null,
             firecrawl_api_key: firecrawlKey || null,
             apollo_api_key: apolloKey || null,
-            qdrant_url: qdrantUrl || null,
-            qdrant_api_key: qdrantApiKey || null,
             pinecone_api_key: pineconeApiKey || null,
             pinecone_environment: pineconeEnvironment || null,
             pinecone_index_name: pineconeIndexName || null,
@@ -145,8 +138,6 @@ export const Settings: React.FC = () => {
             fathom_api_key: fathomKey || null,
             firecrawl_api_key: firecrawlKey || null,
             apollo_api_key: apolloKey || null,
-            qdrant_url: qdrantUrl || null,
-            qdrant_api_key: qdrantApiKey || null,
             pinecone_api_key: pineconeApiKey || null,
             pinecone_environment: pineconeEnvironment || null,
             pinecone_index_name: pineconeIndexName || null,
@@ -750,140 +741,81 @@ export const Settings: React.FC = () => {
 
                       <div className="border-t border-border pt-6">
                         <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                          <span className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center text-sm">6</span>
-                          Vector Database (Choose One: Qdrant or Pinecone)
+                          <span className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">6</span>
+                          Pinecone Vector Database (Required for Documents)
                         </h3>
-
-                        <div className="pl-10 space-y-6">
+                        <div className="pl-10 space-y-3">
                           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
                             <p className="text-sm text-slate-700 mb-2">
                               <strong>Used for:</strong> Document embeddings, semantic search, knowledge base
                             </p>
                             <p className="text-xs text-slate-600">
-                              Store and search document embeddings for intelligent retrieval and RAG (Retrieval Augmented Generation). Configure either Qdrant or Pinecone - not both.
+                              Store and search document embeddings for intelligent retrieval and RAG (Retrieval Augmented Generation)
                             </p>
                           </div>
 
-                          <div className="border-l-4 border-teal-400 pl-4">
-                            <h4 className="text-md font-semibold text-foreground mb-3">Option A: Qdrant</h4>
-                            <div className="space-y-3">
-                              <div>
-                                <label className="block text-sm font-medium text-foreground mb-2">
-                                  Qdrant Cloud URL
-                                </label>
-                                <Input
-                                  type="text"
-                                  value={qdrantUrl}
-                                  onChange={(e) => setQdrantUrl(e.target.value)}
-                                  placeholder="https://your-cluster.aws.cloud.qdrant.io:6333"
-                                  className="font-mono text-sm"
-                                />
-                                <p className="text-xs text-muted-foreground mt-1.5">
-                                  Your Qdrant cluster URL from{' '}
-                                  <a
-                                    href="https://cloud.qdrant.io"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-primary hover:underline font-medium"
-                                  >
-                                    Qdrant Cloud →
-                                  </a>
-                                </p>
-                              </div>
-
-                              <div>
-                                <label className="block text-sm font-medium text-foreground mb-2">
-                                  Qdrant API Key
-                                </label>
-                                <div className="flex gap-2">
-                                  <Input
-                                    type={showQdrantKey ? 'text' : 'password'}
-                                    value={qdrantApiKey}
-                                    onChange={(e) => setQdrantApiKey(e.target.value)}
-                                    placeholder="Enter your Qdrant API key"
-                                    className="font-mono text-sm"
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => setShowQdrantKey(!showQdrantKey)}
-                                  >
-                                    {showQdrantKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                  </Button>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1.5">
-                                  API key for authenticating with your Qdrant cluster
-                                </p>
-                              </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Pinecone API Key
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={showPineconeKey ? 'text' : 'password'}
+                                value={pineconeApiKey}
+                                onChange={(e) => setPineconeApiKey(e.target.value)}
+                                placeholder="Enter your Pinecone API key"
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() => setShowPineconeKey(!showPineconeKey)}
+                              >
+                                {showPineconeKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
                             </div>
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              Get your API key from{' '}
+                              <a
+                                href="https://app.pinecone.io"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-medium"
+                              >
+                                Pinecone Console →
+                              </a>
+                            </p>
                           </div>
 
-                          <div className="border-l-4 border-purple-400 pl-4">
-                            <h4 className="text-md font-semibold text-foreground mb-3">Option B: Pinecone</h4>
-                            <div className="space-y-3">
-                              <div>
-                                <label className="block text-sm font-medium text-foreground mb-2">
-                                  Pinecone API Key
-                                </label>
-                                <div className="flex gap-2">
-                                  <Input
-                                    type={showPineconeKey ? 'text' : 'password'}
-                                    value={pineconeApiKey}
-                                    onChange={(e) => setPineconeApiKey(e.target.value)}
-                                    placeholder="Enter your Pinecone API key"
-                                    className="font-mono text-sm"
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => setShowPineconeKey(!showPineconeKey)}
-                                  >
-                                    {showPineconeKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                  </Button>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1.5">
-                                  Get your API key from{' '}
-                                  <a
-                                    href="https://app.pinecone.io"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-primary hover:underline font-medium"
-                                  >
-                                    Pinecone Console →
-                                  </a>
-                                </p>
-                              </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Pinecone Environment
+                            </label>
+                            <Input
+                              type="text"
+                              value={pineconeEnvironment}
+                              onChange={(e) => setPineconeEnvironment(e.target.value)}
+                              placeholder="us-east-1-aws"
+                              className="font-mono text-sm"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              Your Pinecone environment (e.g., us-east-1-aws, us-west-1-gcp)
+                            </p>
+                          </div>
 
-                              <div>
-                                <label className="block text-sm font-medium text-foreground mb-2">
-                                  Pinecone Environment
-                                </label>
-                                <Input
-                                  type="text"
-                                  value={pineconeEnvironment}
-                                  onChange={(e) => setPineconeEnvironment(e.target.value)}
-                                  placeholder="us-east-1-aws"
-                                  className="font-mono text-sm"
-                                />
-                                <p className="text-xs text-muted-foreground mt-1.5">
-                                  Your Pinecone environment (e.g., us-east-1-aws, us-west-1-gcp)
-                                </p>
-                              </div>
-
-                              <div>
-                                <label className="block text-sm font-medium text-foreground mb-2">
-                                  Pinecone Index Name
-                                </label>
-                                <Input
-                                  type="text"
-                                  value={pineconeIndexName}
-                                  onChange={(e) => setPineconeIndexName(e.target.value)}
-                                  placeholder="personapro-documents"
-                                  className="font-mono text-sm"
-                                />
-                                <p className="text-xs text-muted-foreground mt-1.5">
-                                  Name of your Pinecone index (must have dimension 1536 for OpenAI embeddings)
-                                </p>
-                              </div>
-                            </div>
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Pinecone Index Name
+                            </label>
+                            <Input
+                              type="text"
+                              value={pineconeIndexName}
+                              onChange={(e) => setPineconeIndexName(e.target.value)}
+                              placeholder="personapro-documents"
+                              className="font-mono text-sm"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              Name of your Pinecone index (must have dimension 1536 for OpenAI embeddings)
+                            </p>
                           </div>
                         </div>
                       </div>
