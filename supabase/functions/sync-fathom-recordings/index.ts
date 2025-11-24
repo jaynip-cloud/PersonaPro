@@ -181,6 +181,8 @@ Deno.serve(async (req: Request) => {
           .from('fathom_recordings')
           .select('id, title')
           .eq('recording_id', recordingId)
+          .eq('client_id', client_id)
+          .eq('user_id', user.id)
           .maybeSingle();
 
         if (existingRecording) {
