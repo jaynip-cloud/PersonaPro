@@ -31,11 +31,14 @@ export const Settings: React.FC = () => {
   const [fathomKey, setFathomKey] = useState('');
   const [firecrawlKey, setFirecrawlKey] = useState('');
   const [apolloKey, setApolloKey] = useState('');
+  const [qdrantUrl, setQdrantUrl] = useState('');
+  const [qdrantApiKey, setQdrantApiKey] = useState('');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showPerplexityKey, setShowPerplexityKey] = useState(false);
   const [showFathomKey, setShowFathomKey] = useState(false);
   const [showFirecrawlKey, setShowFirecrawlKey] = useState(false);
   const [showApolloKey, setShowApolloKey] = useState(false);
+  const [showQdrantKey, setShowQdrantKey] = useState(false);
   const [isLoadingKeys, setIsLoadingKeys] = useState(false);
   const [isSavingKeys, setIsSavingKeys] = useState(false);
   const [keysLoaded, setKeysLoaded] = useState(false);
@@ -56,14 +59,14 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     if (!user || activeTab !== 'api' || !keysLoaded) return;
-    if (!openaiKey && !perplexityKey && !fathomKey && !firecrawlKey && !apolloKey) return;
+    if (!openaiKey && !perplexityKey && !fathomKey && !firecrawlKey && !apolloKey && !qdrantUrl && !qdrantApiKey) return;
 
     const timeoutId = setTimeout(() => {
       saveApiKeys();
     }, 1500);
 
     return () => clearTimeout(timeoutId);
-  }, [openaiKey, perplexityKey, fathomKey, firecrawlKey, apolloKey, keysLoaded]);
+  }, [openaiKey, perplexityKey, fathomKey, firecrawlKey, apolloKey, qdrantUrl, qdrantApiKey, keysLoaded]);
 
   const loadApiKeys = async () => {
     if (!user) return;
@@ -73,7 +76,7 @@ export const Settings: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('api_keys')
-        .select('openai_api_key, perplexity_api_key, fathom_api_key, firecrawl_api_key, apollo_api_key')
+        .select('openai_api_key, perplexity_api_key, fathom_api_key, firecrawl_api_key, apollo_api_key, qdrant_url, qdrant_api_key')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -85,6 +88,8 @@ export const Settings: React.FC = () => {
         setFathomKey(data.fathom_api_key || '');
         setFirecrawlKey(data.firecrawl_api_key || '');
         setApolloKey(data.apollo_api_key || '');
+        setQdrantUrl(data.qdrant_url || '');
+        setQdrantApiKey(data.qdrant_api_key || '');
       }
     } catch (error) {
       console.error('Error loading API keys:', error);
@@ -114,6 +119,8 @@ export const Settings: React.FC = () => {
             fathom_api_key: fathomKey || null,
             firecrawl_api_key: firecrawlKey || null,
             apollo_api_key: apolloKey || null,
+            qdrant_url: qdrantUrl || null,
+            qdrant_api_key: qdrantApiKey || null,
           })
           .eq('user_id', user.id);
 
@@ -128,6 +135,8 @@ export const Settings: React.FC = () => {
             fathom_api_key: fathomKey || null,
             firecrawl_api_key: firecrawlKey || null,
             apollo_api_key: apolloKey || null,
+            qdrant_url: qdrantUrl || null,
+            qdrant_api_key: qdrantApiKey || null,
           });
 
         if (error) throw error;
@@ -721,6 +730,71 @@ export const Settings: React.FC = () => {
                               >
                                 Apollo Settings →
                               </a>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-border pt-6">
+                        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                          <span className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center text-sm">6</span>
+                          Qdrant Vector Database (Required for Documents)
+                        </h3>
+                        <div className="pl-10 space-y-3">
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <p className="text-sm text-slate-700 mb-2">
+                              <strong>Used for:</strong> Document embeddings, semantic search, knowledge base
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              Store and search document embeddings for intelligent retrieval and RAG (Retrieval Augmented Generation)
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Qdrant Cloud URL
+                            </label>
+                            <Input
+                              type="text"
+                              value={qdrantUrl}
+                              onChange={(e) => setQdrantUrl(e.target.value)}
+                              placeholder="https://your-cluster.aws.cloud.qdrant.io:6333"
+                              className="font-mono text-sm"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              Your Qdrant cluster URL from{' '}
+                              <a
+                                href="https://cloud.qdrant.io"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-medium"
+                              >
+                                Qdrant Cloud →
+                              </a>
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Qdrant API Key
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={showQdrantKey ? 'text' : 'password'}
+                                value={qdrantApiKey}
+                                onChange={(e) => setQdrantApiKey(e.target.value)}
+                                placeholder="Enter your Qdrant API key"
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() => setShowQdrantKey(!showQdrantKey)}
+                              >
+                                {showQdrantKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              API key for authenticating with your Qdrant cluster
                             </p>
                           </div>
                         </div>
