@@ -6,12 +6,112 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
+const CHUNK_SIZE = 400;
+const CHUNK_OVERLAP = 50;
+const BATCH_SIZE = 50;
+
 interface EmbeddingRequest {
   documentName: string;
   documentUrl: string;
   content: string;
   clientId?: string;
   metadata?: Record<string, any>;
+}
+
+function chunkText(text: string, chunkSize: number, overlap: number): Array<{ text: string; index: number }> {
+  const words = text.split(/\s+/);
+  const chunks: Array<{ text: string; index: number }> = [];
+
+  for (let i = 0; i < words.length; i += chunkSize - overlap) {
+    const chunkWords = words.slice(i, i + chunkSize);
+    const chunkText = chunkWords.join(' ');
+
+    if (chunkText.trim().length > 0) {
+      chunks.push({
+        text: chunkText,
+        index: chunks.length,
+      });
+    }
+
+    if (i + chunkSize >= words.length) break;
+  }
+
+  return chunks;
+}
+
+async function generateEmbeddings(
+  texts: string[],
+  apiKey: string
+): Promise<number[][]> {
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'text-embedding-3-small',
+      input: texts,
+      dimensions: 512,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} ${error}`);
+  }
+
+  const data = await response.json();
+  return data.data.map((item: any) => item.embedding);
+}
+
+async function uploadToPinecone(
+  apiKey: string,
+  environment: string,
+  indexName: string,
+  embeddings: Array<{ chunk: any; embedding: number[] }>,
+  documentName: string,
+  documentUrl: string,
+  clientId: string | null,
+  userId: string,
+  metadata: Record<string, any>
+): Promise<void> {
+  const host = `https://${indexName}-${environment}.svc.aped-4627-b74a.pinecone.io`;
+
+  for (let i = 0; i < embeddings.length; i += BATCH_SIZE) {
+    const batch = embeddings.slice(i, i + BATCH_SIZE);
+
+    const vectors = batch.map((item) => ({
+      id: `doc_${Date.now()}_${Math.random().toString(36).substring(7)}_${item.chunk.index}`,
+      values: item.embedding,
+      metadata: {
+        text: item.chunk.text,
+        chunk_index: item.chunk.index,
+        document_name: documentName,
+        document_url: documentUrl,
+        client_id: clientId,
+        user_id: userId,
+        source_type: 'document',
+        ...metadata,
+      },
+    }));
+
+    const response = await fetch(`${host}/vectors/upsert`, {
+      method: 'POST',
+      headers: {
+        'Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ vectors }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Pinecone upsert failed: ${response.status} ${errorText}`);
+    }
+
+    console.log(`Uploaded batch ${Math.floor(i / BATCH_SIZE) + 1} to Pinecone`);
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -49,77 +149,56 @@ Deno.serve(async (req: Request) => {
       throw new Error('documentName and content are required');
     }
 
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured');
+    console.log(`Processing document: ${documentName} for client: ${clientId || 'none'}`);
+
+    const { data: apiKeys, error: keysError } = await supabaseClient
+      .from('api_keys')
+      .select('openai_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (keysError || !apiKeys?.openai_api_key) {
+      throw new Error('OpenAI API key not configured. Please add it in Settings.');
     }
 
-    // Split content into chunks (max 8000 chars per chunk for safety with token limits)
-    const chunkSize = 8000;
-    const chunks: string[] = [];
-    for (let i = 0; i < content.length; i += chunkSize) {
-      chunks.push(content.slice(i, i + chunkSize));
+    if (!apiKeys.pinecone_api_key || !apiKeys.pinecone_environment || !apiKeys.pinecone_index_name) {
+      throw new Error('Pinecone credentials not configured. Please add them in Settings.');
     }
 
-    console.log(`Processing ${chunks.length} chunks for document: ${documentName}`);
+    console.log('Using Pinecone for vector storage');
 
-    // Generate embeddings for each chunk
-    const embeddingRecords = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      
-      // Call OpenAI API to generate embedding
-      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'text-embedding-3-small',
-          input: chunk,
-        }),
-      });
+    const chunks = chunkText(content, CHUNK_SIZE, CHUNK_OVERLAP);
+    console.log(`Created ${chunks.length} chunks`);
 
-      if (!embeddingResponse.ok) {
-        const errorText = await embeddingResponse.text();
-        console.error('OpenAI API error:', errorText);
-        throw new Error(`Failed to generate embedding for chunk ${i}`);
-      }
+    const chunkTexts = chunks.map(c => c.text);
+    console.log('Generating embeddings with OpenAI...');
+    const embeddings = await generateEmbeddings(chunkTexts, apiKeys.openai_api_key);
+    console.log(`Generated ${embeddings.length} embeddings`);
 
-      const embeddingData = await embeddingResponse.json();
-      const embedding = embeddingData.data[0].embedding;
+    const embeddingsWithChunks = chunks.map((chunk, idx) => ({
+      chunk,
+      embedding: embeddings[idx],
+    }));
 
-      embeddingRecords.push({
-        user_id: user.id,
-        client_id: clientId || null,
-        document_name: documentName,
-        document_url: documentUrl,
-        content_chunk: chunk,
-        chunk_index: i,
-        embedding: embedding,
-        metadata: {
-          ...metadata,
-          chunk_total: chunks.length,
-          chunk_length: chunk.length,
-        },
-      });
-    }
+    console.log('Uploading to Pinecone...');
+    await uploadToPinecone(
+      apiKeys.pinecone_api_key,
+      apiKeys.pinecone_environment,
+      apiKeys.pinecone_index_name,
+      embeddingsWithChunks,
+      documentName,
+      documentUrl,
+      clientId || null,
+      user.id,
+      metadata
+    );
 
-    // Insert embeddings into database
-    const { error: insertError } = await supabaseClient
-      .from('document_embeddings')
-      .insert(embeddingRecords);
-
-    if (insertError) {
-      console.error('Database insert error:', insertError);
-      throw new Error('Failed to store embeddings');
-    }
+    console.log('Successfully completed document processing');
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Successfully generated ${embeddingRecords.length} embeddings`,
+        message: `Successfully processed ${chunks.length} chunks and stored in Pinecone`,
         chunksProcessed: chunks.length,
       }),
       {
