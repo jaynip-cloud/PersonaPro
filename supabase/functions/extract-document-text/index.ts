@@ -71,6 +71,43 @@ Deno.serve(async (req: Request) => {
 });
 
 async function extractFromPDF(file: File): Promise<string> {
+  try {
+    const pdfjs = await import('npm:pdfjs-dist@4.0.379');
+
+    const arrayBuffer = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+
+    const loadingTask = pdfjs.getDocument({ data: uint8Array });
+    const pdf = await loadingTask.promise;
+
+    let fullText = '';
+
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      fullText += pageText + '\n';
+    }
+
+    fullText = fullText
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (fullText.length < 50) {
+      throw new Error('Extracted text is too short. PDF may be image-based.');
+    }
+
+    return fullText;
+  } catch (error) {
+    console.error('PDF extraction with pdfjs failed:', error);
+    return await extractFromPDFBasic(file);
+  }
+}
+
+async function extractFromPDFBasic(file: File): Promise<string> {
+  console.log('Falling back to basic PDF extraction');
   const arrayBuffer = await file.arrayBuffer();
   const uint8Array = new Uint8Array(arrayBuffer);
   const decoder = new TextDecoder('utf-8', { fatal: false });
