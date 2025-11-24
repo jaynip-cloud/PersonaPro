@@ -8,44 +8,58 @@ export interface DocumentProcessingOptions {
 export async function extractTextFromFile(file: File): Promise<string> {
   const fileType = file.type;
 
-  if (fileType === 'application/pdf') {
-    return await extractTextFromPDF(file);
-  } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-    return await extractTextFromDOCX(file);
-  } else if (fileType === 'text/plain') {
+  if (fileType === 'text/plain') {
     return await file.text();
+  } else if (fileType === 'application/pdf' ||
+             fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    return await extractWithServerSide(file);
   } else {
     throw new Error(`Unsupported file type: ${fileType}`);
   }
 }
 
-async function extractTextFromPDF(file: File): Promise<string> {
-  const arrayBuffer = await file.arrayBuffer();
-  const uint8Array = new Uint8Array(arrayBuffer);
+async function extractWithServerSide(file: File): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('User not authenticated');
 
-  let text = '';
-  const decoder = new TextDecoder('utf-8');
-  const content = decoder.decode(uint8Array);
+  const formData = new FormData();
+  formData.append('file', file);
 
-  const textMatches = content.match(/\(([^)]+)\)/g);
-  if (textMatches) {
-    text = textMatches.map(match => match.slice(1, -1)).join(' ');
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-document-text`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    console.warn('Server-side extraction failed, using basic extraction');
+    return await basicExtraction(file);
   }
 
-  text = text.replace(/\\[0-9]{3}/g, ' ')
-    .replace(/\\/g, '')
+  const result = await response.json();
+  return result.text || '';
+}
+
+async function basicExtraction(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const uint8Array = new Uint8Array(arrayBuffer);
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+  let content = decoder.decode(uint8Array);
+
+  content = content.replace(/[^\x20-\x7E\n\r]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
-  if (!text || text.length < 50) {
-    return `[PDF content from ${file.name}] - Content extraction requires server-side processing`;
+  if (content.length < 100) {
+    return `Document: ${file.name}. This document requires proper extraction tools. Please ensure the text content is meaningful for analysis.`;
   }
 
-  return text;
-}
-
-async function extractTextFromDOCX(file: File): Promise<string> {
-  return `[DOCX content from ${file.name}] - Full text extraction requires server-side processing`;
+  return content;
 }
 
 export async function uploadDocumentToStorage(
