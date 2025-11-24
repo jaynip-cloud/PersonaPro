@@ -258,25 +258,33 @@ function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): str
       contactsSection.push('');
     }
 
-    if (intent.topics.includes('contacts') || mode === 'deep') {
-      if (primaryContacts.length > 0) {
-        contactsSection.push('Primary Contacts:');
-        primaryContacts.forEach((c: any) => {
-          // Skip if already shown as CEO or decision maker
-          if (c.id === ceo?.id || c.is_decision_maker) return;
+    if (primaryContacts.length > 0) {
+      contactsSection.push('Primary Contacts:');
+      primaryContacts.forEach((c: any) => {
+        // Skip if already shown as CEO or decision maker
+        if (c.id === ceo?.id || c.is_decision_maker) return;
 
-          contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
-          contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
-        });
-        contactsSection.push('');
-      }
+        contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
+        contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
+      });
+      contactsSection.push('');
+    }
 
-      if (mode === 'deep' && otherContacts.length > 0) {
-        contactsSection.push('Other Contacts:');
-        otherContacts.slice(0, 3).forEach((c: any) => {
-          contactsSection.push(`  • ${c.name} - ${c.role}${c.email ? ` (${c.email})` : ''}`);
-        });
-      }
+    // Show other contacts if:
+    // 1. User asked about contacts specifically, OR
+    // 2. Deep mode, OR
+    // 3. There are no CEO/decision makers/primary contacts (so we don't return empty)
+    const shouldShowOthers = intent.topics.includes('contacts') ||
+                             mode === 'deep' ||
+                             (!ceo && decisionMakers.length === 0 && primaryContacts.length === 0);
+
+    if (shouldShowOthers && otherContacts.length > 0) {
+      contactsSection.push('Contacts:');
+      const contactsToShow = mode === 'deep' ? otherContacts.slice(0, 5) : otherContacts.slice(0, 3);
+      contactsToShow.forEach((c: any) => {
+        contactsSection.push(`  • ${c.name}${c.role ? ` - ${c.role}` : ''}${c.department ? ` (${c.department})` : ''}`);
+        if (c.email) contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
+      });
     }
 
     contextParts.push(contactsSection.join('\n'));
@@ -696,6 +704,19 @@ Deno.serve(async (req: Request) => {
 
     const fullContext = buildEnhancedContext(contextData, intent, mode);
     const systemPrompt = buildEnhancedPrompt(intent, mode);
+
+    console.log('Context summary:', {
+      hasClient: !!client,
+      contactsCount: contacts.length,
+      transcriptsCount: transcripts.length,
+      hasIntelligenceContext: !!intelligenceContext,
+      contextLength: fullContext.length
+    });
+
+    // Debug: Log a snippet of the context to verify contacts are included
+    if (contacts.length > 0) {
+      console.log(`Contacts in context: ${contacts.length} contacts, first contact: ${contacts[0]?.name || 'Unknown'}`);
+    }
 
     const messages: any[] = [
       { role: 'system', content: systemPrompt },
