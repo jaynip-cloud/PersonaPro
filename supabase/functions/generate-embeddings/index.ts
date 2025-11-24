@@ -76,7 +76,9 @@ async function uploadToPinecone(
   userId: string,
   metadata: Record<string, any>
 ): Promise<void> {
-  const host = `https://${indexName}-${environment}.svc.aped-4627-b74a.pinecone.io`;
+  const host = environment.startsWith('http')
+    ? environment
+    : `https://${indexName}-${environment}.svc.pinecone.io`;
 
   for (let i = 0; i < embeddings.length; i += BATCH_SIZE) {
     const batch = embeddings.slice(i, i + BATCH_SIZE);

@@ -788,17 +788,17 @@ export const Settings: React.FC = () => {
 
                           <div>
                             <label className="block text-sm font-medium text-foreground mb-2">
-                              Pinecone Environment
+                              Pinecone Host URL
                             </label>
                             <Input
                               type="text"
                               value={pineconeEnvironment}
                               onChange={(e) => setPineconeEnvironment(e.target.value)}
-                              placeholder="us-east-1-aws"
+                              placeholder="https://your-index-xxxx.svc.pinecone.io"
                               className="font-mono text-sm"
                             />
                             <p className="text-xs text-muted-foreground mt-1.5">
-                              Your Pinecone environment (e.g., us-east-1-aws, us-west-1-gcp)
+                              Your Pinecone index host URL from the Pinecone console (or environment like us-east-1-aws)
                             </p>
                           </div>
 
