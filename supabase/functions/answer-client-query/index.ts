@@ -55,8 +55,50 @@ function analyzeQueryIntent(query: string): QueryIntent {
 }
 
 function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): string {
-  const { client, companyProfile, contacts, transcripts, fathomRecordings, opportunities, documentMatches, additionalFathomContext } = data;
+  const { client, companyProfile, contacts, transcripts, fathomRecordings, opportunities, documentMatches, additionalFathomContext, intelligenceContext } = data;
   const contextParts = [];
+
+  // If we have intelligence context from the new retrieval agent, use it
+  if (intelligenceContext) {
+    contextParts.push('=== MOST RELEVANT CONTEXT (AI-RANKED) ===\n');
+
+    if (intelligenceContext.meetings && intelligenceContext.meetings.length > 0) {
+      contextParts.push('\n--- Meeting Insights ---');
+      intelligenceContext.meetings.forEach((meeting: any, i: number) => {
+        const date = meeting.meeting_date ? new Date(meeting.meeting_date).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        }) : '';
+        contextParts.push(`\n[Meeting ${i + 1}] ${meeting.recording_title || 'Unknown'}${date ? ` (${date})` : ''}`);
+        if (meeting.speaker_name) contextParts.push(`Speaker: ${meeting.speaker_name}`);
+        contextParts.push(`Relevance: ${(meeting.similarity_score * 100).toFixed(1)}%`);
+        contextParts.push(meeting.text);
+      });
+    }
+
+    if (intelligenceContext.documents && intelligenceContext.documents.length > 0) {
+      contextParts.push('\n--- Document Insights ---');
+      intelligenceContext.documents.forEach((doc: any, i: number) => {
+        contextParts.push(`\n[Document ${i + 1}] ${doc.title || 'Unknown'}`);
+        if (doc.url) contextParts.push(`URL: ${doc.url}`);
+        contextParts.push(`Relevance: ${(doc.similarity_score * 100).toFixed(1)}%`);
+        contextParts.push(doc.text);
+      });
+    }
+
+    if (intelligenceContext.company_kb && intelligenceContext.company_kb.length > 0) {
+      contextParts.push('\n--- Your Company Knowledge ---');
+      intelligenceContext.company_kb.forEach((kb: any, i: number) => {
+        contextParts.push(`\n[Resource ${i + 1}] ${kb.title || 'Unknown'}`);
+        if (kb.url) contextParts.push(`URL: ${kb.url}`);
+        contextParts.push(`Relevance: ${(kb.similarity_score * 100).toFixed(1)}%`);
+        contextParts.push(kb.text);
+      });
+    }
+
+    contextParts.push('\n=== END RELEVANT CONTEXT ===\n');
+  }
 
   if (intent.type === 'recommendation' || intent.type === 'analytical') {
     contextParts.push('=== STRATEGIC CONTEXT ===');
@@ -397,6 +439,39 @@ Deno.serve(async (req: Request) => {
     const intent = analyzeQueryIntent(query);
     console.log('Query intent:', intent);
 
+    // Step 1: Call the new Intelligence Retrieval Agent
+    console.log('Calling Intelligence Retrieval Agent...');
+    const retrievalResponse = await fetch(
+      `${Deno.env.get('SUPABASE_URL')}/functions/v1/retrieve-intelligence`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query,
+          client_id: clientId,
+          source_filters: [],
+          top_k: {
+            meetings: mode === 'deep' ? 15 : 10,
+            documents: mode === 'deep' ? 15 : 10,
+            company_kb: mode === 'deep' ? 10 : 6,
+          }
+        }),
+      }
+    );
+
+    let intelligenceContext = null;
+    if (retrievalResponse.ok) {
+      const retrievalData = await retrievalResponse.json();
+      intelligenceContext = retrievalData.context;
+      console.log('Intelligence context retrieved:', retrievalData.metadata);
+    } else {
+      console.warn('Intelligence retrieval failed, falling back to legacy search');
+    }
+
+    // Step 2: Fetch structured data
     const [
       clientResult,
       companyProfileResult,
@@ -539,6 +614,7 @@ Deno.serve(async (req: Request) => {
       opportunities,
       documentMatches: allDocumentMatches,
       additionalFathomContext,
+      intelligenceContext,
     };
 
     const fullContext = buildEnhancedContext(contextData, intent, mode);
