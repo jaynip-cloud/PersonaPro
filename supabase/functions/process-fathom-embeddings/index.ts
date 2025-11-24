@@ -20,8 +20,8 @@ interface TranscriptChunk {
   speaker_email: string;
 }
 
-const CHUNK_SIZE = 1500;
-const CHUNK_OVERLAP = 200;
+const CHUNK_SIZE = 150;
+const CHUNK_OVERLAP = 30;
 const CHARS_PER_TOKEN = 4;
 
 Deno.serve(async (req: Request) => {
