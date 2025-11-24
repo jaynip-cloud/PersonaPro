@@ -433,6 +433,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         model: 'text-embedding-3-small',
         input: query,
+        dimensions: 512,
       }),
     });
 

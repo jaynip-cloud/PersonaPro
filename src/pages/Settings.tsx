@@ -814,7 +814,7 @@ export const Settings: React.FC = () => {
                               className="font-mono text-sm"
                             />
                             <p className="text-xs text-muted-foreground mt-1.5">
-                              Name of your Pinecone index (must have dimension 1536 for OpenAI embeddings)
+                              Name of your Pinecone index (must have dimension 512 for OpenAI embeddings)
                             </p>
                           </div>
                         </div>

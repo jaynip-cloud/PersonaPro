@@ -257,6 +257,7 @@ async function generateEmbeddings(
     body: JSON.stringify({
       model: 'text-embedding-3-small',
       input: texts,
+      dimensions: 512,
     }),
   });
 
