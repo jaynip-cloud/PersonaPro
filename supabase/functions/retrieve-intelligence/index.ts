@@ -284,7 +284,7 @@ async function queryPinecone(
       topK,
       includeMetadata: true,
       filter,
-      namespace: '',
+      namespace,
     }),
   });
 

@@ -402,10 +402,11 @@ IMPORTANT: You will only receive substantive questions here. Simple greetings ar
   };
 
   const guidelines = [
-    '• ALWAYS use only the retrieved context. Never guess or make up information.',
+    '• CRITICAL: ONLY answer based on the retrieved context. NEVER guess, assume, or make up information.',
+    '• If the information is not in the provided context, clearly state: "I don\'t have that information in the current data."',
+    '• DO NOT answer out of context - if the query cannot be answered with the provided data, say so explicitly.',
     '• Incorporate evidence smoothly into your answers (e.g., "Based on your meeting notes from June..." or "Looking at their website...")',
     '• Be specific with numbers, dates, names, and quotes when available',
-    '• If the context is incomplete, say so politely and suggest what additional data could help',
     `• ${intentSpecificGuidance[intent.type]}`,
     '• Write in a natural, warm tone. Avoid robotic or template-like language.',
     '• Do NOT show internal metadata like "sources: 1 contacts" or timestamps.',
@@ -731,7 +732,77 @@ Deno.serve(async (req: Request) => {
     }
 
     const chatData = await chatResponse.json();
-    const answer = chatData.choices[0].message.content;
+    let answer = chatData.choices[0].message.content;
+
+    // Check if answer indicates insufficient context and try web search
+    const insufficientContextIndicators = [
+      'I do not have',
+      'I don\'t have',
+      'not provide',
+      'does not provide',
+      'missing',
+      'unclear',
+      'I cannot find',
+      'unable to find',
+      'no information',
+      'not available',
+      'would need additional',
+      'more information would be needed'
+    ];
+
+    const hasInsufficientContext = insufficientContextIndicators.some(indicator =>
+      answer.toLowerCase().includes(indicator.toLowerCase())
+    );
+
+    if (hasInsufficientContext) {
+      console.log('Insufficient context detected, attempting web search...');
+
+      try {
+        // Get Perplexity API key
+        const { data: perplexityKeys } = await supabaseClient
+          .from('api_keys')
+          .select('perplexity_api_key')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        const perplexityKey = perplexityKeys?.perplexity_api_key || Deno.env.get('PERPLEXITY_API_KEY');
+
+        if (perplexityKey) {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL');
+          const webSearchResponse = await fetch(`${supabaseUrl}/functions/v1/search-web`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${perplexityKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              query,
+              clientName: client.name,
+            }),
+          });
+
+          if (webSearchResponse.ok) {
+            const webData = await webSearchResponse.json();
+            if (webData.success && webData.answer) {
+              console.log('Web search successful, enriching answer');
+              answer = `${answer}\n\n**Additional information from web search:**\n\n${webData.answer}`;
+
+              if (webData.citations && webData.citations.length > 0) {
+                answer += '\n\n**Sources:**';
+                webData.citations.forEach((citation: string, idx: number) => {
+                  answer += `\n${idx + 1}. ${citation}`;
+                });
+              }
+            }
+          }
+        } else {
+          console.log('Perplexity API key not configured, skipping web search');
+        }
+      } catch (webSearchError) {
+        console.error('Web search error (non-fatal):', webSearchError);
+        // Continue with original answer
+      }
+    }
 
     // Build comprehensive sources list from intelligence context
     const sourcesList = [];

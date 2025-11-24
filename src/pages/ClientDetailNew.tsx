@@ -849,36 +849,8 @@ export const ClientDetailNew: React.FC = () => {
 
       setIsProcessingQuery(false);
 
-      // Build enhanced sources info with metadata and actual sources
-      let sourcesInfo = '';
-      if (data.metadata) {
-        const { sources, confidence, intent } = data.metadata;
-
-        const sourcesParts = [];
-        if (sources.documentsSearched > 0) sourcesParts.push(`${sources.documentsSearched} documents`);
-        if (sources.manualTranscriptsIncluded > 0) sourcesParts.push(`${sources.manualTranscriptsIncluded} manual notes`);
-        if (sources.fathomRecordingsAvailable > 0) sourcesParts.push(`${sources.fathomRecordingsAvailable} Fathom recordings`);
-        if (sources.fathomTranscriptsFound > 0) sourcesParts.push(`${sources.fathomTranscriptsFound} Fathom excerpts`);
-        if (sources.transcriptMatchesFound > 0 && !sources.fathomTranscriptsFound) sourcesParts.push(`${sources.transcriptMatchesFound} meeting excerpts`);
-        if (sources.contactsFound > 0) sourcesParts.push(`${sources.contactsFound} contacts`);
-
-        const confidenceEmoji = confidence === 'high' ? '🟢' : confidence === 'medium' ? '🟡' : '🔴';
-
-        sourcesInfo = `\n\n---\n📊 Sources: ${sourcesParts.join(', ') || 'None'}\n${confidenceEmoji} Confidence: ${confidence}`;
-        if (intent) sourcesInfo += ` | Query type: ${intent}`;
-      }
-
-      // Add actual source details if available
-      if (data.sources && data.sources.length > 0) {
-        sourcesInfo += '\n\n📄 Specific sources used:\n';
-        data.sources.forEach((source: any, index: number) => {
-          const relevance = source.similarity ? `${(source.similarity * 100).toFixed(0)}%` : '';
-          sourcesInfo += `\n${index + 1}. ${source.name || 'Unknown'}${relevance ? ` (${relevance} match)` : ''}`;
-          if (source.type) sourcesInfo += ` [${source.type}]`;
-        });
-      }
-
-      return data.answer + sourcesInfo;
+      // Return clean answer without metadata
+      return data.answer;
     } catch (error) {
       console.error('Error processing query:', error);
       setIsProcessingQuery(false);
