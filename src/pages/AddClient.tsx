@@ -334,45 +334,63 @@ export const AddClient: React.FC = () => {
       }
 
       const { data } = await response.json();
+      
+      // Debug: Log the received data
+      console.log('📥 Apollo API Response Data:', JSON.stringify(data, null, 2));
+      console.log('📍 Address fields in response:', {
+        city: data?.city,
+        country: data?.country,
+        zipCode: data?.zipCode
+      });
 
       // Map Apollo response to form fields
       if (data) {
         const updatedData: Partial<ClientFormData> = {};
 
-        // Basic Info
-        if (data.company) updatedData.company = data.company;
-        if (data.website) updatedData.website = data.website;
-        if (data.industry) updatedData.industry = data.industry;
-        if (data.companySize) updatedData.companySize = data.companySize;
-        if (data.employeeCount) updatedData.employeeCount = data.employeeCount;
-        if (data.founded) updatedData.founded = data.founded;
-        if (data.description) updatedData.description = data.description;
-        if (data.annualRevenue) updatedData.annualRevenue = data.annualRevenue;
-        if (data.logoUrl) updatedData.logoUrl = data.logoUrl;
+        // Basic Info - Update if field exists in response (even if empty string)
+        if ('company' in data) updatedData.company = data.company || '';
+        if ('website' in data) updatedData.website = data.website || '';
+        if ('industry' in data) updatedData.industry = data.industry || '';
+        if ('companySize' in data) updatedData.companySize = data.companySize || '';
+        if ('employeeCount' in data) updatedData.employeeCount = data.employeeCount || '';
+        if ('founded' in data) updatedData.founded = data.founded || '';
+        if ('description' in data) updatedData.description = data.description || '';
+        if ('annualRevenue' in data) updatedData.annualRevenue = data.annualRevenue || '';
+        if ('logoUrl' in data) updatedData.logoUrl = data.logoUrl || '';
 
-        // Location
-        if (data.city) updatedData.city = data.city;
-        if (data.country) updatedData.country = data.country;
-        if (data.zipCode) updatedData.zipCode = data.zipCode;
+        // Location - Update if field exists in response (even if empty string)
+        if ('city' in data) updatedData.city = data.city || '';
+        if ('country' in data) updatedData.country = data.country || '';
+        if ('zipCode' in data) updatedData.zipCode = data.zipCode || '';
 
-        // Social Media
-        if (data.linkedinUrl) updatedData.linkedinUrl = data.linkedinUrl;
-        if (data.twitterUrl) updatedData.twitterUrl = data.twitterUrl;
-        if (data.facebookUrl) updatedData.facebookUrl = data.facebookUrl;
-        if (data.instagramUrl) updatedData.instagramUrl = data.instagramUrl;
+        // Social Media - Update if field exists in response (even if empty string)
+        if ('linkedinUrl' in data) updatedData.linkedinUrl = data.linkedinUrl || '';
+        if ('twitterUrl' in data) updatedData.twitterUrl = data.twitterUrl || '';
+        if ('facebookUrl' in data) updatedData.facebookUrl = data.facebookUrl || '';
+        if ('instagramUrl' in data) updatedData.instagramUrl = data.instagramUrl || '';
 
-        // Contact Info
-        if (data.email) updatedData.email = data.email;
-        if (data.phone) updatedData.phone = data.phone;
-        if (data.contactName) updatedData.contactName = data.contactName;
-        if (data.primaryEmail) updatedData.primaryEmail = data.primaryEmail;
-        if (data.alternateEmail) updatedData.alternateEmail = data.alternateEmail;
-        if (data.primaryPhone) updatedData.primaryPhone = data.primaryPhone;
-        if (data.alternatePhone) updatedData.alternatePhone = data.alternatePhone;
-        if (data.jobTitle) updatedData.jobTitle = data.jobTitle;
+        // Contact Info - Update if field exists in response (even if empty string)
+        if ('email' in data) updatedData.email = data.email || '';
+        if ('phone' in data) updatedData.phone = data.phone || '';
+        if ('contactName' in data) updatedData.contactName = data.contactName || '';
+        if ('primaryEmail' in data) updatedData.primaryEmail = data.primaryEmail || '';
+        if ('alternateEmail' in data) updatedData.alternateEmail = data.alternateEmail || '';
+        if ('primaryPhone' in data) updatedData.primaryPhone = data.primaryPhone || '';
+        if ('alternatePhone' in data) updatedData.alternatePhone = data.alternatePhone || '';
+        if ('jobTitle' in data) updatedData.jobTitle = data.jobTitle || '';
 
-        // Blogs/News Articles
-        if (data.blogs && data.blogs.length > 0) {
+        // Tags - Update if array exists
+        if ('tags' in data && Array.isArray(data.tags)) {
+          updatedData.tags = data.tags;
+        }
+
+        // Technologies - Update if array exists
+        if ('technologies' in data && Array.isArray(data.technologies)) {
+          updatedData.technologies = data.technologies;
+        }
+
+        // Blogs/News Articles - Only update if array exists and has items
+        if ('blogs' in data && Array.isArray(data.blogs) && data.blogs.length > 0) {
           updatedData.blogs = data.blogs;
         }
 
