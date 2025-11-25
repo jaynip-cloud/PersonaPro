@@ -7,6 +7,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isKnowledgeBaseComplete: boolean;
+  hasCheckedKnowledgeBase: boolean;
   checkKnowledgeBaseStatus: () => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null; requiresConfirmation?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -24,9 +25,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isKnowledgeBaseComplete, setIsKnowledgeBaseComplete] = useState(false);
+  const [hasCheckedKnowledgeBase, setHasCheckedKnowledgeBase] = useState(false);
 
   const checkKnowledgeBaseStatus = async () => {
     try {
+      console.log('🔍 Checking knowledge base status...');
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
@@ -35,10 +38,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .eq('user_id', user.id)
           .maybeSingle();
 
-        setIsKnowledgeBaseComplete(profile?.onboarding_completed ?? false);
+        const isComplete = profile?.onboarding_completed ?? false;
+        console.log('📊 Knowledge base status:', { isComplete, hasProfile: !!profile });
+        setIsKnowledgeBaseComplete(isComplete);
+        setHasCheckedKnowledgeBase(true);
+        console.log('✅ Knowledge base check complete');
       }
     } catch (error) {
-      console.error('Error checking knowledge base status:', error);
+      console.error('❌ Error checking knowledge base status:', error);
+      setHasCheckedKnowledgeBase(true); // Set to true even on error to prevent infinite loading
     }
   };
 
@@ -159,6 +167,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setHasCheckedKnowledgeBase(false);
+    setIsKnowledgeBaseComplete(false);
   };
 
   return (
@@ -168,6 +178,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         session,
         loading,
         isKnowledgeBaseComplete,
+        hasCheckedKnowledgeBase,
         checkKnowledgeBaseStatus,
         signUp,
         signIn,

@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { load } from "npm:cheerio@1.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -303,62 +304,109 @@ async function crawlWebsite(startUrl: string): Promise<CrawlResult[]> {
 }
 
 function parseHtml(html: string, url: string): CrawlResult {
-  const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].trim() : '';
-
-  // Extract emails from HTML
-  const emailPattern = /([a-zA-Z0-9._+-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
-  const mailtoPattern = /mailto:([a-zA-Z0-9._+-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
+  const $ = load(html);
+  
+  // Extract title - try multiple sources
+  const title = $('title').first().text().trim() || 
+                $('meta[property="og:title"]').attr('content') || 
+                $('h1').first().text().trim() || 
+                new URL(url).hostname;
+  
+  // Extract emails
   const emails = new Set<string>();
-
-  // Extract from mailto links
-  let mailtoMatch;
-  while ((mailtoMatch = mailtoPattern.exec(html)) !== null) {
-    emails.add(mailtoMatch[1].toLowerCase());
-  }
-
-  // Extract from plain text email patterns
-  let emailMatch;
-  while ((emailMatch = emailPattern.exec(html)) !== null) {
-    const email = emailMatch[1].toLowerCase();
-    // Filter out common false positives
-    if (!email.includes('.png') && !email.includes('.jpg') &&
-        !email.includes('.jpeg') && !email.includes('.gif') &&
-        !email.includes('example.com') && !email.includes('domain.com')) {
+  
+  // From mailto links (more reliable)
+  $('a[href^="mailto:"]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (href) {
+      const email = href.replace(/^mailto:/i, '').split('?')[0].split('&')[0].trim().toLowerCase();
+      if (email && isValidEmail(email)) {
+        emails.add(email);
+      }
+    }
+  });
+  
+  // From text content (with better context awareness)
+  const textContent = $('body').text();
+  const emailPattern = /([a-zA-Z0-9._+-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
+  let match;
+  while ((match = emailPattern.exec(textContent)) !== null) {
+    const email = match[1].toLowerCase();
+    if (isValidEmail(email)) {
       emails.add(email);
     }
   }
-
-  const socialPatterns = [
-    /https?:\/\/(www\.)?(linkedin\.com\/company\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(linkedin\.com\/in\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(twitter\.com\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(x\.com\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(facebook\.com\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(instagram\.com\/[^\s"'<>]+)/gi,
-    /https?:\/\/(www\.)?(youtube\.com\/(c\/|channel\/|user\/|@)?[^\s"'<>]+)/gi,
-  ];
-
+  
+  // Extract social links using CSS selectors (more reliable)
   const socialLinks = new Set<string>();
-  for (const pattern of socialPatterns) {
-    const matches = html.matchAll(pattern);
-    for (const match of matches) {
-      socialLinks.add(match[0]);
+  
+  // LinkedIn company pages
+  $('a[href*="linkedin.com/company/"]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (href) {
+      socialLinks.add(href);
     }
-  }
-
-  const linkPattern = /<a[^>]+href=["']([^"']+)["']/gi;
+  });
+  
+  // LinkedIn profiles
+  $('a[href*="linkedin.com/in/"]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (href) {
+      socialLinks.add(href);
+    }
+  });
+  
+  // Twitter/X
+  $('a[href*="twitter.com/"], a[href*="x.com/"]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (href) {
+      socialLinks.add(href);
+    }
+  });
+  
+  // Facebook
+  $('a[href*="facebook.com/"]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (href) {
+      socialLinks.add(href);
+    }
+  });
+  
+  // Instagram
+  $('a[href*="instagram.com/"]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (href) {
+      socialLinks.add(href);
+    }
+  });
+  
+  // YouTube
+  $('a[href*="youtube.com/"]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (href) {
+      socialLinks.add(href);
+    }
+  });
+  
+  // Extract all links with proper URL resolution
   const links: string[] = [];
-  let match;
-  while ((match = linkPattern.exec(html)) !== null) {
-    const href = match[1];
+  $('a[href]').each((_, el) => {
+    const href = $(el).attr('href');
     if (href && !href.startsWith('#') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
-      links.push(href);
+      try {
+        // Resolve relative URLs
+        const absoluteUrl = new URL(href, url).href;
+        links.push(absoluteUrl);
+      } catch {
+        // If URL parsing fails, just push the href as-is
+        links.push(href);
+      }
     }
-  }
-
-  const content = extractTextFromHtml(html);
-
+  });
+  
+  // Extract clean text content
+  const content = extractTextFromHtml($);
+  
   return {
     url,
     title,
@@ -369,14 +417,38 @@ function parseHtml(html: string, url: string): CrawlResult {
   };
 }
 
-function extractTextFromHtml(html: string): string {
-  let text = html
-    .replace(/<script[^>]*>.*?<\/script>/gi, "")
-    .replace(/<style[^>]*>.*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+// Helper function for email validation
+function isValidEmail(email: string): boolean {
+  if (!email.includes('@')) return false;
+  if (email.includes('.png') || email.includes('.jpg') || 
+      email.includes('.jpeg') || email.includes('.gif') || 
+      email.includes('.svg') || email.includes('.webp')) return false;
+  if (email.includes('example.com') || email.includes('domain.com') || 
+      email.includes('test.com') || email.includes('placeholder')) return false;
+  // Basic email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
 
+function extractTextFromHtml($: ReturnType<typeof load>): string {
+  // Remove script, style, and other non-content elements
+  $('script, style, noscript, iframe, svg, img').remove();
+  
+  // Try to get main content first (better structure)
+  let text = '';
+  
+  // Priority order: main > article > [role="main"] > body
+  const mainContent = $('main').first().text() || 
+                      $('article').first().text() || 
+                      $('[role="main"]').first().text() || 
+                      $('body').text();
+  
+  // Clean up whitespace
+  text = mainContent
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Limit to 20,000 characters
   return text.substring(0, 20000);
 }
 
@@ -400,24 +472,25 @@ async function extractCompanyInfo(crawlResults: CrawlResult[], perplexityKey: st
   const facebookUrls = Array.from(allSocialLinks).filter(link => link.includes('facebook.com'));
   const instagramUrls = Array.from(allSocialLinks).filter(link => link.includes('instagram.com'));
 
-  const prompt = `You are an expert business intelligence analyst specializing in company research and data extraction. Your task is to extract ONLY accurate, verified company information following a strict priority order.
+  const prompt = `You are an expert business intelligence analyst specializing in company research and data extraction. Your task is to extract ONLY accurate, verified company information that is EXPLICITLY found in the provided website content or can be verified through web search.
 
-CRITICAL: ACCURACY IS PARAMOUNT - NEVER GUESS OR INFER DATA THAT IS NOT EXPLICITLY STATED OR FOUND.
+CRITICAL: ACCURACY IS PARAMOUNT - NEVER GUESS, INFER, OR GENERATE DATA THAT IS NOT EXPLICITLY STATED OR VERIFIABLY FOUND.
 
-⚠️ MANDATORY FIELDS - THESE MUST BE EXTRACTED (use web search extensively if needed):
-1. companyOverview/description - REQUIRED (minimum 2-3 sentences about what the company does)
-2. shortTermGoals - REQUIRED (search press releases, blog, investor pages, CEO interviews)
-3. longTermGoals - REQUIRED (search about page, vision/mission, strategic direction, investor deck)
-4. expectations - REQUIRED (infer from testimonials, service pages, partnership requirements)
-5. **LEADERSHIP** - ABSOLUTELY REQUIRED (minimum CEO/Founder - search LinkedIn People, About page, team page)
-6. **TECHNOLOGY STACK** - REQUIRED if tech company (search job postings, about page, partners page, footer)
-7. **BLOGS/ARTICLES** - REQUIRED if blog exists (extract from /blog, /news, /insights pages)
-8. budgetRange - OPTIONAL but highly valuable (look for pricing pages, case studies)
+⚠️ EXTRACTION GUIDELINES - ONLY EXTRACT IF FOUND:
+1. companyOverview/description - Extract ONLY if found in website content (minimum 2-3 sentences about what the company does)
+2. shortTermGoals - Extract ONLY if explicitly mentioned in website content, press releases, or verified news articles
+3. longTermGoals - Extract ONLY if explicitly mentioned in website content, vision/mission pages, or verified sources
+4. expectations - Extract ONLY if explicitly stated in testimonials, service pages, or partnership pages
+5. **LEADERSHIP** - Extract ONLY if found on team/about/leadership pages or verified LinkedIn profiles. If not found, leave empty.
+6. **TECHNOLOGY STACK** - Extract ONLY if explicitly mentioned on website (job postings, about page, partners page, footer). If not found, leave empty.
+7. **BLOGS/ARTICLES** - Extract ONLY if blog exists and articles are found in crawled pages (/blog, /news, /insights). If not found, leave empty.
+8. budgetRange - Extract ONLY if found on pricing pages or case studies
 
-🔴 CRITICAL EXTRACTION PRIORITY:
-- If the company has a team/about/leadership page → MUST extract leadership
-- If the company has a blog/news section → MUST extract at least 5-10 blog posts
-- If the company is tech-related → MUST extract technology stack (languages, frameworks, platforms)
+🔴 STRICT EXTRACTION RULES:
+- If leadership is NOT found on website or LinkedIn → Leave leadership fields EMPTY (do not generate fake names)
+- If blog does NOT exist or no articles found → Leave blogs array EMPTY (do not generate fake blog posts)
+- If technology stack is NOT mentioned → Leave technology fields EMPTY (do not guess technologies)
+- If contact names are NOT found → Leave contact name fields EMPTY (do not generate fake contacts)
 
 DATA SOURCE PRIORITY (USE IN THIS EXACT ORDER):
 1. **PRIMARY SOURCE - LinkedIn Company Page**: ${linkedinCompanyUrls[0] || 'Not found - search for it'}
@@ -1080,62 +1153,65 @@ SEARCH STRATEGY:
 
 QUALITY REQUIREMENTS (MANDATORY MINIMUMS):
 
-🚨 ABSOLUTELY REQUIRED - NO EXCEPTIONS:
+🚨 EXTRACTION GUIDELINES - ONLY IF FOUND:
 1. **LEADERSHIP**:
-   - ✅ MUST have at least 1 leader (CEO, Founder, or President)
-   - ✅ PREFER 3-10 leadership/team members
-   - ✅ Search LinkedIn People section, team page, about page, web search
-   - ❌ NEVER return empty leadership - use web search to find CEO/Founder
+   - ✅ Extract ONLY if found on team/about/leadership pages or verified LinkedIn profiles
+   - ✅ Extract ALL leadership/team members found (no minimum requirement)
+   - ✅ Search LinkedIn People section, team page, about page ONLY if links provided
+   - ❌ If NOT found, leave leadership fields EMPTY - do NOT generate fake names or profiles
 
 2. **BLOGS** (if blog exists):
-   - ✅ MUST extract 5-10 recent articles if blog/news section exists
+   - ✅ Extract ONLY articles found in crawled /blog, /news, /insights pages
    - ✅ Each article needs: title, URL, date (if available), summary
-   - ✅ Check crawled pages for /blog, /news, /insights URLs
-   - ❌ DO NOT skip if blog exists on website
+   - ✅ Check crawled pages for actual blog content
+   - ❌ If blog pages are NOT in crawl results or contain no articles, leave blogs array EMPTY
 
 3. **TECHNOLOGY STACK** (if tech company):
-   - ✅ MUST have 3-5+ technologies if company is tech-related
-   - ✅ Include: languages, frameworks, cloud platforms, tools
-   - ✅ Search job postings, partners page, about page, footer
-   - ❌ DO NOT leave empty for SaaS/software/IT companies
+   - ✅ Extract ONLY if explicitly mentioned on website (job postings, partners page, about page, footer)
+   - ✅ Include ONLY technologies that are actually mentioned
+   - ❌ If NOT mentioned anywhere, leave technology fields EMPTY - do NOT guess
 
 4. **CONTACTS**:
-   - ✅ Minimum 3-10 contacts with names and titles
-   - ✅ Extract ALL people found on team/about/leadership pages
+   - ✅ Extract ONLY people found on team/about/leadership pages
+   - ✅ Extract ALL people found (no minimum requirement)
    - ✅ For each: determine isDecisionMaker and influenceLevel accurately
+   - ❌ If no team page found, leave contacts array EMPTY
 
 5. **SERVICES/PRODUCTS**:
-   - ✅ Minimum 3-5 services/products (if available on website)
-   - ✅ Each service needs name and comprehensive description
+   - ✅ Extract ONLY services/products found on website services/products pages
+   - ✅ Each service needs name and description from website content
+   - ❌ If services page not found, leave services array EMPTY
 
 6. **TESTIMONIALS** (if exists):
-   - ✅ Minimum 5-15 testimonials (if testimonials/reviews/case studies page exists)
-   - ✅ Extract ALL testimonials from testimonials page
+   - ✅ Extract ONLY testimonials found on testimonials/reviews/case studies pages
+   - ✅ Extract ALL testimonials found (no minimum requirement)
+   - ❌ If testimonials page not found, leave testimonials array EMPTY
 
 7. **CONTACT INFO**:
-   - ✅ Must have at least one email address (use discovered emails)
-   - ✅ Must have full physical address with street, city, country, postal code
-   - ✅ Should have at least one phone number
+   - ✅ Extract ONLY emails, phones, addresses EXPLICITLY displayed on website
+   - ✅ Use discovered emails from crawl results if they match company domain
+   - ❌ If NOT found, leave fields EMPTY - do NOT guess or construct
 
 8. **GENERAL**:
    - ✅ All URLs must be complete and valid (start with http:// or https://)
-   - ✅ Company description must be 2-4 sentences minimum
-   - ✅ Short-term and long-term goals required (search news/press releases)
+   - ✅ Company description from website content only
+   - ✅ Goals ONLY if explicitly mentioned - do NOT infer or generate
 
 VALIDATION CHECKLIST BEFORE RETURNING:
-□ Leadership section has at least 1 leader with name + title
-□ If blog exists → extracted 5-10 blog posts
-□ If tech company → extracted 3-5+ technologies
-□ Contacts has 3-10 people with titles
-□ Services has 3-5+ offerings
-□ At least one email address included
-□ Full address with street + postal code (if found)
-□ Company description is 2+ sentences
+□ All extracted data is VERIFIABLY found in website content or verified sources
+□ NO fake or generated data (names, emails, blog posts, etc.)
+□ Leadership: Only included if actually found on website/LinkedIn
+□ Blogs: Only included if actually found in crawled pages
+□ Technology: Only included if explicitly mentioned on website
+□ Contacts: Only included if found on team/about pages
+□ Services: Only included if found on services/products pages
+□ Contact info: Only included if explicitly displayed
+□ Empty fields are preferred over incorrect/fake data
 
 WEBSITE CONTENT FROM MULTIPLE PAGES:
 ${combinedContent.substring(0, 75000)}
 
-Now extract the comprehensive company information including services, blogs, technology, and leadership details. Use web search extensively to fill gaps. Return ONLY the JSON object:`;
+Now extract ONLY the company information that is EXPLICITLY found in the provided website content. Do NOT generate or guess any information. If data is not found, leave fields empty. Return ONLY the JSON object:`;
 
   try {
     console.log(`\n${'='.repeat(60)}`);
@@ -1158,7 +1234,7 @@ Now extract the comprehensive company information including services, blogs, tec
         messages: [
           {
             role: "system",
-            content: "You are an expert business intelligence analyst who AGGRESSIVELY extracts comprehensive company data while maintaining accuracy. You follow a strict data source priority: 1) LinkedIn company page (most reliable), 2) Official website content, 3) Web search for missing data. Your PRIMARY MISSION: Extract leadership, blogs, and technology stack - these are MANDATORY. For contact information: you ONLY extract emails, phone numbers, and addresses that are EXPLICITLY displayed. You validate emails match the company domain. CRITICAL EXTRACTION RULES: 1) LEADERSHIP IS MANDATORY - Always extract at least CEO/Founder using LinkedIn People section, team pages, or web search '[Company Name] CEO'. NEVER return empty leadership. 2) BLOGS ARE MANDATORY if blog exists - Extract 5-10 articles from /blog or /news pages found in crawl results. 3) TECHNOLOGY IS MANDATORY for tech companies - Extract from job postings, partners page, footer, or web search '[Company Name] tech stack'. 4) USE WEB SEARCH EXTENSIVELY - If data not on website/LinkedIn, search for it. You are aggressive about finding information through web search but accurate about what you report. You always return properly formatted JSON with comprehensive data.",
+            content: "You are an expert business intelligence analyst who extracts ONLY verified company data. You follow a strict data source priority: 1) LinkedIn company page (most reliable), 2) Official website content, 3) Web search ONLY for verification. CRITICAL RULES: 1) Extract ONLY data that is EXPLICITLY found - NEVER generate or guess information. 2) If leadership is NOT found on website/LinkedIn, leave leadership fields EMPTY - do NOT create fake names. 3) If blogs are NOT found in crawled pages, leave blogs array EMPTY - do NOT generate fake blog posts. 4) If technology stack is NOT mentioned, leave empty - do NOT guess technologies. 5) For contact information: ONLY extract emails, phone numbers, and addresses that are EXPLICITLY displayed. 6) Validate emails match the company domain. 7) If data is not found after thorough search, leave fields empty rather than generating fake data. You prioritize accuracy over completeness - empty fields are better than incorrect data.",
           },
           {
             role: "user",

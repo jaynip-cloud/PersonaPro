@@ -29,7 +29,6 @@ export const Settings: React.FC = () => {
   const [openaiKey, setOpenaiKey] = useState('');
   const [perplexityKey, setPerplexityKey] = useState('');
   const [fathomKey, setFathomKey] = useState('');
-  const [firecrawlKey, setFirecrawlKey] = useState('');
   const [apolloKey, setApolloKey] = useState('');
   const [pineconeApiKey, setPineconeApiKey] = useState('');
   const [pineconeEnvironment, setPineconeEnvironment] = useState('');
@@ -37,7 +36,6 @@ export const Settings: React.FC = () => {
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showPerplexityKey, setShowPerplexityKey] = useState(false);
   const [showFathomKey, setShowFathomKey] = useState(false);
-  const [showFirecrawlKey, setShowFirecrawlKey] = useState(false);
   const [showApolloKey, setShowApolloKey] = useState(false);
   const [showPineconeKey, setShowPineconeKey] = useState(false);
   const [isLoadingKeys, setIsLoadingKeys] = useState(false);
@@ -60,14 +58,14 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     if (!user || activeTab !== 'api' || !keysLoaded) return;
-    if (!openaiKey && !perplexityKey && !fathomKey && !firecrawlKey && !apolloKey && !pineconeApiKey && !pineconeEnvironment && !pineconeIndexName) return;
+    if (!openaiKey && !perplexityKey && !fathomKey && !apolloKey && !pineconeApiKey && !pineconeEnvironment && !pineconeIndexName) return;
 
     const timeoutId = setTimeout(() => {
       saveApiKeys();
     }, 1500);
 
     return () => clearTimeout(timeoutId);
-  }, [openaiKey, perplexityKey, fathomKey, firecrawlKey, apolloKey, pineconeApiKey, pineconeEnvironment, pineconeIndexName, keysLoaded]);
+  }, [openaiKey, perplexityKey, fathomKey, apolloKey, pineconeApiKey, pineconeEnvironment, pineconeIndexName, keysLoaded]);
 
   const loadApiKeys = async () => {
     if (!user) return;
@@ -77,7 +75,7 @@ export const Settings: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('api_keys')
-        .select('openai_api_key, perplexity_api_key, fathom_api_key, firecrawl_api_key, apollo_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
+        .select('openai_api_key, perplexity_api_key, fathom_api_key, apollo_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -87,7 +85,6 @@ export const Settings: React.FC = () => {
         setOpenaiKey(data.openai_api_key || '');
         setPerplexityKey(data.perplexity_api_key || '');
         setFathomKey(data.fathom_api_key || '');
-        setFirecrawlKey(data.firecrawl_api_key || '');
         setApolloKey(data.apollo_api_key || '');
         setPineconeApiKey(data.pinecone_api_key || '');
         setPineconeEnvironment(data.pinecone_environment || '');
@@ -119,7 +116,6 @@ export const Settings: React.FC = () => {
             openai_api_key: openaiKey || null,
             perplexity_api_key: perplexityKey || null,
             fathom_api_key: fathomKey || null,
-            firecrawl_api_key: firecrawlKey || null,
             apollo_api_key: apolloKey || null,
             pinecone_api_key: pineconeApiKey || null,
             pinecone_environment: pineconeEnvironment || null,
@@ -136,7 +132,6 @@ export const Settings: React.FC = () => {
             openai_api_key: openaiKey || null,
             perplexity_api_key: perplexityKey || null,
             fathom_api_key: fathomKey || null,
-            firecrawl_api_key: firecrawlKey || null,
             apollo_api_key: apolloKey || null,
             pinecone_api_key: pineconeApiKey || null,
             pinecone_environment: pineconeEnvironment || null,
@@ -644,64 +639,15 @@ export const Settings: React.FC = () => {
                       <div className="border-t border-border pt-6">
                         <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                           <span className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center text-sm">4</span>
-                          Firecrawl API Key (Optional)
-                        </h3>
-                        <div className="pl-10 space-y-3">
-                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                            <p className="text-sm text-slate-700 mb-2">
-                              <strong>Used for:</strong> Web scraping, content extraction from company websites
-                            </p>
-                            <p className="text-xs text-slate-600">
-                              Extract structured data from company websites to enrich your knowledge base
-                            </p>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-foreground mb-2">
-                              Firecrawl API Key
-                            </label>
-                            <div className="flex gap-2">
-                              <Input
-                                type={showFirecrawlKey ? 'text' : 'password'}
-                                value={firecrawlKey}
-                                onChange={(e) => setFirecrawlKey(e.target.value)}
-                                placeholder="fc-..."
-                                className="font-mono text-sm"
-                              />
-                              <Button
-                                variant="outline"
-                                onClick={() => setShowFirecrawlKey(!showFirecrawlKey)}
-                              >
-                                {showFirecrawlKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </Button>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1.5">
-                              Get your API key from{' '}
-                              <a
-                                href="https://www.firecrawl.dev"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline font-medium"
-                              >
-                                Firecrawl →
-                              </a>
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="border-t border-border pt-6">
-                        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                          <span className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-sm">5</span>
                           Apollo API Key (Optional)
                         </h3>
                         <div className="pl-10 space-y-3">
                           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
                             <p className="text-sm text-slate-700 mb-2">
-                              <strong>Used for:</strong> Company and contact data enrichment
+                              <strong>Used for:</strong> Company data enrichment, contact information, autofill client details
                             </p>
                             <p className="text-xs text-slate-600">
-                              Automatically enrich client data with company information, contacts, and firmographics
+                              Enables AI-powered autofill of company information when adding new clients
                             </p>
                           </div>
 
@@ -714,7 +660,7 @@ export const Settings: React.FC = () => {
                                 type={showApolloKey ? 'text' : 'password'}
                                 value={apolloKey}
                                 onChange={(e) => setApolloKey(e.target.value)}
-                                placeholder="apollo_..."
+                                placeholder="Enter your Apollo API key"
                                 className="font-mono text-sm"
                               />
                               <Button
@@ -732,7 +678,7 @@ export const Settings: React.FC = () => {
                                 rel="noopener noreferrer"
                                 className="text-primary hover:underline font-medium"
                               >
-                                Apollo Settings →
+                                Apollo Settings → 
                               </a>
                             </p>
                           </div>
@@ -741,7 +687,7 @@ export const Settings: React.FC = () => {
 
                       <div className="border-t border-border pt-6">
                         <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                          <span className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">6</span>
+                          <span className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">5</span>
                           Pinecone Vector Database (Required for Documents)
                         </h3>
                         <div className="pl-10 space-y-3">
@@ -824,7 +770,7 @@ export const Settings: React.FC = () => {
                     <div className="flex items-center justify-between pt-4 border-t border-border">
                       <div className="flex items-center gap-4">
                         <div className="text-sm text-muted-foreground">
-                          {openaiKey && perplexityKey && fathomKey && firecrawlKey && apolloKey ? (
+                          {openaiKey && perplexityKey && fathomKey && apolloKey ? (
                             <span className="text-green-600 flex items-center gap-1">
                               <CheckCircle className="h-4 w-4" />
                               All keys configured (Full features)
@@ -832,7 +778,7 @@ export const Settings: React.FC = () => {
                           ) : openaiKey ? (
                             <span className="text-green-600 flex items-center gap-1">
                               <CheckCircle className="h-4 w-4" />
-                              OpenAI configured + {[perplexityKey && 'Perplexity', fathomKey && 'Fathom', firecrawlKey && 'Firecrawl', apolloKey && 'Apollo'].filter(Boolean).join(', ')}
+                              OpenAI configured + {[perplexityKey && 'Perplexity', fathomKey && 'Fathom', apolloKey && 'Apollo'].filter(Boolean).join(', ')}
                             </span>
                           ) : (
                             <span className="text-orange-600 flex items-center gap-1">
@@ -852,7 +798,7 @@ export const Settings: React.FC = () => {
                               <CheckCircle className="h-3 w-3 text-green-600" />
                               <span className="text-green-600">Saved automatically</span>
                             </>
-                          ) : keysLoaded && (openaiKey || perplexityKey || fathomKey) ? (
+                          ) : keysLoaded && (openaiKey || perplexityKey || fathomKey || apolloKey) ? (
                             <span className="text-slate-400">Changes save automatically</span>
                           ) : null}
                         </div>
@@ -860,7 +806,7 @@ export const Settings: React.FC = () => {
                       <Button
                         variant="outline"
                         onClick={handleSave}
-                        disabled={isSavingKeys || (!openaiKey && !perplexityKey && !fathomKey)}
+                        disabled={isSavingKeys || (!openaiKey && !perplexityKey && !fathomKey && !apolloKey)}
                         className="text-sm"
                       >
                         {isSavingKeys ? (

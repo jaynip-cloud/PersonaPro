@@ -86,8 +86,8 @@ export const AddClient: React.FC = () => {
   const [newTag, setNewTag] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [aiPrefilling, setAiPrefilling] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [aiPrefilling, setAiPrefilling] = useState(false);
   const isEditMode = !!id;
 
   const [formData, setFormData] = useState<ClientFormData>({
@@ -301,185 +301,88 @@ export const AddClient: React.FC = () => {
   };
 
   const handleAIPrefill = async () => {
-    const urlToExtract = formData.website || formData.linkedinUrl;
-
-    if (!urlToExtract || !user) {
-      showToast('error', 'Please enter a website URL or LinkedIn URL first');
+    if (!formData.website.trim()) {
+      showToast('error', 'Please enter a website URL first');
       return;
     }
 
     setAiPrefilling(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-company-data`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ url: urlToExtract })
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('AI Prefill error:', errorData);
-        showToast('error', `AI Autofill failed: ${errorData.error || 'Unknown error'}`);
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        showToast('error', 'Please log in to use this feature');
+        setAiPrefilling(false);
         return;
       }
 
-      const data = await response.json();
+      const response = await fetch(`${supabaseUrl}/functions/v1/apollo-enrich-client`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          website: formData.website,
+        }),
+      });
 
-      console.log('=== AI PREFILL RAW DATA ===');
-      console.log('Full response:', data);
-      console.log('Services:', data.data?.services);
-      console.log('Technologies:', data.data?.technology);
-      console.log('Blogs:', data.data?.blogs);
-      console.log('Challenges:', data.data?.challenges);
-      console.log('Competitors:', data.data?.competitors);
-      console.log('=== END RAW DATA ===');
-
-      if (data.success && data.data) {
-        const updates: Partial<ClientFormData> = {};
-
-        if (data.data.name) updates.company = data.data.name;
-        if (data.data.industry) updates.industry = data.data.industry;
-        if (data.data.founded) updates.founded = data.data.founded;
-        if (data.data.companySize) updates.companySize = data.data.companySize;
-
-        if (data.data.location?.city) updates.city = data.data.location.city;
-        if (data.data.location?.country) updates.country = data.data.location.country;
-        if (data.data.location?.zipCode) updates.zipCode = data.data.location.zipCode;
-
-        if (data.data.contactInfo?.contactName) updates.contactName = data.data.contactInfo.contactName;
-        if (data.data.contactInfo?.jobTitle) updates.jobTitle = data.data.contactInfo.jobTitle;
-        if (data.data.contactInfo?.primaryEmail) updates.primaryEmail = data.data.contactInfo.primaryEmail;
-        if (data.data.contactInfo?.alternateEmail) updates.alternateEmail = data.data.contactInfo.alternateEmail;
-        if (data.data.contactInfo?.primaryPhone) updates.primaryPhone = data.data.contactInfo.primaryPhone;
-        if (data.data.contactInfo?.alternatePhone) updates.alternatePhone = data.data.contactInfo.alternatePhone;
-
-        if (data.data.contactInfo?.primaryEmail) updates.email = data.data.contactInfo.primaryEmail;
-        if (data.data.contactInfo?.primaryPhone) updates.phone = data.data.contactInfo.primaryPhone;
-
-        if (data.data.businessInfo?.shortTermGoals) updates.shortTermGoals = data.data.businessInfo.shortTermGoals;
-        if (data.data.businessInfo?.longTermGoals) updates.longTermGoals = data.data.businessInfo.longTermGoals;
-        if (data.data.businessInfo?.expectations) updates.expectations = data.data.businessInfo.expectations;
-
-        if (data.data.socialProfiles?.linkedin) updates.linkedinUrl = data.data.socialProfiles.linkedin;
-        if (data.data.socialProfiles?.twitter) updates.twitterUrl = data.data.socialProfiles.twitter;
-        if (data.data.socialProfiles?.facebook) updates.facebookUrl = data.data.socialProfiles.facebook;
-        if (data.data.socialProfiles?.instagram) updates.instagramUrl = data.data.socialProfiles.instagram;
-
-        if (data.data.logo) updates.logoUrl = data.data.logo;
-
-        // NEW FIELDS
-        if (data.data.companySize) updates.employeeCount = data.data.companySize;
-
-        // Map services
-        if (data.data.services && Array.isArray(data.data.services) && data.data.services.length > 0) {
-          updates.services = data.data.services.map((s: any) => ({
-            name: s.name || s.title || '',
-            description: s.description || ''
-          }));
-        }
-
-        // Map technologies from tech stack
-        if (data.data.technology?.stack && Array.isArray(data.data.technology.stack) && data.data.technology.stack.length > 0) {
-          updates.technologies = data.data.technology.stack.map((tech: any) => ({
-            name: typeof tech === 'string' ? tech : (tech.name || ''),
-            category: typeof tech === 'string' ? 'General' : (tech.category || tech.type || 'General')
-          }));
-        }
-
-        // Map blogs
-        if (data.data.blogs && Array.isArray(data.data.blogs) && data.data.blogs.length > 0) {
-          updates.blogs = data.data.blogs.map((blog: any) => ({
-            title: blog.title || '',
-            url: blog.url || blog.link || '',
-            date: blog.date || blog.publishedDate || ''
-          }));
-        }
-
-        // Extract pain points from challenges
-        if (data.data.challenges) {
-          if (Array.isArray(data.data.challenges)) {
-            updates.painPoints = data.data.challenges.filter((c: any) => c);
-          } else if (typeof data.data.challenges === 'string') {
-            updates.painPoints = [data.data.challenges];
-          }
-        }
-
-        // Map competitors
-        if (data.data.competitors && Array.isArray(data.data.competitors) && data.data.competitors.length > 0) {
-          updates.competitors = data.data.competitors.map((comp: any) => ({
-            name: typeof comp === 'string' ? comp : (comp.name || ''),
-            comparison: typeof comp === 'string' ? '' : (comp.description || comp.comparison || '')
-          }));
-        }
-
-        if (Object.keys(updates).length > 0) {
-          console.log('=== APPLYING UPDATES ===');
-          console.log('Updates object:', updates);
-          console.log('Services being set:', updates.services);
-          console.log('Technologies being set:', updates.technologies);
-          console.log('Blogs being set:', updates.blogs);
-          console.log('Pain points being set:', updates.painPoints);
-          console.log('Competitors being set:', updates.competitors);
-          console.log('=== END UPDATES ===');
-
-          setFormData({ ...formData, ...updates });
-
-          const extractedInfo = [];
-          if (data.data.contacts && data.data.contacts.length > 0) {
-            extractedInfo.push(`${data.data.contacts.length} contacts`);
-          }
-          if (data.data.services && data.data.services.length > 0) {
-            extractedInfo.push(`${data.data.services.length} services`);
-          }
-          if (data.data.technology?.stack && data.data.technology.stack.length > 0) {
-            extractedInfo.push(`${data.data.technology.stack.length} technologies`);
-          }
-          if (data.data.blogs && data.data.blogs.length > 0) {
-            extractedInfo.push(`${data.data.blogs.length} blogs`);
-          }
-          if (data.data.competitors && data.data.competitors.length > 0) {
-            extractedInfo.push(`${data.data.competitors.length} competitors`);
-          }
-          if (data.data.testimonials && data.data.testimonials.length > 0) {
-            extractedInfo.push(`${data.data.testimonials.length} testimonials`);
-          }
-
-          const infoMessage = extractedInfo.length > 0
-            ? ` Also extracted: ${extractedInfo.join(', ')}`
-            : '';
-
-          showToast('success', `Successfully extracted and populated ${Object.keys(updates).length} fields with company data!${infoMessage}`);
-
-          if (data.data.contacts && data.data.contacts.length > 0) {
-            console.log('Extracted contacts:', data.data.contacts);
-          }
-          if (data.data.services && data.data.services.length > 0) {
-            console.log('Extracted services:', data.data.services);
-          }
-          if (data.data.technology?.stack && data.data.technology.stack.length > 0) {
-            console.log('Extracted technologies:', data.data.technology.stack);
-          }
-          if (data.data.blogs && data.data.blogs.length > 0) {
-            console.log('Extracted blogs:', data.data.blogs);
-          }
-          if (data.data.competitors && data.data.competitors.length > 0) {
-            console.log('Extracted competitors:', data.data.competitors);
-          }
-        } else {
-          showToast('warning', 'No data could be extracted from the provided URL. Please check the URL and try again.');
-        }
-      } else {
-        showToast('warning', 'No company data could be extracted from the website.');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch company data');
       }
-    } catch (error) {
-      console.error('AI Prefill error:', error);
-      showToast('error', 'AI Autofill encountered an error. Please try again or fill in manually.');
+
+      const { data } = await response.json();
+
+      // Map Apollo response to form fields
+      if (data) {
+        const updatedData: Partial<ClientFormData> = {};
+
+        // Basic Info
+        if (data.company) updatedData.company = data.company;
+        if (data.website) updatedData.website = data.website;
+        if (data.industry) updatedData.industry = data.industry;
+        if (data.companySize) updatedData.companySize = data.companySize;
+        if (data.employeeCount) updatedData.employeeCount = data.employeeCount;
+        if (data.founded) updatedData.founded = data.founded;
+        if (data.description) updatedData.description = data.description;
+        if (data.annualRevenue) updatedData.annualRevenue = data.annualRevenue;
+        if (data.logoUrl) updatedData.logoUrl = data.logoUrl;
+
+        // Location
+        if (data.city) updatedData.city = data.city;
+        if (data.country) updatedData.country = data.country;
+        if (data.zipCode) updatedData.zipCode = data.zipCode;
+
+        // Social Media
+        if (data.linkedinUrl) updatedData.linkedinUrl = data.linkedinUrl;
+        if (data.twitterUrl) updatedData.twitterUrl = data.twitterUrl;
+        if (data.facebookUrl) updatedData.facebookUrl = data.facebookUrl;
+        if (data.instagramUrl) updatedData.instagramUrl = data.instagramUrl;
+
+        // Contact Info
+        if (data.email) updatedData.email = data.email;
+        if (data.phone) updatedData.phone = data.phone;
+        if (data.contactName) updatedData.contactName = data.contactName;
+        if (data.primaryEmail) updatedData.primaryEmail = data.primaryEmail;
+        if (data.alternateEmail) updatedData.alternateEmail = data.alternateEmail;
+        if (data.primaryPhone) updatedData.primaryPhone = data.primaryPhone;
+        if (data.alternatePhone) updatedData.alternatePhone = data.alternatePhone;
+        if (data.jobTitle) updatedData.jobTitle = data.jobTitle;
+
+        // Blogs/News Articles
+        if (data.blogs && data.blogs.length > 0) {
+          updatedData.blogs = data.blogs;
+        }
+
+        // Update form data
+        setFormData(prev => ({ ...prev, ...updatedData }));
+        showToast('success', 'Company data fetched successfully!');
+      }
+    } catch (error: any) {
+      console.error('Error fetching company data:', error);
+      showToast('error', error.message || 'Failed to fetch company data. Please try again.');
     } finally {
       setAiPrefilling(false);
     }
@@ -848,43 +751,34 @@ export const AddClient: React.FC = () => {
               <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <p className="text-sm text-blue-900 dark:text-blue-100 mb-3 font-medium">
                   <Sparkles className="h-4 w-4 inline mr-2" />
-                  AI-Powered Autofill: Enter company website or LinkedIn URL and let AI populate the details!
+                  AI-Powered Autofill: Enter company website URL and let AI populate the details!
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <Input
-                      placeholder="https://company.com"
-                      value={formData.website}
-                      onChange={(e) => handleInputChange('website', e.target.value)}
-                      className={errors.website ? 'border-red-500' : ''}
-                    />
-                    {errors.website && (
-                      <p className="text-xs text-red-600 mt-1">{errors.website}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Input
-                      placeholder="https://linkedin.com/company/..."
-                      value={formData.linkedinUrl}
-                      onChange={(e) => handleInputChange('linkedinUrl', e.target.value)}
-                    />
-                  </div>
+                <div className="mb-3">
+                  <Input
+                    placeholder="https://company.com"
+                    value={formData.website}
+                    onChange={(e) => handleInputChange('website', e.target.value)}
+                    className={errors.website ? 'border-red-500' : ''}
+                  />
+                  {errors.website && (
+                    <p className="text-xs text-red-600 mt-1">{errors.website}</p>
+                  )}
                 </div>
                 <Button
                   variant="primary"
                   onClick={handleAIPrefill}
-                  disabled={(!formData.website && !formData.linkedinUrl) || aiPrefilling}
+                  disabled={aiPrefilling || !formData.website.trim()}
                   className="w-full"
                 >
                   {aiPrefilling ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Prefilling...
+                      Fetching Company Data...
                     </>
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4 mr-2" />
-                      AI Autofill from {formData.website ? 'Website' : formData.linkedinUrl ? 'LinkedIn' : 'URL'}
+                      AI Autofill from Apollo
                     </>
                   )}
                 </Button>
