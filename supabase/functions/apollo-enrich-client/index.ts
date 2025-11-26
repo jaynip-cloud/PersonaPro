@@ -161,18 +161,18 @@ interface EnrichedClientData {
   description?: string;
   annualRevenue?: string;
   logoUrl?: string;
-  
+
   // Location
   city?: string;
   country?: string;
   zipCode?: string;
-  
+
   // Social Media
   linkedinUrl?: string;
   twitterUrl?: string;
   facebookUrl?: string;
   instagramUrl?: string;
-  
+
   // Contact Info
   email?: string;
   phone?: string;
@@ -182,14 +182,14 @@ interface EnrichedClientData {
   primaryPhone?: string;
   alternatePhone?: string;
   jobTitle?: string;
-  
+
   // Additional fields from Apollo
   tags?: string[];
   technologies?: Array<{
     name: string;
     category: string;
   }>;
-  
+
   // News/Blogs
   blogs?: Array<{
     title: string;
@@ -235,11 +235,11 @@ async function enrichOrganization(
 
     const data = await response.json();
     console.log('Apollo Organization Enrichment Response:', JSON.stringify(data, null, 2));
-    
+
     // Apollo returns organization directly or nested
     let organization = data.organization || data;
     console.log('Extracted Organization:', JSON.stringify(organization, null, 2));
-    
+
     // If we have an organization ID, try to get complete organization info
     if (organization?.id) {
       try {
@@ -254,20 +254,20 @@ async function enrichOrganization(
           }
         );
 
-          if (completeResponse.ok) {
-            const completeData = await completeResponse.json();
-            console.log('Complete Organization Info Response:', JSON.stringify(completeData, null, 2));
-            
-            // Merge complete data with enrichment data (complete data takes precedence)
-            const completeOrg = completeData.organization || completeData;
-            organization = { ...organization, ...completeOrg };
-            console.log('Merged Organization Data:', JSON.stringify(organization, null, 2));
-          }
+        if (completeResponse.ok) {
+          const completeData = await completeResponse.json();
+          console.log('Complete Organization Info Response:', JSON.stringify(completeData, null, 2));
+
+          // Merge complete data with enrichment data (complete data takes precedence)
+          const completeOrg = completeData.organization || completeData;
+          organization = { ...organization, ...completeOrg };
+          console.log('Merged Organization Data:', JSON.stringify(organization, null, 2));
+        }
       } catch (error) {
         console.warn('Failed to fetch complete organization info, using enrichment data only:', error);
       }
     }
-    
+
     return organization || null;
   } catch (error) {
     console.error('Error enriching organization:', error);
@@ -305,11 +305,11 @@ async function searchMixedCompanies(
 
     const data: ApolloMixedCompaniesResponse = await response.json();
     console.log('Apollo Mixed Companies Search Response:', JSON.stringify(data, null, 2));
-    
+
     if (data.accounts && data.accounts.length > 0) {
       return data.accounts[0];
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error searching mixed companies:', error);
@@ -402,7 +402,7 @@ function mapOrganizationToClientData(
   console.log('Input Mixed Company Object:', JSON.stringify(mixedCompany, null, 2));
   console.log('Input People Array:', JSON.stringify(people, null, 2));
   console.log('Input News Articles Array:', JSON.stringify(newsArticles, null, 2));
-  
+
   // Initialize all fields to ensure they're always present in the response
   const clientData: EnrichedClientData = {
     company: '',
@@ -438,22 +438,22 @@ function mapOrganizationToClientData(
   console.log('\n--- Mapping Basic Info ---');
   clientData.company = org.name || '';
   console.log('Mapped company:', clientData.company);
-  
+
   // Website: prefer organization.website_url, fallback to account.website_url or mixedCompany.website_url
   clientData.website = org.website_url || org.account?.website_url || mixedCompany?.website_url || '';
   console.log('Mapped website:', clientData.website);
-  
+
   // Industry
   clientData.industry = org.industry || '';
   console.log('Mapped industry:', clientData.industry);
-  
+
   // Employee count: use estimated_num_employees from organization
   if (org.estimated_num_employees !== undefined && org.estimated_num_employees !== null) {
     clientData.companySize = org.estimated_num_employees.toString();
     clientData.employeeCount = org.estimated_num_employees.toString();
     console.log('Mapped employeeCount:', clientData.employeeCount);
   }
-  
+
   // Founded year
   if (org.founded_year !== undefined && org.founded_year !== null) {
     clientData.founded = org.founded_year.toString();
@@ -462,11 +462,11 @@ function mapOrganizationToClientData(
     clientData.founded = mixedCompany.founded_year.toString();
     console.log('Mapped founded (from mixedCompany):', clientData.founded);
   }
-  
+
   // Description: use short_description from organization
   clientData.description = org.short_description || '';
   console.log('Mapped description:', clientData.description);
-  
+
   // Logo URL: prefer organization.logo_url, fallback to account.logo_url or mixedCompany.logo_url
   clientData.logoUrl = org.logo_url || org.account?.logo_url || mixedCompany?.logo_url || '';
   console.log('Mapped logoUrl:', clientData.logoUrl);
@@ -477,37 +477,37 @@ function mapOrganizationToClientData(
   console.log('org.account?.city:', org.account?.city);
   console.log('mixedCompany?.city:', mixedCompany?.city);
   console.log('mixedCompany?.organization_city:', mixedCompany?.organization_city);
-  
+
   // City: prefer organization.city, fallback to account.city, then mixedCompany fields
-  clientData.city = org.city || 
-                    org.account?.city || 
-                    mixedCompany?.city || 
-                    mixedCompany?.organization_city || 
-                    '';
+  clientData.city = org.city ||
+    org.account?.city ||
+    mixedCompany?.city ||
+    mixedCompany?.organization_city ||
+    '';
   console.log('Mapped city:', clientData.city);
-  
+
   console.log('org.country:', org.country);
   console.log('org.account?.country:', org.account?.country);
   console.log('mixedCompany?.country:', mixedCompany?.country);
   console.log('mixedCompany?.organization_country:', mixedCompany?.organization_country);
-  
+
   // Country: prefer organization.country, fallback to account.country, then mixedCompany fields
-  clientData.country = org.country || 
-                       org.account?.country || 
-                       mixedCompany?.country || 
-                       mixedCompany?.organization_country || 
-                       '';
+  clientData.country = org.country ||
+    org.account?.country ||
+    mixedCompany?.country ||
+    mixedCompany?.organization_country ||
+    '';
   console.log('Mapped country:', clientData.country);
-  
+
   console.log('org.postal_code:', org.postal_code);
   console.log('org.account?.postal_code:', org.account?.postal_code);
   console.log('mixedCompany?.organization_postal_code:', mixedCompany?.organization_postal_code);
-  
+
   // Postal code: prefer organization.postal_code, fallback to account.postal_code, then mixedCompany fields
-  clientData.zipCode = org.postal_code || 
-                       org.account?.postal_code || 
-                       mixedCompany?.organization_postal_code || 
-                       '';
+  clientData.zipCode = org.postal_code ||
+    org.account?.postal_code ||
+    mixedCompany?.organization_postal_code ||
+    '';
   console.log('Mapped zipCode:', clientData.zipCode);
 
   // Social Media
@@ -515,36 +515,36 @@ function mapOrganizationToClientData(
   // LinkedIn: prefer organization.linkedin_url, fallback to mixedCompany.linkedin_url
   clientData.linkedinUrl = org.linkedin_url || mixedCompany?.linkedin_url || '';
   console.log('Mapped linkedinUrl:', clientData.linkedinUrl);
-  
+
   // Twitter
   clientData.twitterUrl = org.twitter_url || '';
   console.log('Mapped twitterUrl:', clientData.twitterUrl);
-  
+
   // Facebook: prefer organization.facebook_url, fallback to mixedCompany.facebook_url
   clientData.facebookUrl = org.facebook_url || mixedCompany?.facebook_url || '';
   console.log('Mapped facebookUrl:', clientData.facebookUrl);
-  
+
   // Instagram (not in Apollo examples, but keeping for compatibility)
   clientData.instagramUrl = '';
 
   // Phone: proper fallback chain
   console.log('\n--- Mapping Phone ---');
   // Primary phone: organization.primary_phone?.number -> organization.phone -> account.phone -> mixedCompany.phone
-  clientData.phone = org.primary_phone?.number || 
-                     org.phone || 
-                     org.account?.phone || 
-                     mixedCompany?.phone || 
-                     mixedCompany?.primary_phone?.number || 
-                     '';
+  clientData.phone = org.primary_phone?.number ||
+    org.phone ||
+    org.account?.phone ||
+    mixedCompany?.phone ||
+    mixedCompany?.primary_phone?.number ||
+    '';
   console.log('Mapped phone:', clientData.phone);
-  
+
   // Primary phone (sanitized): organization.primary_phone?.sanitized_number -> organization.sanitized_phone -> account.sanitized_phone -> mixedCompany.sanitized_phone
-  clientData.primaryPhone = org.primary_phone?.sanitized_number || 
-                            org.sanitized_phone || 
-                            org.account?.sanitized_phone || 
-                            mixedCompany?.sanitized_phone || 
-                            mixedCompany?.primary_phone?.sanitized_number || 
-                            '';
+  clientData.primaryPhone = org.primary_phone?.sanitized_number ||
+    org.sanitized_phone ||
+    org.account?.sanitized_phone ||
+    mixedCompany?.sanitized_phone ||
+    mixedCompany?.primary_phone?.sanitized_number ||
+    '';
   console.log('Mapped primaryPhone:', clientData.primaryPhone);
 
   // People/Contact Info - Get the first person (usually CEO/Founder)
@@ -553,48 +553,48 @@ function mapOrganizationToClientData(
   if (people.length > 0) {
     const primaryPerson = people[0];
     console.log('Primary Person:', JSON.stringify(primaryPerson, null, 2));
-    
+
     // Contact name
-    clientData.contactName = primaryPerson.name || 
-                            (primaryPerson.first_name || primaryPerson.last_name 
-                              ? `${primaryPerson.first_name || ''} ${primaryPerson.last_name || ''}`.trim() 
-                              : '') || 
-                            '';
+    clientData.contactName = primaryPerson.name ||
+      (primaryPerson.first_name || primaryPerson.last_name
+        ? `${primaryPerson.first_name || ''} ${primaryPerson.last_name || ''}`.trim()
+        : '') ||
+      '';
     console.log('Mapped contactName:', clientData.contactName);
-    
+
     // Job title
     clientData.jobTitle = primaryPerson.title || '';
     console.log('Mapped jobTitle:', clientData.jobTitle);
-    
+
     // Primary email
-    clientData.primaryEmail = primaryPerson.email || 
-                             (primaryPerson.emails && primaryPerson.emails.length > 0 ? primaryPerson.emails[0].email : '') || 
-                             '';
+    clientData.primaryEmail = primaryPerson.email ||
+      (primaryPerson.emails && primaryPerson.emails.length > 0 ? primaryPerson.emails[0].email : '') ||
+      '';
     // Also set email field to primaryEmail
     clientData.email = clientData.primaryEmail;
     console.log('Mapped primaryEmail:', clientData.primaryEmail);
-    
+
     // Alternate email (if available)
     clientData.alternateEmail = (primaryPerson.emails && primaryPerson.emails.length > 1 ? primaryPerson.emails[1].email : '') || '';
     if (clientData.alternateEmail) {
       console.log('Mapped alternateEmail:', clientData.alternateEmail);
     }
-    
+
     // Person phone (only if we don't already have organization phone)
     if (!clientData.primaryPhone && primaryPerson.phone_numbers && primaryPerson.phone_numbers.length > 0) {
-      clientData.primaryPhone = primaryPerson.phone_numbers[0].sanitized_number || 
-                                primaryPerson.phone_numbers[0].raw_number || 
-                                '';
+      clientData.primaryPhone = primaryPerson.phone_numbers[0].sanitized_number ||
+        primaryPerson.phone_numbers[0].raw_number ||
+        '';
       if (clientData.primaryPhone) {
         console.log('Mapped primaryPhone (from person):', clientData.primaryPhone);
       }
     }
-    
+
     // Alternate phone (if available)
     if (primaryPerson.phone_numbers && primaryPerson.phone_numbers.length > 1) {
-      clientData.alternatePhone = primaryPerson.phone_numbers[1].sanitized_number || 
-                                  primaryPerson.phone_numbers[1].raw_number || 
-                                  '';
+      clientData.alternatePhone = primaryPerson.phone_numbers[1].sanitized_number ||
+        primaryPerson.phone_numbers[1].raw_number ||
+        '';
       if (clientData.alternatePhone) {
         console.log('Mapped alternatePhone:', clientData.alternatePhone);
       }
@@ -722,7 +722,7 @@ Deno.serve(async (req) => {
 
     // Get Apollo API key from request, environment, or database
     let apolloApiKey = requestKey || Deno.env.get('APOLLO_API_KEY');
-    
+
     if (!apolloApiKey) {
       // Try to get from database (filtered by user_id)
       const { data: apiKeys } = await supabaseClient
@@ -781,7 +781,7 @@ Deno.serve(async (req) => {
 
     // Step 4: Map Apollo data to client form data
     const enrichedData = mapOrganizationToClientData(organization, mixedCompany, people, newsArticles);
-    
+
     // Explicitly construct response with all required fields to ensure they're always present
     // Use explicit checks to ensure fields exist, defaulting to empty string if undefined/null
     const responseData: EnrichedClientData = {
@@ -813,7 +813,7 @@ Deno.serve(async (req) => {
       technologies: Array.isArray(enrichedData.technologies) ? enrichedData.technologies : [],
       blogs: Array.isArray(enrichedData.blogs) ? enrichedData.blogs : [],
     };
-    
+
     // Debug: Log the enriched data before returning
     console.log('\n=== FINAL ENRICHED DATA BEFORE RESPONSE ===');
     console.log('enrichedData keys:', Object.keys(enrichedData));

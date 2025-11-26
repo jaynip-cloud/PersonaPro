@@ -56,342 +56,322 @@ function analyzeQueryIntent(query: string): QueryIntent {
 
 function buildEnhancedContext(data: any, intent: QueryIntent, mode: string): string {
   const { client, companyProfile, contacts, transcripts, fathomRecordings, opportunities, documentMatches, additionalFathomContext, intelligenceContext } = data;
-  const contextParts = [];
 
-  // If we have intelligence context from the new retrieval agent, use it
-  if (intelligenceContext) {
-    contextParts.push('=== MOST RELEVANT CONTEXT (AI-RANKED) ===\n');
+  if (intelligenceContext.documents && intelligenceContext.documents.length > 0) {
+    contextParts.push('\n--- Document Insights ---');
+    intelligenceContext.documents.forEach((doc: any, i: number) => {
+      contextParts.push(`\n[Document ${i + 1}] ${doc.title || 'Unknown'}`);
+      if (doc.url) contextParts.push(`URL: ${doc.url}`);
+      contextParts.push(`Relevance: ${(doc.similarity_score * 100).toFixed(1)}%`);
+      contextParts.push(doc.text);
+    });
+  }
 
-    if (intelligenceContext.meetings && intelligenceContext.meetings.length > 0) {
-      contextParts.push('\n--- Meeting Insights ---');
-      intelligenceContext.meetings.forEach((meeting: any, i: number) => {
-        const date = meeting.meeting_date ? new Date(meeting.meeting_date).toLocaleDateString('en-US', {
+  if (intelligenceContext.company_kb && intelligenceContext.company_kb.length > 0) {
+    contextParts.push('\n--- Your Company Knowledge ---');
+    intelligenceContext.company_kb.forEach((kb: any, i: number) => {
+      contextParts.push(`\n[Resource ${i + 1}] ${kb.title || 'Unknown'}`);
+      if (kb.url) contextParts.push(`URL: ${kb.url}`);
+      contextParts.push(`Relevance: ${(kb.similarity_score * 100).toFixed(1)}%`);
+      contextParts.push(kb.text);
+    });
+  }
+
+  contextParts.push('\n=== END RELEVANT CONTEXT ===\n');
+}
+
+if (intent.type === 'recommendation' || intent.type === 'analytical') {
+  contextParts.push('=== STRATEGIC CONTEXT ===');
+}
+
+if (companyProfile) {
+  const companySection = [];
+  companySection.push('YOUR COMPANY PROFILE:');
+  companySection.push(`Name: ${companyProfile.company_name || 'N/A'}`);
+  companySection.push(`Industry: ${companyProfile.industry || 'N/A'}`);
+
+  if (companyProfile.value_proposition) {
+    companySection.push(`Value Proposition: ${companyProfile.value_proposition}`);
+  }
+
+  if (companyProfile.services && Array.isArray(companyProfile.services) && companyProfile.services.length > 0) {
+    const services = companyProfile.services.slice(0, 5).map((s: any) =>
+      `  • ${s.name || s.title || s}: ${s.description || ''}`
+    ).join('\n');
+    companySection.push(`\nYour Services:\n${services}`);
+  }
+
+  if (intent.topics.includes('services') && companyProfile.case_studies && Array.isArray(companyProfile.case_studies)) {
+    const caseStudies = companyProfile.case_studies.slice(0, 3).map((cs: any, i: number) =>
+      `  ${i + 1}. ${cs.title || 'Untitled'}\n     ${cs.description || ''}\n     Results: ${cs.results || 'N/A'}`
+    ).join('\n');
+    companySection.push(`\nRelevant Case Studies:\n${caseStudies}`);
+  }
+
+  contextParts.push(companySection.join('\n'));
+}
+
+const clientSection = [];
+clientSection.push('\n=== CLIENT PROFILE ===');
+clientSection.push(`Company: ${client.company || 'N/A'}`);
+clientSection.push(`Industry: ${client.industry || 'N/A'}`);
+clientSection.push(`Status: ${client.status || 'N/A'}`);
+
+if (client.description) {
+  clientSection.push(`About: ${client.description}`);
+}
+
+if (intent.topics.includes('financial') || intent.topics.includes('opportunities')) {
+  if (client.annual_revenue) clientSection.push(`Revenue: ${client.annual_revenue}`);
+  if (client.employee_count) clientSection.push(`Employees: ${client.employee_count}`);
+}
+
+if (client.services && Array.isArray(client.services) && client.services.length > 0) {
+  clientSection.push('\nServices/Products They Use:');
+  client.services.forEach((service: any) => {
+    const name = service.name || '';
+    const desc = service.description || '';
+    if (name) {
+      clientSection.push(`  • ${name}${desc ? `: ${desc}` : ''}`);
+    }
+  });
+}
+
+if (client.technologies && Array.isArray(client.technologies) && client.technologies.length > 0) {
+  clientSection.push('\nTechnology Stack:');
+  client.technologies.forEach((tech: any) => {
+    const name = tech.name || tech;
+    const category = tech.category || '';
+    if (name) {
+      clientSection.push(`  • ${name}${category ? ` (${category})` : ''}`);
+    }
+  });
+}
+
+if (intent.topics.includes('content') || mode === 'deep') {
+  if (client.blogs && Array.isArray(client.blogs) && client.blogs.length > 0) {
+    clientSection.push('\nRecent Blog Posts/Articles:');
+    client.blogs.slice(0, 5).forEach((blog: any) => {
+      const title = blog.title || '';
+      const url = blog.url || '';
+      const date = blog.date || '';
+      if (title) {
+        clientSection.push(`  • ${title}${date ? ` (${date})` : ''}${url ? ` - ${url}` : ''}`);
+      }
+    });
+  }
+}
+
+if (intent.topics.includes('challenges') || intent.type === 'analytical' || intent.type === 'recommendation') {
+  if (client.pain_points && Array.isArray(client.pain_points) && client.pain_points.length > 0) {
+    clientSection.push('\nKnown Pain Points/Challenges:');
+    client.pain_points.forEach((painPoint: string) => {
+      if (painPoint) {
+        clientSection.push(`  • ${painPoint}`);
+      }
+    });
+  }
+}
+
+if (intent.topics.includes('market') || intent.topics.includes('competitors') || mode === 'deep') {
+  if (client.competitors && Array.isArray(client.competitors) && client.competitors.length > 0) {
+    clientSection.push('\nCompetitors/Alternatives They Consider:');
+    client.competitors.forEach((competitor: any) => {
+      const name = competitor.name || competitor;
+      const comparison = competitor.comparison || competitor.description || '';
+      if (name) {
+        clientSection.push(`  • ${name}${comparison ? `: ${comparison}` : ''}`);
+      }
+    });
+  }
+}
+
+if (client.ai_insights) {
+  try {
+    const insights = typeof client.ai_insights === 'string'
+      ? JSON.parse(client.ai_insights)
+      : client.ai_insights;
+
+    if (insights.pain_points || insights.priorities || insights.goals) {
+      clientSection.push('\nKey AI Insights:');
+      if (insights.pain_points) clientSection.push(`  Pain Points: ${Array.isArray(insights.pain_points) ? insights.pain_points.join('; ') : insights.pain_points}`);
+      if (insights.priorities) clientSection.push(`  Priorities: ${Array.isArray(insights.priorities) ? insights.priorities.join('; ') : insights.priorities}`);
+      if (insights.goals) clientSection.push(`  Goals: ${Array.isArray(insights.goals) ? insights.goals.join('; ') : insights.goals}`);
+    }
+  } catch (e) {
+  }
+}
+
+contextParts.push(clientSection.join('\n'));
+
+// Always include contacts section if they exist (not just when explicitly requested)
+if (contacts && contacts.length > 0) {
+  const decisionMakers = contacts.filter((c: any) => c.is_decision_maker);
+  const ceo = contacts.find((c: any) => c.role && (
+    c.role.toLowerCase().includes('ceo') ||
+    c.role.toLowerCase().includes('chief executive')
+  ));
+  const primaryContacts = contacts.filter((c: any) => c.is_primary);
+  const otherContacts = contacts.filter((c: any) => !c.is_decision_maker && !c.is_primary);
+
+  const contactsSection = ['\n=== KEY CONTACTS ==='];
+
+  // Always show CEO if exists
+  if (ceo) {
+    contactsSection.push('Chief Executive Officer (CEO):');
+    contactsSection.push(`  • ${ceo.name} - ${ceo.role}`);
+    contactsSection.push(`    Email: ${ceo.email}${ceo.phone ? ` | Phone: ${ceo.phone}` : ''}`);
+    if (ceo.linkedin_url) contactsSection.push(`    LinkedIn: ${ceo.linkedin_url}`);
+    contactsSection.push('');
+  }
+
+  if (decisionMakers.length > 0) {
+    contactsSection.push('Decision Makers:');
+    decisionMakers.forEach((c: any) => {
+      // Skip if already shown as CEO
+      if (c.id === ceo?.id) return;
+
+      contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
+      contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
+      if (c.influence_level) contactsSection.push(`    Influence: ${c.influence_level}`);
+    });
+    contactsSection.push('');
+  }
+
+  if (primaryContacts.length > 0) {
+    contactsSection.push('Primary Contacts:');
+    primaryContacts.forEach((c: any) => {
+      // Skip if already shown as CEO or decision maker
+      if (c.id === ceo?.id || c.is_decision_maker) return;
+
+      contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
+      contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
+    });
+    contactsSection.push('');
+  }
+
+  // Show other contacts if:
+  // 1. User asked about contacts specifically, OR
+  // 2. Deep mode, OR
+  // 3. There are no CEO/decision makers/primary contacts (so we don't return empty)
+  const shouldShowOthers = intent.topics.includes('contacts') ||
+    mode === 'deep' ||
+    (!ceo && decisionMakers.length === 0 && primaryContacts.length === 0);
+
+  if (shouldShowOthers && otherContacts.length > 0) {
+    contactsSection.push('Contacts:');
+    const contactsToShow = mode === 'deep' ? otherContacts.slice(0, 5) : otherContacts.slice(0, 3);
+    contactsToShow.forEach((c: any) => {
+      contactsSection.push(`  • ${c.name}${c.role ? ` - ${c.role}` : ''}${c.department ? ` (${c.department})` : ''}`);
+      if (c.email) contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
+    });
+  }
+
+  contextParts.push(contactsSection.join('\n'));
+}
+
+if (transcripts && transcripts.length > 0) {
+  const transcriptsSection = ['\n=== MEETING HISTORY (Manual Notes) ==='];
+
+  transcripts.forEach((t: any, i: number) => {
+    const date = new Date(t.meeting_date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+
+    transcriptsSection.push(`\nMeeting ${i + 1}: ${t.title} (${date})`);
+
+    if (t.sentiment) {
+      transcriptsSection.push(`Sentiment: ${t.sentiment}`);
+    }
+
+    if (t.action_items && Array.isArray(t.action_items) && t.action_items.length > 0) {
+      transcriptsSection.push(`Action Items: ${t.action_items.join('; ')}`);
+    }
+
+    const maxLength = mode === 'deep' ? 3000 : (intent.topics.includes('meetings') ? 1200 : 600);
+    const transcript = t.transcript_text || '';
+    transcriptsSection.push(`Content: ${transcript.substring(0, maxLength)}${transcript.length > maxLength ? '...' : ''}`);
+  });
+
+  contextParts.push(transcriptsSection.join('\n'));
+}
+
+if (fathomRecordings && fathomRecordings.length > 0) {
+  const fathomSection = ['\n=== FATHOM RECORDINGS AVAILABLE ==='];
+  fathomSection.push(`Found ${fathomRecordings.length} Fathom-recorded meetings for this client.`);
+  fathomSection.push('Note: Detailed excerpts from these recordings appear in the "RELEVANT MEETING EXCERPTS" section below when semantically relevant to your query.\n');
+
+  fathomRecordings.forEach((recording: any, i: number) => {
+    const date = new Date(recording.start_time).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    const duration = recording.duration ? ` (${Math.round(recording.duration / 60)} min)` : '';
+    fathomSection.push(`${i + 1}. ${recording.title} - ${date}${duration}`);
+  });
+
+  // Add sample excerpts for meeting queries if semantic search didn't find much
+  if (additionalFathomContext && additionalFathomContext.length > 0) {
+    fathomSection.push('\nRecent Discussion Samples:');
+    additionalFathomContext.slice(0, 3).forEach((excerpt: any, i: number) => {
+      fathomSection.push(`\nExcerpt ${i + 1} (${excerpt.speaker_name || 'Unknown'}):`);
+      fathomSection.push(excerpt.chunk_text.substring(0, 500));
+    });
+  }
+
+  contextParts.push(fathomSection.join('\n'));
+}
+
+if (documentMatches && documentMatches.length > 0) {
+  const docMatches = documentMatches.filter((doc: any) =>
+    doc.source_type !== 'meeting_transcript' && doc.source_type !== 'fathom_transcript'
+  );
+  const transcriptMatches = documentMatches.filter((doc: any) =>
+    doc.source_type === 'meeting_transcript' || doc.source_type === 'fathom_transcript'
+  );
+
+  if (docMatches.length > 0) {
+    const docsSection = ['\n=== RELEVANT DOCUMENTS ==='];
+    docMatches.forEach((doc: any, i: number) => {
+      docsSection.push(`\n[Document ${i + 1}] ${doc.document_name} (${(doc.similarity * 100).toFixed(1)}% relevant)`);
+      docsSection.push(doc.content_chunk);
+    });
+    contextParts.push(docsSection.join('\n'));
+  }
+
+  if (transcriptMatches.length > 0) {
+    const transcriptSection = ['\n=== RELEVANT MEETING EXCERPTS ==='];
+    transcriptMatches.forEach((doc: any, i: number) => {
+      const meetingDate = doc.metadata?.meeting_date
+        ? new Date(doc.metadata.meeting_date).toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
           year: 'numeric'
-        }) : '';
-        contextParts.push(`\n[Meeting ${i + 1}] ${meeting.recording_title || 'Unknown'}${date ? ` (${date})` : ''}`);
-        if (meeting.speaker_name) contextParts.push(`Speaker: ${meeting.speaker_name}`);
-        contextParts.push(`Relevance: ${(meeting.similarity_score * 100).toFixed(1)}%`);
-        contextParts.push(meeting.text);
-      });
-    }
-
-    if (intelligenceContext.documents && intelligenceContext.documents.length > 0) {
-      contextParts.push('\n--- Document Insights ---');
-      intelligenceContext.documents.forEach((doc: any, i: number) => {
-        contextParts.push(`\n[Document ${i + 1}] ${doc.title || 'Unknown'}`);
-        if (doc.url) contextParts.push(`URL: ${doc.url}`);
-        contextParts.push(`Relevance: ${(doc.similarity_score * 100).toFixed(1)}%`);
-        contextParts.push(doc.text);
-      });
-    }
-
-    if (intelligenceContext.company_kb && intelligenceContext.company_kb.length > 0) {
-      contextParts.push('\n--- Your Company Knowledge ---');
-      intelligenceContext.company_kb.forEach((kb: any, i: number) => {
-        contextParts.push(`\n[Resource ${i + 1}] ${kb.title || 'Unknown'}`);
-        if (kb.url) contextParts.push(`URL: ${kb.url}`);
-        contextParts.push(`Relevance: ${(kb.similarity_score * 100).toFixed(1)}%`);
-        contextParts.push(kb.text);
-      });
-    }
-
-    contextParts.push('\n=== END RELEVANT CONTEXT ===\n');
-  }
-
-  if (intent.type === 'recommendation' || intent.type === 'analytical') {
-    contextParts.push('=== STRATEGIC CONTEXT ===');
-  }
-
-  if (companyProfile) {
-    const companySection = [];
-    companySection.push('YOUR COMPANY PROFILE:');
-    companySection.push(`Name: ${companyProfile.company_name || 'N/A'}`);
-    companySection.push(`Industry: ${companyProfile.industry || 'N/A'}`);
-
-    if (companyProfile.value_proposition) {
-      companySection.push(`Value Proposition: ${companyProfile.value_proposition}`);
-    }
-
-    if (companyProfile.services && Array.isArray(companyProfile.services) && companyProfile.services.length > 0) {
-      const services = companyProfile.services.slice(0, 5).map((s: any) =>
-        `  • ${s.name || s.title || s}: ${s.description || ''}`
-      ).join('\n');
-      companySection.push(`\nYour Services:\n${services}`);
-    }
-
-    if (intent.topics.includes('services') && companyProfile.case_studies && Array.isArray(companyProfile.case_studies)) {
-      const caseStudies = companyProfile.case_studies.slice(0, 3).map((cs: any, i: number) =>
-        `  ${i + 1}. ${cs.title || 'Untitled'}\n     ${cs.description || ''}\n     Results: ${cs.results || 'N/A'}`
-      ).join('\n');
-      companySection.push(`\nRelevant Case Studies:\n${caseStudies}`);
-    }
-
-    contextParts.push(companySection.join('\n'));
-  }
-
-  const clientSection = [];
-  clientSection.push('\n=== CLIENT PROFILE ===');
-  clientSection.push(`Company: ${client.company || 'N/A'}`);
-  clientSection.push(`Industry: ${client.industry || 'N/A'}`);
-  clientSection.push(`Status: ${client.status || 'N/A'}`);
-
-  if (client.description) {
-    clientSection.push(`About: ${client.description}`);
-  }
-
-  if (intent.topics.includes('financial') || intent.topics.includes('opportunities')) {
-    if (client.annual_revenue) clientSection.push(`Revenue: ${client.annual_revenue}`);
-    if (client.employee_count) clientSection.push(`Employees: ${client.employee_count}`);
-  }
-
-  if (client.services && Array.isArray(client.services) && client.services.length > 0) {
-    clientSection.push('\nServices/Products They Use:');
-    client.services.forEach((service: any) => {
-      const name = service.name || '';
-      const desc = service.description || '';
-      if (name) {
-        clientSection.push(`  • ${name}${desc ? `: ${desc}` : ''}`);
-      }
+        })
+        : '';
+      const speaker = doc.metadata?.speaker_name ? ` - ${doc.metadata.speaker_name}` : '';
+      transcriptSection.push(`\n[Excerpt ${i + 1}] From: ${doc.document_name}${meetingDate ? ` (${meetingDate})` : ''}${speaker} (${(doc.similarity * 100).toFixed(1)}% relevant)`);
+      transcriptSection.push(doc.content_chunk);
     });
+    contextParts.push(transcriptSection.join('\n'));
   }
+}
 
-  if (client.technologies && Array.isArray(client.technologies) && client.technologies.length > 0) {
-    clientSection.push('\nTechnology Stack:');
-    client.technologies.forEach((tech: any) => {
-      const name = tech.name || tech;
-      const category = tech.category || '';
-      if (name) {
-        clientSection.push(`  • ${name}${category ? ` (${category})` : ''}`);
-      }
-    });
-  }
+if (opportunities && opportunities.length > 0 && (intent.topics.includes('opportunities') || intent.type === 'recommendation')) {
+  const oppsSection = ['\n=== IDENTIFIED OPPORTUNITIES ==='];
+  opportunities.slice(0, 5).forEach((opp: any, i: number) => {
+    oppsSection.push(`\n${i + 1}. ${opp.title}`);
+    oppsSection.push(`   Status: ${opp.status || 'N/A'}`);
+    oppsSection.push(`   ${opp.description}`);
+    if (opp.estimated_value) oppsSection.push(`   Est. Value: ${opp.estimated_value}`);
+  });
+  contextParts.push(oppsSection.join('\n'));
+}
 
-  if (intent.topics.includes('content') || mode === 'deep') {
-    if (client.blogs && Array.isArray(client.blogs) && client.blogs.length > 0) {
-      clientSection.push('\nRecent Blog Posts/Articles:');
-      client.blogs.slice(0, 5).forEach((blog: any) => {
-        const title = blog.title || '';
-        const url = blog.url || '';
-        const date = blog.date || '';
-        if (title) {
-          clientSection.push(`  • ${title}${date ? ` (${date})` : ''}${url ? ` - ${url}` : ''}`);
-        }
-      });
-    }
-  }
-
-  if (intent.topics.includes('challenges') || intent.type === 'analytical' || intent.type === 'recommendation') {
-    if (client.pain_points && Array.isArray(client.pain_points) && client.pain_points.length > 0) {
-      clientSection.push('\nKnown Pain Points/Challenges:');
-      client.pain_points.forEach((painPoint: string) => {
-        if (painPoint) {
-          clientSection.push(`  • ${painPoint}`);
-        }
-      });
-    }
-  }
-
-  if (intent.topics.includes('market') || intent.topics.includes('competitors') || mode === 'deep') {
-    if (client.competitors && Array.isArray(client.competitors) && client.competitors.length > 0) {
-      clientSection.push('\nCompetitors/Alternatives They Consider:');
-      client.competitors.forEach((competitor: any) => {
-        const name = competitor.name || competitor;
-        const comparison = competitor.comparison || competitor.description || '';
-        if (name) {
-          clientSection.push(`  • ${name}${comparison ? `: ${comparison}` : ''}`);
-        }
-      });
-    }
-  }
-
-  if (client.ai_insights) {
-    try {
-      const insights = typeof client.ai_insights === 'string'
-        ? JSON.parse(client.ai_insights)
-        : client.ai_insights;
-
-      if (insights.pain_points || insights.priorities || insights.goals) {
-        clientSection.push('\nKey AI Insights:');
-        if (insights.pain_points) clientSection.push(`  Pain Points: ${Array.isArray(insights.pain_points) ? insights.pain_points.join('; ') : insights.pain_points}`);
-        if (insights.priorities) clientSection.push(`  Priorities: ${Array.isArray(insights.priorities) ? insights.priorities.join('; ') : insights.priorities}`);
-        if (insights.goals) clientSection.push(`  Goals: ${Array.isArray(insights.goals) ? insights.goals.join('; ') : insights.goals}`);
-      }
-    } catch (e) {
-    }
-  }
-
-  contextParts.push(clientSection.join('\n'));
-
-  // Always include contacts section if they exist (not just when explicitly requested)
-  if (contacts && contacts.length > 0) {
-    const decisionMakers = contacts.filter((c: any) => c.is_decision_maker);
-    const ceo = contacts.find((c: any) => c.role && (
-      c.role.toLowerCase().includes('ceo') ||
-      c.role.toLowerCase().includes('chief executive')
-    ));
-    const primaryContacts = contacts.filter((c: any) => c.is_primary);
-    const otherContacts = contacts.filter((c: any) => !c.is_decision_maker && !c.is_primary);
-
-    const contactsSection = ['\n=== KEY CONTACTS ==='];
-
-    // Always show CEO if exists
-    if (ceo) {
-      contactsSection.push('Chief Executive Officer (CEO):');
-      contactsSection.push(`  • ${ceo.name} - ${ceo.role}`);
-      contactsSection.push(`    Email: ${ceo.email}${ceo.phone ? ` | Phone: ${ceo.phone}` : ''}`);
-      if (ceo.linkedin_url) contactsSection.push(`    LinkedIn: ${ceo.linkedin_url}`);
-      contactsSection.push('');
-    }
-
-    if (decisionMakers.length > 0) {
-      contactsSection.push('Decision Makers:');
-      decisionMakers.forEach((c: any) => {
-        // Skip if already shown as CEO
-        if (c.id === ceo?.id) return;
-
-        contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
-        contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
-        if (c.influence_level) contactsSection.push(`    Influence: ${c.influence_level}`);
-      });
-      contactsSection.push('');
-    }
-
-    if (primaryContacts.length > 0) {
-      contactsSection.push('Primary Contacts:');
-      primaryContacts.forEach((c: any) => {
-        // Skip if already shown as CEO or decision maker
-        if (c.id === ceo?.id || c.is_decision_maker) return;
-
-        contactsSection.push(`  • ${c.name} - ${c.role}${c.department ? ` (${c.department})` : ''}`);
-        contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
-      });
-      contactsSection.push('');
-    }
-
-    // Show other contacts if:
-    // 1. User asked about contacts specifically, OR
-    // 2. Deep mode, OR
-    // 3. There are no CEO/decision makers/primary contacts (so we don't return empty)
-    const shouldShowOthers = intent.topics.includes('contacts') ||
-                             mode === 'deep' ||
-                             (!ceo && decisionMakers.length === 0 && primaryContacts.length === 0);
-
-    if (shouldShowOthers && otherContacts.length > 0) {
-      contactsSection.push('Contacts:');
-      const contactsToShow = mode === 'deep' ? otherContacts.slice(0, 5) : otherContacts.slice(0, 3);
-      contactsToShow.forEach((c: any) => {
-        contactsSection.push(`  • ${c.name}${c.role ? ` - ${c.role}` : ''}${c.department ? ` (${c.department})` : ''}`);
-        if (c.email) contactsSection.push(`    Email: ${c.email}${c.phone ? ` | Phone: ${c.phone}` : ''}`);
-      });
-    }
-
-    contextParts.push(contactsSection.join('\n'));
-  }
-
-  if (transcripts && transcripts.length > 0) {
-    const transcriptsSection = ['\n=== MEETING HISTORY (Manual Notes) ==='];
-
-    transcripts.forEach((t: any, i: number) => {
-      const date = new Date(t.meeting_date).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-
-      transcriptsSection.push(`\nMeeting ${i + 1}: ${t.title} (${date})`);
-
-      if (t.sentiment) {
-        transcriptsSection.push(`Sentiment: ${t.sentiment}`);
-      }
-
-      if (t.action_items && Array.isArray(t.action_items) && t.action_items.length > 0) {
-        transcriptsSection.push(`Action Items: ${t.action_items.join('; ')}`);
-      }
-
-      const maxLength = mode === 'deep' ? 3000 : (intent.topics.includes('meetings') ? 1200 : 600);
-      const transcript = t.transcript_text || '';
-      transcriptsSection.push(`Content: ${transcript.substring(0, maxLength)}${transcript.length > maxLength ? '...' : ''}`);
-    });
-
-    contextParts.push(transcriptsSection.join('\n'));
-  }
-
-  if (fathomRecordings && fathomRecordings.length > 0) {
-    const fathomSection = ['\n=== FATHOM RECORDINGS AVAILABLE ==='];
-    fathomSection.push(`Found ${fathomRecordings.length} Fathom-recorded meetings for this client.`);
-    fathomSection.push('Note: Detailed excerpts from these recordings appear in the "RELEVANT MEETING EXCERPTS" section below when semantically relevant to your query.\n');
-
-    fathomRecordings.forEach((recording: any, i: number) => {
-      const date = new Date(recording.start_time).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-      const duration = recording.duration ? ` (${Math.round(recording.duration / 60)} min)` : '';
-      fathomSection.push(`${i + 1}. ${recording.title} - ${date}${duration}`);
-    });
-
-    // Add sample excerpts for meeting queries if semantic search didn't find much
-    if (additionalFathomContext && additionalFathomContext.length > 0) {
-      fathomSection.push('\nRecent Discussion Samples:');
-      additionalFathomContext.slice(0, 3).forEach((excerpt: any, i: number) => {
-        fathomSection.push(`\nExcerpt ${i + 1} (${excerpt.speaker_name || 'Unknown'}):`);
-        fathomSection.push(excerpt.chunk_text.substring(0, 500));
-      });
-    }
-
-    contextParts.push(fathomSection.join('\n'));
-  }
-
-  if (documentMatches && documentMatches.length > 0) {
-    const docMatches = documentMatches.filter((doc: any) =>
-      doc.source_type !== 'meeting_transcript' && doc.source_type !== 'fathom_transcript'
-    );
-    const transcriptMatches = documentMatches.filter((doc: any) =>
-      doc.source_type === 'meeting_transcript' || doc.source_type === 'fathom_transcript'
-    );
-
-    if (docMatches.length > 0) {
-      const docsSection = ['\n=== RELEVANT DOCUMENTS ==='];
-      docMatches.forEach((doc: any, i: number) => {
-        docsSection.push(`\n[Document ${i + 1}] ${doc.document_name} (${(doc.similarity * 100).toFixed(1)}% relevant)`);
-        docsSection.push(doc.content_chunk);
-      });
-      contextParts.push(docsSection.join('\n'));
-    }
-
-    if (transcriptMatches.length > 0) {
-      const transcriptSection = ['\n=== RELEVANT MEETING EXCERPTS ==='];
-      transcriptMatches.forEach((doc: any, i: number) => {
-        const meetingDate = doc.metadata?.meeting_date
-          ? new Date(doc.metadata.meeting_date).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric'
-            })
-          : '';
-        const speaker = doc.metadata?.speaker_name ? ` - ${doc.metadata.speaker_name}` : '';
-        transcriptSection.push(`\n[Excerpt ${i + 1}] From: ${doc.document_name}${meetingDate ? ` (${meetingDate})` : ''}${speaker} (${(doc.similarity * 100).toFixed(1)}% relevant)`);
-        transcriptSection.push(doc.content_chunk);
-      });
-      contextParts.push(transcriptSection.join('\n'));
-    }
-  }
-
-  if (opportunities && opportunities.length > 0 && (intent.topics.includes('opportunities') || intent.type === 'recommendation')) {
-    const oppsSection = ['\n=== IDENTIFIED OPPORTUNITIES ==='];
-    opportunities.slice(0, 5).forEach((opp: any, i: number) => {
-      oppsSection.push(`\n${i + 1}. ${opp.title}`);
-      oppsSection.push(`   Status: ${opp.status || 'N/A'}`);
-      oppsSection.push(`   ${opp.description}`);
-      if (opp.estimated_value) oppsSection.push(`   Est. Value: ${opp.estimated_value}`);
-    });
-    contextParts.push(oppsSection.join('\n'));
-  }
-
-  return contextParts.join('\n\n');
+return contextParts.join('\n\n');
 }
 
 function buildEnhancedPrompt(intent: QueryIntent, mode: string): string {
@@ -551,9 +531,17 @@ Deno.serve(async (req: Request) => {
     if (retrievalResponse.ok) {
       const retrievalData = await retrievalResponse.json();
       intelligenceContext = retrievalData.context;
-      console.log('Intelligence context retrieved:', retrievalData.metadata);
+      console.log('Intelligence context retrieved:', JSON.stringify({
+        metadata: retrievalData.metadata,
+        summariesCount: intelligenceContext?.summaries?.length || 0,
+        meetingsCount: intelligenceContext?.meetings?.length || 0,
+        documentsCount: intelligenceContext?.documents?.length || 0,
+        companyKbCount: intelligenceContext?.company_kb?.length || 0,
+      }, null, 2));
     } else {
-      console.warn('Intelligence retrieval failed, falling back to legacy search');
+      const errorText = await retrievalResponse.text();
+      console.error('Intelligence retrieval failed:', retrievalResponse.status, errorText);
+      console.warn('Falling back to legacy search');
     }
 
     // Step 2: Fetch structured data
@@ -884,8 +872,8 @@ Deno.serve(async (req: Request) => {
               name: title,
               similarity: kb.similarity_score,
               type: kb.source_type === 'service' ? 'Service' :
-                    kb.source_type === 'case_study' ? 'Case Study' :
-                    kb.source_type === 'technology' ? 'Technology' :
+                kb.source_type === 'case_study' ? 'Case Study' :
+                  kb.source_type === 'technology' ? 'Technology' :
                     kb.source_type === 'blog' ? 'Blog Post' : 'Company Knowledge',
               url: kb.url,
             });

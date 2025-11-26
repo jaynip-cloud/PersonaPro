@@ -2,19 +2,17 @@ import React, { useState } from 'react';
 import { Avatar } from '../ui/Avatar';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { MapPin, Calendar, RefreshCw, ChevronDown, MoreVertical, Edit, Trash2, Phone, Mail } from 'lucide-react';
+import { MapPin, Calendar, ChevronDown, MoreVertical, Edit, Trash2, Phone, Mail } from 'lucide-react';
 import { Client } from '../../types';
 import { useNavigate } from 'react-router-dom';
 
 interface ClientHeaderProps {
   client: Client;
-  onRefreshData: () => void;
-  isRefreshing: boolean;
   onEditClient?: () => void;
   onDeleteClient?: () => void;
 }
 
-export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshData, isRefreshing, onEditClient, onDeleteClient }) => {
+export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onEditClient, onDeleteClient }) => {
   const navigate = useNavigate();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showCsmMenu, setShowCsmMenu] = useState(false);
@@ -83,16 +81,6 @@ export const ClientHeader: React.FC<ClientHeaderProps> = ({ client, onRefreshDat
           </div>
 
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onRefreshData}
-              disabled={isRefreshing}
-              title="Refresh Data"
-            >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
-
             <div className="relative">
               <Button
                 variant="ghost"

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { Sparkles, Loader2, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Target, Users, Brain, BarChart3, Lightbulb, Calendar, ArrowRight, RefreshCw, Globe, FileText, MessageSquare, Briefcase, ChevronDown, ChevronUp, DollarSign, Zap } from 'lucide-react';
+import { Sparkles, Loader2, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Target, Users, Brain, BarChart3, Lightbulb, Calendar, ArrowRight, RefreshCw, Globe, FileText, MessageSquare, Briefcase, ChevronDown, ChevronUp, DollarSign, Zap, Database } from 'lucide-react';
 
 interface AIInsightsOverviewProps {
   clientId: string;
@@ -105,12 +105,12 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
 
   const timeAgo = insightsGeneratedAt
     ? new Date(insightsGeneratedAt).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
     : 'Unknown';
 
   return (
@@ -139,6 +139,33 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
             </div>
           </div>
         </CardHeader>
+        {insights.dataSourcesAnalysis && (
+          <div className="px-6 pb-4">
+            <div className="p-3 bg-muted/50 rounded-lg border border-border space-y-2">
+              <p className="text-xs font-medium flex items-center gap-2">
+                <Database className="h-3 w-3" />
+                Data Sources Usage Analysis
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-muted-foreground">
+                {insights.dataSourcesAnalysis.pineconeUsage && (
+                  <div>
+                    <span className="font-semibold text-foreground">Vector Search:</span> {insights.dataSourcesAnalysis.pineconeUsage}
+                  </div>
+                )}
+                {insights.dataSourcesAnalysis.webSearchUsage && (
+                  <div>
+                    <span className="font-semibold text-foreground">Market Intel:</span> {insights.dataSourcesAnalysis.webSearchUsage}
+                  </div>
+                )}
+                {insights.dataSourcesAnalysis.databaseUsage && (
+                  <div>
+                    <span className="font-semibold text-foreground">Database:</span> {insights.dataSourcesAnalysis.databaseUsage}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {dataGathered && (
           <div className="px-6 pb-4">
             <button
@@ -200,10 +227,10 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
                       <p className="text-xs font-medium">Market Intel</p>
                       <p className="text-xs text-muted-foreground">
                         {dataGathered.marketIntelligence ? 'Available' :
-                         dataGathered.marketIntelligenceStatus === 'no_api_key' ? 'No API Key' :
-                         dataGathered.marketIntelligenceStatus === 'api_error' ? 'API Error' :
-                         dataGathered.marketIntelligenceStatus === 'fetch_error' ? 'Fetch Error' :
-                         'N/A'}
+                          dataGathered.marketIntelligenceStatus === 'no_api_key' ? 'No API Key' :
+                            dataGathered.marketIntelligenceStatus === 'api_error' ? 'API Error' :
+                              dataGathered.marketIntelligenceStatus === 'fetch_error' ? 'Fetch Error' :
+                                'N/A'}
                       </p>
                     </div>
                   </div>
@@ -257,7 +284,13 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
           <div className="space-y-4">
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-900 font-medium mb-1">Executive Summary</p>
-              <p className="text-sm text-blue-800">{insights.executiveSummary}</p>
+              <p className="text-sm text-blue-800 mb-2">{insights.executiveSummary}</p>
+              {insights.executiveSummaryReasoning && (
+                <div className="mt-2 pt-2 border-t border-blue-200">
+                  <p className="text-xs font-medium text-blue-900 mb-1">Analysis Reasoning</p>
+                  <p className="text-xs text-blue-800 italic">{insights.executiveSummaryReasoning}</p>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -333,6 +366,12 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
                 <span className="text-sm font-semibold">{insights.behavioralAnalysis?.reliabilityScore}/100</span>
               </div>
             </div>
+            {insights.behavioralAnalysis?.evidence && (
+              <div className="pt-2 border-t border-border">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Key Evidence</p>
+                <p className="text-xs italic text-muted-foreground">{insights.behavioralAnalysis.evidence}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -496,6 +535,13 @@ export const AIInsightsOverview: React.FC<AIInsightsOverviewProps> = ({
               </div>
             ))}
           </CardContent>
+          {insights.kpiReasoning && (
+            <div className="px-6 pb-4">
+              <div className="p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground">
+                <span className="font-medium">Calculation Logic:</span> {insights.kpiReasoning}
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card>

@@ -149,7 +149,7 @@ Deno.serve(async (req: Request) => {
 
     const allChunks: ContextChunk[] = [];
 
-    // Query meetings namespace
+    // Query meetings namespace (transcripts)
     if (source_filters.length === 0 || source_filters.includes('fathom_transcript')) {
       console.log(`Querying meetings namespace (top_k=${topKMeetings})...`);
       const meetingsFilter: any = {
@@ -167,6 +167,26 @@ Deno.serve(async (req: Request) => {
         'meetings'
       );
       allChunks.push(...meetingsResults);
+    }
+
+    // Query meeting summaries namespace
+    if (source_filters.length === 0 || source_filters.includes('fathom_summary')) {
+      console.log(`Querying summaries namespace (top_k=5)...`);
+      const summariesFilter: any = {
+        user_id: { $eq: user.id },
+        client_id: { $eq: client_id },
+        source_type: { $eq: 'fathom_summary' }
+      };
+
+      const summariesResults = await queryPinecone(
+        pineconeUrl,
+        pineconeKey,
+        queryEmbedding,
+        5, // Top 5 summaries for overview
+        summariesFilter,
+        'summaries'
+      );
+      allChunks.push(...summariesResults);
     }
 
     // Query documents namespace
@@ -233,6 +253,7 @@ Deno.serve(async (req: Request) => {
           total_chunks_retrieved: allChunks.length,
           top_chunks_selected: top20Chunks.length,
           breakdown: {
+            summaries: contextBundle.summaries.length,
             meetings: contextBundle.meetings.length,
             documents: contextBundle.documents.length,
             company_kb: contextBundle.company_kb.length
@@ -336,13 +357,22 @@ function reRankChunks(chunks: ContextChunk[], query: string): ContextChunk[] {
   const isBehaviorQuery = /\b(how|why|sentiment|feeling|think|opinion|behavior|attitude)\b/i.test(query);
   const isFactQuery = /\b(what|when|where|which|fact|data|number|case study|example)\b/i.test(query);
   const isCapabilityQuery = /\b(can you|do you|service|offering|capability|technology|solution)\b/i.test(query);
+  const isOverviewQuery = /\b(summarize|overview|summary|general|overall|relationship|history)\b/i.test(query);
+  const isSpecificQuery = /\b(specific|detail|exactly|precisely|mentioned|said|discussed)\b/i.test(query);
 
   return chunks.map(chunk => {
     let score = chunk.similarity_score * 0.7;
     score += chunk.recency_score * 0.15;
 
     // Apply source priority based on query type
-    if (isBehaviorQuery && chunk.source_type === 'fathom_transcript') {
+    if (isOverviewQuery && chunk.source_type === 'fathom_summary') {
+      // Boost summaries for overview questions
+      score += 0.20;
+    } else if (isSpecificQuery && chunk.source_type === 'fathom_transcript') {
+      // Boost transcripts for specific detail questions
+      score += 0.20;
+    } else if (isBehaviorQuery && (chunk.source_type === 'fathom_transcript' || chunk.source_type === 'fathom_summary')) {
+      // Boost both for behavior questions
       score += 0.15;
     } else if (isFactQuery && chunk.source_type === 'document') {
       score += 0.15;
@@ -359,6 +389,7 @@ function reRankChunks(chunks: ContextChunk[], query: string): ContextChunk[] {
 
 function structureContextBundle(chunks: ContextChunk[]) {
   const meetings: any[] = [];
+  const summaries: any[] = [];
   const documents: any[] = [];
   const company_kb: any[] = [];
 
@@ -371,7 +402,15 @@ function structureContextBundle(chunks: ContextChunk[]) {
       source_type: chunk.source_type,
     };
 
-    if (chunk.source_type === 'fathom_transcript') {
+    if (chunk.source_type === 'fathom_summary') {
+      summaries.push({
+        ...item,
+        recording_id: chunk.metadata.recording_id,
+        recording_title: chunk.metadata.recording_title,
+        meeting_date: chunk.metadata.meeting_date,
+        is_summary: chunk.metadata.is_summary,
+      });
+    } else if (chunk.source_type === 'fathom_transcript') {
       meetings.push({
         ...item,
         recording_id: chunk.metadata.recording_id,
@@ -404,6 +443,7 @@ function structureContextBundle(chunks: ContextChunk[]) {
   }
 
   return {
+    summaries,
     meetings,
     documents,
     company_kb,

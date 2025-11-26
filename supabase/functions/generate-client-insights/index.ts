@@ -10,6 +10,12 @@ interface ClientInsightsRequest {
   clientId: string;
 }
 
+interface PineconeMatch {
+  id: string;
+  score: number;
+  metadata: any;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -38,9 +44,10 @@ Deno.serve(async (req: Request) => {
       throw new Error('clientId is required');
     }
 
+    // Fetch API keys including Pinecone
     const { data: apiKeys, error: keysError } = await supabase
       .from('api_keys')
-      .select('openai_api_key, perplexity_api_key')
+      .select('openai_api_key, perplexity_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
       .eq('user_id', user.id)
       .maybeSingle();
 
@@ -50,6 +57,9 @@ Deno.serve(async (req: Request) => {
 
     const openaiKey = apiKeys?.openai_api_key || Deno.env.get('OPENAI_API_KEY');
     const perplexityKey = apiKeys?.perplexity_api_key || Deno.env.get('PERPLEXITY_API_KEY');
+    const pineconeKey = apiKeys?.pinecone_api_key;
+    let pineconeEnvironment = apiKeys?.pinecone_environment;
+    let pineconeIndexName = apiKeys?.pinecone_index_name;
 
     if (!openaiKey) {
       throw new Error('OpenAI API key is not configured. Please add your API key in Settings.');
@@ -57,6 +67,7 @@ Deno.serve(async (req: Request) => {
 
     console.log(`Gathering comprehensive data for client: ${clientId}`);
 
+    // 1. Fetch Core Supabase Data
     const { data: client, error: clientError } = await supabase
       .from('clients')
       .select('*')
@@ -74,14 +85,6 @@ Deno.serve(async (req: Request) => {
       .eq('client_id', clientId)
       .eq('user_id', user.id);
 
-    const { data: meetings } = await supabase
-      .from('meeting_transcripts')
-      .select('*')
-      .eq('client_id', clientId)
-      .eq('user_id', user.id)
-      .order('meeting_date', { ascending: false })
-      .limit(10);
-
     const { data: projects } = await supabase
       .from('projects')
       .select('*')
@@ -97,59 +100,103 @@ Deno.serve(async (req: Request) => {
       .order('created_at', { ascending: false })
       .limit(5);
 
-    // Fetch Fathom recordings with recent context
-    const { data: fathomRecordings } = await supabase
-      .rpc('get_recent_fathom_context', {
-        match_client_id: clientId,
-        days_back: 90,
-        limit_count: 10
-      });
+    // 2. Fetch Pinecone Data (Vector Search)
+    let pineconeContext = '';
+    let pineconeChunksCount = 0;
 
-    console.log(`Found ${fathomRecordings?.length || 0} Fathom recordings for client`);
+    if (pineconeKey) {
+      try {
+        console.log('Querying Pinecone for semantic context...');
 
-    let documentsList: any[] = [];
-    try {
-      const { data: documents } = await supabase.storage
-        .from('client-documents')
-        .list(`${user.id}/${clientId}`);
+        // Construct Pinecone URL
+        let pineconeUrl = '';
+        if (pineconeIndexName && pineconeIndexName.startsWith('https://')) {
+          pineconeUrl = pineconeIndexName;
+        } else if (pineconeEnvironment && pineconeEnvironment.startsWith('https://')) {
+          pineconeUrl = pineconeEnvironment;
+        } else if (pineconeIndexName && pineconeEnvironment) {
+          pineconeUrl = `https://${pineconeIndexName}-${pineconeEnvironment}.svc.${pineconeEnvironment}.pinecone.io`;
+        }
 
-      if (documents) {
-        documentsList = documents.map(doc => ({
-          name: doc.name,
-          size: doc.metadata?.size,
-          type: doc.metadata?.mimetype,
-        }));
+        if (pineconeUrl) {
+          // Generate embedding for broad context
+          const query = `Comprehensive history, key decisions, sentiment, and important details for client ${client.name}`;
+          const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'text-embedding-3-small',
+              input: query,
+              dimensions: 512,
+            }),
+          });
+
+          if (embeddingResponse.ok) {
+            const embeddingData = await embeddingResponse.json();
+            const queryEmbedding = embeddingData.data[0].embedding;
+
+            // Query meetings and documents
+            const meetingsFilter = {
+              user_id: { $eq: user.id },
+              client_id: { $eq: clientId },
+              source_type: { $eq: 'fathom_transcript' }
+            };
+
+            const documentsFilter = {
+              user_id: { $eq: user.id },
+              client_id: { $eq: clientId },
+              source_type: { $eq: 'document' }
+            };
+
+            const [meetingChunks, documentChunks] = await Promise.all([
+              queryPinecone(pineconeUrl, pineconeKey, queryEmbedding, 15, meetingsFilter, 'meetings'),
+              queryPinecone(pineconeUrl, pineconeKey, queryEmbedding, 10, documentsFilter, 'documents')
+            ]);
+
+            const allChunks = [...meetingChunks, ...documentChunks]
+              .sort((a, b) => b.score - a.score) // Sort by similarity
+              .slice(0, 20); // Take top 20 most relevant chunks
+
+            pineconeChunksCount = allChunks.length;
+
+            if (allChunks.length > 0) {
+              pineconeContext = `
+# SEMANTIC SEARCH RESULTS (From Meeting Transcripts & Documents)
+${allChunks.map(chunk => `
+## Source: ${chunk.metadata.source_type} - ${chunk.metadata.recording_title || chunk.metadata.title || 'Untitled'} (${chunk.metadata.meeting_date || chunk.metadata.created_at || 'Unknown Date'})
+"${chunk.metadata.text}"
+`).join('\n')}
+`;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error querying Pinecone:', e);
       }
-    } catch (e) {
-      console.log('No documents found for client');
     }
 
+    // 3. Web Search (Market Intelligence)
     console.log('Data gathered. Performing web search for market intelligence...');
-    console.log(`Perplexity API key configured: ${!!perplexityKey}`);
-    console.log(`Client name: ${client.name}`);
-
     let marketIntelligence = '';
     let marketIntelligenceStatus = 'not_attempted';
     let marketIntelligenceError = '';
 
     if (!perplexityKey) {
-      console.log('Perplexity API key not configured - skipping market intelligence');
       marketIntelligenceStatus = 'no_api_key';
     } else if (!client.name) {
-      console.log('Client name missing - skipping market intelligence');
       marketIntelligenceStatus = 'no_client_name';
     } else {
       try {
-        console.log(`Performing web search for: ${client.name}`);
         const searchQuery = `Research ${client.name} in the ${client.industry || 'business'} industry. Provide:
 1. Recent news, press releases, and announcements (last 6 months)
 2. Market position and competitive landscape
 3. Growth trajectory and funding information
 4. Industry trends affecting this company
 5. Public sentiment and reputation
-6. Notable partnerships, acquisitions, or strategic moves
-7. Key challenges and opportunities in their market
-8. Financial performance indicators if publicly available
+6. Key challenges and opportunities in their market
 
 Focus on factual, recent information from reliable sources.`;
 
@@ -173,48 +220,27 @@ Focus on factual, recent information from reliable sources.`;
             ],
             temperature: 0.2,
             max_tokens: 2000,
-            return_citations: false,
-            return_related_questions: false
           })
         });
 
-        console.log(`Perplexity API response status: ${perplexityResponse.status}`);
-
         if (perplexityResponse.ok) {
           const perplexityData = await perplexityResponse.json();
-          console.log('Perplexity response structure:', JSON.stringify(perplexityData).substring(0, 200));
           marketIntelligence = perplexityData.choices?.[0]?.message?.content || '';
-          if (marketIntelligence) {
-            marketIntelligenceStatus = 'success';
-            console.log(`Market intelligence retrieved: ${marketIntelligence.length} characters`);
-          } else {
-            marketIntelligenceStatus = 'empty_response';
-            console.log('Perplexity returned empty response');
-            console.log('Full response:', JSON.stringify(perplexityData));
-          }
+          marketIntelligenceStatus = marketIntelligence ? 'success' : 'empty_response';
         } else {
           const errorText = await perplexityResponse.text();
           console.error(`Perplexity API error: ${perplexityResponse.status} - ${errorText}`);
           marketIntelligenceStatus = 'api_error';
           marketIntelligenceError = errorText;
-
-          try {
-            const errorJson = JSON.parse(errorText);
-            if (errorJson.error) {
-              marketIntelligenceError = typeof errorJson.error === 'string' ? errorJson.error : errorJson.error.message || errorText;
-            }
-          } catch (e) {
-            marketIntelligenceError = errorText.substring(0, 200);
-          }
         }
       } catch (e) {
         console.error('Web search failed:', e);
         marketIntelligenceStatus = 'fetch_error';
         marketIntelligenceError = e.message || String(e);
-        marketIntelligence = '';
       }
     }
 
+    // 4. Generate AI Insights
     console.log('Generating comprehensive AI insights...');
 
     const clientContext = `
@@ -240,24 +266,13 @@ Short-term Goals: ${client.short_term_goals || 'Not specified'}
 Long-term Goals: ${client.long_term_goals || 'Not specified'}
 Expectations: ${client.expectations || 'Not specified'}
 
-## Satisfaction
-Satisfaction Score: ${client.satisfaction_score ? `${client.satisfaction_score}/10` : 'Not rated'}
-Feedback: ${client.satisfaction_feedback || 'No feedback provided'}
-
 # CONTACTS (${contacts?.length || 0} total)
 ${contacts?.map(c => `
 - ${c.name} (${c.title || 'No title'})
   Role: ${c.department || 'Not specified'}
   Decision Maker: ${c.is_decision_maker ? 'Yes' : 'No'}
   Influence: ${c.influence_level || 'Unknown'}
-  Contact: ${c.email || ''} ${c.phone || ''}
 `).join('\n') || 'No contacts recorded'}
-
-# MEETING HISTORY (${meetings?.length || 0} meetings)
-${meetings?.map(m => `
-## ${m.title} (${m.meeting_date})
-${m.transcript?.substring(0, 500)}${m.transcript?.length > 500 ? '...' : ''}
-`).join('\n---\n') || 'No meeting transcripts available'}
 
 # PROJECTS (${projects?.length || 0} total)
 ${projects?.map(p => `
@@ -267,30 +282,7 @@ ${projects?.map(p => `
   ${p.description ? `Description: ${p.description.substring(0, 200)}` : ''}
 `).join('\n') || 'No projects recorded'}
 
-# SALES PITCHES (${pitches?.length || 0} total)
-${pitches?.map(p => `
-- ${p.title || 'Untitled'} (${new Date(p.created_at).toLocaleDateString()})
-  Focus: ${p.pitch_content?.substring(0, 150) || ''}
-`).join('\n') || 'No pitches saved'}
-
-# DOCUMENTS (${documentsList.length} files)
-${documentsList.map(d => `- ${d.name} (${d.type || 'unknown type'})`).join('\n') || 'No documents uploaded'}
-
-# FATHOM MEETING RECORDINGS (${fathomRecordings?.length || 0} recent meetings)
-${fathomRecordings?.map(r => `
-## ${r.title} (${new Date(r.start_time).toLocaleDateString()})
-Summary: ${r.summary || 'No summary available'}
-Topics: ${r.key_topics?.map((t: any) => t.name).join(', ') || 'None'}
-Action Items: ${r.action_items?.length || 0} items
-Sentiment Score: ${r.sentiment_score ? `${(r.sentiment_score * 100).toFixed(0)}%` : 'Not analyzed'}
----
-`).join('\n') || 'No Fathom recordings available'}
-
-# SOCIAL MEDIA PRESENCE
-LinkedIn: ${client.linkedin_url || 'Not provided'}
-Twitter: ${client.twitter_url || 'Not provided'}
-Facebook: ${client.facebook_url || 'Not provided'}
-Instagram: ${client.instagram_url || 'Not provided'}
+${pineconeContext}
 
 # MARKET INTELLIGENCE (Web Search Results)
 ${marketIntelligence || 'No external market data available'}
@@ -305,115 +297,105 @@ ${clientContext}
 Provide a comprehensive analysis in JSON format with the following structure:
 
 {
-  \"executiveSummary\": \"2-3 sentence high-level overview of this client relationship and status\",
+  "executiveSummary": "A detailed, data-backed executive summary of the client relationship. Must be at least 4-5 sentences.",
+  "executiveSummaryReasoning": "Explain WHY you wrote this summary. Cite specific data points (e.g., 'Based on the meeting on [Date] where they mentioned X' or 'Market data shows Y').",
 
-  \"clientProfile\": {
-    \"maturityLevel\": \"early-stage | growing | established | enterprise\",
-    \"sophisticationScore\": number (0-100, based on goals clarity, processes, expectations),
-    \"readinessToEngage\": \"high | medium | low\",
-    \"strategicValue\": number (0-100, their long-term potential value)
+  "clientProfile": {
+    "maturityLevel": "early-stage | growing | established | enterprise",
+    "sophisticationScore": number (0-100),
+    "readinessToEngage": "high | medium | low",
+    "strategicValue": number (0-100)
   },
 
-  \"behavioralAnalysis\": {
-    \"communicationStyle\": \"formal | professional | casual | mixed\",
-    \"decisionMakingPattern\": \"data-driven | relationship-driven | consensus-based | hierarchical | fast-moving | cautious\",
-    \"engagementLevel\": \"highly engaged | moderately engaged | passive | disengaged\",
-    \"responsePattern\": \"quick responder | thoughtful responder | slow responder | inconsistent\",
-    \"meetingBehavior\": \"Analysis of meeting frequency, topics, tone, and outcomes based on transcripts\",
-    \"projectEngagement\": \"Analysis of how they engage with projects - active, hands-off, demanding, collaborative, etc.\",
-    \"reliabilityScore\": number (0-100, based on meeting consistency, communication patterns)
+  "behavioralAnalysis": {
+    "communicationStyle": "formal | professional | casual | mixed",
+    "decisionMakingPattern": "data-driven | relationship-driven | consensus-based | hierarchical | fast-moving | cautious",
+    "engagementLevel": "highly engaged | moderately engaged | passive | disengaged",
+    "reliabilityScore": number (0-100),
+    "evidence": "Cite specific interactions or transcript excerpts that support this analysis."
   },
 
-  \"sentimentAnalysis\": {
-    \"overallSentiment\": \"very positive | positive | neutral | concerned | negative\",
-    \"sentimentScore\": number (0-100, overall satisfaction and relationship health),
-    \"satisfactionDrivers\": [\"key factors driving positive sentiment\"],
-    \"concernAreas\": [\"areas of concern or dissatisfaction if any\"],
-    \"relationshipTrend\": \"improving | stable | declining\",
-    \"trustLevel\": \"high | medium | low\",
-    \"enthusiasmLevel\": number (0-100, their excitement about working together),
-    \"sentimentEvolution\": \"How sentiment has evolved over time based on meeting history\"
+  "sentimentAnalysis": {
+    "overallSentiment": "very positive | positive | neutral | concerned | negative",
+    "sentimentScore": number (0-100),
+    "relationshipTrend": "improving | stable | declining",
+    "trustLevel": "high | medium | low",
+    "rootCauses": "Explain the drivers of this sentiment based on the data."
   },
 
-  \"psychographicProfile\": {
-    \"priorities\": [\"ranked list of what matters most to this client\"],
-    \"painPoints\": [\"their biggest challenges and frustrations\"],
-    \"motivations\": [\"what drives their decision-making\"],
-    \"riskTolerance\": \"risk-averse | balanced | risk-taking\",
-    \"innovationAppetite\": \"bleeding-edge | early-adopter | pragmatic | conservative\",
-    \"valueOrientation\": \"cost-focused | quality-focused | speed-focused | relationship-focused | innovation-focused\"
+  "psychographicProfile": {
+    "priorities": ["ranked list of what matters most to this client"],
+    "painPoints": ["their biggest challenges and frustrations"],
+    "motivations": ["what drives their decision-making"],
+    "riskTolerance": "risk-averse | balanced | risk-taking",
+    "innovationAppetite": "bleeding-edge | early-adopter | pragmatic | conservative",
+    "valueOrientation": "cost-focused | quality-focused | speed-focused | relationship-focused | innovation-focused"
   },
 
-  \"relationshipHealth\": {
-    \"healthScore\": number (0-100, overall relationship health),
-    \"strengthAreas\": [\"what's working well in the relationship\"],
-    \"riskAreas\": [\"potential problems or red flags\"],
-    \"churnRisk\": \"low | medium | high\",
-    \"expansionPotential\": \"low | medium | high\",
-    \"loyaltyScore\": number (0-100, likelihood they'll stay long-term)
+  "relationshipHealth": {
+    "healthScore": number (0-100),
+    "strengthAreas": ["what's working well"],
+    "riskAreas": ["potential problems"],
+    "churnRisk": "low | medium | high",
+    "expansionPotential": "low | medium | high"
   },
 
-  \"marketContext\": {
-    \"industryPosition\": \"Analysis of their position in their industry based on web search\",
-    \"competitivePressure\": \"low | moderate | high\",
-    \"growthTrajectory\": \"declining | stable | growing | rapid growth\",
-    \"marketChallenges\": [\"key challenges they face in their market\"],
-    \"marketOpportunities\": [\"opportunities visible in their market\"],
-    \"industryTrends\": [\"relevant trends affecting them\"],
-    \"reputationInsights\": \"What the market/public perception is of this company\"
+  "marketContext": {
+    "industryPosition": "Analysis of their position based on web search",
+    "competitivePressure": "low | moderate | high",
+    "growthTrajectory": "declining | stable | growing | rapid growth",
+    "marketChallenges": ["key challenges they face"],
+    "marketOpportunities": ["opportunities visible in their market"]
   },
 
-  \"opportunityAnalysis\": {
-    \"upsellOpportunities\": [\"specific areas where you could expand services\"],
-    \"crossSellOpportunities\": [\"other services they might need\"],
-    \"valueGaps\": [\"unmet needs or problems you could solve\"],
-    \"timingIndicators\": [\"signals that now is a good time to propose something\"],
-    \"budgetIndicators\": \"Analysis of their budget capacity and spending patterns\",
-    \"decisionTimeframe\": \"Estimated decision-making timeline - fast | medium | slow\"
+  "opportunityAnalysis": {
+    "upsellOpportunities": ["specific areas where you could expand services"],
+    "crossSellOpportunities": ["other services they might need"],
+    "budgetIndicators": "Analysis of their budget capacity",
+    "decisionTimeframe": "fast | medium | slow"
   },
 
-  \"actionableInsights\": {
-    \"immediatePriorities\": [\"top 3-5 things to do in next 30 days\"],
-    \"strategicRecommendations\": [\"long-term relationship strategies\"],
-    \"communicationStrategy\": \"How to best communicate with this client based on their patterns\",
-    \"engagementTactics\": [\"specific tactics to deepen the relationship\"],
-    \"riskMitigation\": [\"actions to address any risk areas\"],
-    \"nextBestActions\": [\"prioritized list of next steps to maximize value\"]
+  "actionableInsights": {
+    "immediatePriorities": ["top 3-5 things to do in next 30 days"],
+    "strategicRecommendations": ["long-term relationship strategies"],
+    "communicationStrategy": "How to best communicate with this client",
+    "engagementTactics": ["specific tactics to deepen the relationship"]
   },
 
-  \"kpis\": {
-    \"engagementScore\": number (0-100, how actively engaged they are),
-    \"collaborationScore\": number (0-100, how well you work together),
-    \"communicationScore\": number (0-100, quality of communication),
-    \"alignmentScore\": number (0-100, alignment of goals and expectations),
-    \"momentumScore\": number (0-100, forward momentum in relationship),
-    \"valueRealizationScore\": number (0-100, are they getting value from you)
+  "kpis": {
+    "engagementScore": number (0-100),
+    "collaborationScore": number (0-100),
+    "communicationScore": number (0-100),
+    "alignmentScore": number (0-100),
+    "momentumScore": number (0-100),
+    "valueRealizationScore": number (0-100)
+  },
+  "kpiReasoning": "Explain how these scores were calculated based on the provided data (e.g., 'Engagement is high due to frequent meetings and quick email responses').",
+
+  "redFlags": ["Any concerning signals"],
+  "greenFlags": ["Positive signals"],
+
+  "predictiveInsights": {
+    "likelyNextStep": "Prediction of what they'll likely do next",
+    "retentionProbability": number (0-100),
+    "growthProbability": number (0-100),
+    "timeToDecision": "days | weeks | months"
   },
 
-  \"redFlags\": [\"Any concerning signals that require attention\"],
-  \"greenFlags\": [\"Positive signals indicating strong relationship\"],
-
-  \"predictiveInsights\": {
-    \"likelyNextStep\": \"Prediction of what they'll likely do next\",
-    \"retentionProbability\": number (0-100, likelihood of retention),
-    \"growthProbability\": number (0-100, likelihood of expanding spend),
-    \"timeToDecision\": \"Estimated time for major decisions - days | weeks | months\",
-    \"influencers\": [\"key people who influence their decisions based on contacts\"]
+  "dataSourcesAnalysis": {
+    "pineconeUsage": "How did the vector search results (transcripts/docs) contribute to this analysis?",
+    "webSearchUsage": "How did the market intelligence contribute?",
+    "databaseUsage": "How did the structured DB data contribute?"
   }
 }
 
 ## CRITICAL REQUIREMENTS:
-1. Base analysis ONLY on factual data provided - never invent information
-2. If data is limited, indicate \"Limited data\" and provide what you can
-3. Use meeting transcripts to understand actual communication patterns and tone
-4. Use web search results to contextualize their market position and challenges
-5. Consider contact influence levels when analyzing decision-making
-6. Look for patterns across meetings, projects, and interactions
-7. Be honest about areas of concern - don't sugarcoat problems
-8. Provide specific, actionable recommendations based on actual data
-9. Respond ONLY with valid JSON, no additional text
-
-Analyze comprehensively and provide strategic, actionable intelligence.`;
+1. **NO GENERIC INSIGHTS**: Do not use phrases like "optimize workflows", "leverage synergies", or "strategic alignment" unless backed by specific client details.
+2. **EVIDENCE-BASED**: Every major conclusion must be supported by evidence from the provided data (transcripts, docs, web search).
+3. **KPI DERIVATION**: KPIs must be derived *strictly* from the data. If data is missing (e.g., no meetings), lower the relevant scores (e.g., Engagement Score).
+4. **HONESTY**: If data is insufficient to make a determination, state "Insufficient data" in the text fields or use conservative scores.
+5. **JSON ONLY**: Respond ONLY with valid JSON.
+`;
 
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -426,14 +408,14 @@ Analyze comprehensively and provide strategic, actionable intelligence.`;
         messages: [
           {
             role: 'system',
-            content: 'You are an elite business intelligence analyst with expertise in behavioral psychology, sentiment analysis, and strategic relationship management. You provide deep, actionable insights based on comprehensive data analysis. Always respond with valid JSON only.',
+            content: 'You are an elite business intelligence analyst. You provide deep, specific, and evidence-based insights. You NEVER provide generic advice. You always cite your sources.'
           },
           {
             role: 'user',
             content: analysisPrompt,
           },
         ],
-        temperature: 0.7,
+        temperature: 0.5, // Lower temperature for more grounded analysis
         max_tokens: 4000,
       }),
     });
@@ -456,8 +438,7 @@ Analyze comprehensively and provide strategic, actionable intelligence.`;
       insights = JSON.parse(insightsText);
     } catch (e) {
       console.error('Failed to parse OpenAI response:', insightsText);
-      console.error('Parse error:', e);
-      throw new Error('Failed to parse AI insights. The AI response may not be valid JSON.');
+      throw new Error('Failed to parse AI insights.');
     }
 
     console.log('Insights generated successfully');
@@ -465,16 +446,14 @@ Analyze comprehensively and provide strategic, actionable intelligence.`;
     const dataGathered = {
       client: true,
       contacts: contacts?.length || 0,
-      meetings: meetings?.length || 0,
       projects: projects?.length || 0,
       pitches: pitches?.length || 0,
-      documents: documentsList.length,
+      pineconeChunks: pineconeChunksCount,
       marketIntelligence: !!marketIntelligence && marketIntelligenceStatus === 'success',
       marketIntelligenceStatus,
       marketIntelligenceError: marketIntelligenceError || undefined,
     };
 
-    // Include dataGathered in the insights for persistence
     const insightsWithMetadata = {
       ...insights,
       dataGathered,
@@ -523,3 +502,36 @@ Analyze comprehensively and provide strategic, actionable intelligence.`;
     );
   }
 });
+
+async function queryPinecone(
+  pineconeUrl: string,
+  apiKey: string,
+  embedding: number[],
+  topK: number,
+  filter: any,
+  namespace: string
+): Promise<PineconeMatch[]> {
+  const response = await fetch(`${pineconeUrl}/query`, {
+    method: 'POST',
+    headers: {
+      'Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      vector: embedding,
+      topK,
+      includeMetadata: true,
+      filter,
+      namespace,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Pinecone query error for ${namespace}:`, errorText);
+    return [];
+  }
+
+  const data = await response.json();
+  return data.matches || [];
+}

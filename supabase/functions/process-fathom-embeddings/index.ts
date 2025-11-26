@@ -263,6 +263,82 @@ Deno.serve(async (req: Request) => {
       console.log('No vectors to upload');
     }
 
+    // Process summary embedding if summary exists
+    let summaryEmbeddingCreated = false;
+
+    console.log('=== SUMMARY EMBEDDING CHECK ===');
+    console.log('Recording has summary field:', !!recording.summary);
+    console.log('Summary value:', recording.summary ? `"${recording.summary.substring(0, 100)}..."` : 'null/undefined');
+    console.log('Summary length:', recording.summary?.length || 0);
+    console.log('Summary trimmed length:', recording.summary?.trim().length || 0);
+
+    if (recording.summary && recording.summary.trim().length > 0) {
+      console.log('✓ Summary exists, proceeding with embedding generation...');
+
+      try {
+        const summaryEmbeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            input: recording.summary,
+            model: 'text-embedding-3-small',
+            dimensions: 512,
+          }),
+        });
+
+        if (summaryEmbeddingResponse.ok) {
+          const summaryEmbeddingData = await summaryEmbeddingResponse.json();
+          const summaryEmbedding = summaryEmbeddingData.data[0].embedding;
+
+          const summaryVector = {
+            id: `fathom_summary_${recording.id}_${Date.now()}`,
+            values: summaryEmbedding,
+            metadata: {
+              user_id: user.id,
+              client_id: recording.client_id,
+              recording_id: recording.id,
+              text: recording.summary,
+              source_type: 'fathom_summary',
+              recording_title: recording.title,
+              meeting_date: recording.start_time,
+              is_summary: true,
+            }
+          };
+
+          // Upload summary embedding to Pinecone
+          const summaryUpsertResponse = await fetch(`${pineconeUrl}/vectors/upsert`, {
+            method: 'POST',
+            headers: {
+              'Api-Key': pineconeKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              vectors: [summaryVector],
+              namespace: '',
+            }),
+          });
+
+          if (summaryUpsertResponse.ok) {
+            console.log('Successfully uploaded summary embedding to Pinecone');
+            summaryEmbeddingCreated = true;
+          } else {
+            const errorText = await summaryUpsertResponse.text();
+            console.error('Failed to upload summary embedding:', errorText);
+          }
+        } else {
+          const errorText = await summaryEmbeddingResponse.text();
+          console.error('Failed to generate summary embedding:', errorText);
+        }
+      } catch (error) {
+        console.error('Error processing summary embedding:', error);
+      }
+    } else {
+      console.log('No summary available for this recording');
+    }
+
     if (pineconeVectors.length > 0) {
       const { error: updateError } = await supabaseClient
         .from('fathom_recordings')
@@ -280,6 +356,7 @@ Deno.serve(async (req: Request) => {
           success: true,
           embeddings_created: pineconeVectors.length,
           chunks_total: chunks.length,
+          summary_embedding_created: summaryEmbeddingCreated,
         }),
         {
           status: 200,
