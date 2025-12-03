@@ -20,6 +20,46 @@ export interface Client {
   tier?: 'platinum' | 'gold' | 'silver' | 'bronze';
   healthScore?: number;
   csm?: string;
+  website?: string;
+  state?: string;
+  streetAddress?: string;
+  annualRevenue?: number;
+  totalFunding?: number;
+  latestFundingStage?: string;
+  apolloData?: {
+    keywords?: string[];
+    technologyNames?: string[];
+    currentTechnologies?: Array<{
+      uid: string;
+      name: string;
+      category: string;
+    }>;
+    fundingEvents?: Array<{
+      id: string;
+      date: string;
+      type: string;
+      amount: string;
+      investors: string;
+      newsUrl?: string;
+    }>;
+    employeeMetrics?: Array<{
+      startDate: string;
+      departments: Array<{
+        functions?: string;
+        new: number;
+        retained: number;
+        churned: number;
+      }>;
+    }>;
+    departmentalHeadCount?: Record<string, number>;
+    industries?: string[];
+    secondaryIndustries?: string[];
+    alexaRanking?: number;
+    annualRevenuePrinted?: string;
+    totalFundingPrinted?: string;
+    latestFundingRoundDate?: string;
+    rawAddress?: string;
+  };
 }
 
 export interface Persona {
@@ -280,6 +320,7 @@ export interface Contact {
   influenceLevel?: 'high' | 'medium' | 'low';
   source?: string;
   lastContact?: string;
+  linkedinUrl?: string;
 }
 
 export interface Opportunity {

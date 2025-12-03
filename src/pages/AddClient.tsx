@@ -8,6 +8,10 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 import { processAndEmbedDocument } from '../utils/documentEmbeddings';
+import { mapAIResponseToFormData } from '../utils/clientDataMapper';
+import { AIResponseComparison } from '../components/client/AIResponseComparison';
+import { AIFetchProgress } from '../components/client/AIFetchProgress';
+import { ClientOverview } from '../components/client/ClientOverview';
 import {
   ArrowLeft,
   Save,
@@ -23,7 +27,6 @@ import {
   X,
   Upload,
   Target,
-  Smile,
   MapPin,
   Linkedin,
   Twitter,
@@ -60,8 +63,6 @@ interface ClientFormData {
   shortTermGoals: string;
   longTermGoals: string;
   expectations: string;
-  satisfactionScore: number;
-  satisfactionFeedback: string;
   status: 'active' | 'inactive' | 'prospect' | 'churned';
   tags: string[];
   description: string;
@@ -90,6 +91,21 @@ export const AddClient: React.FC = () => {
   const [aiPrefilling, setAiPrefilling] = useState(false);
   const isEditMode = !!id;
 
+  // New dual AI create flow state
+  type CreateFlowStep = 'input' | 'fetching' | 'comparing' | 'overview';
+  const [createFlowStep, setCreateFlowStep] = useState<CreateFlowStep>('input');
+  const [inputData, setInputData] = useState({
+    clientName: '',
+    websiteUrl: '',
+    linkedinUrl: '',
+  });
+  const [aiResponses, setAiResponses] = useState<{
+    perplexity: any | null;
+    openai: any | null;
+  }>({ perplexity: null, openai: null });
+  const [comparison, setComparison] = useState<any | null>(null);
+  const [selectedModel, setSelectedModel] = useState<'perplexity' | 'openai' | null>(null);
+
   const [formData, setFormData] = useState<ClientFormData>({
     company: '',
     website: '',
@@ -116,8 +132,6 @@ export const AddClient: React.FC = () => {
     shortTermGoals: '',
     longTermGoals: '',
     expectations: '',
-    satisfactionScore: 0,
-    satisfactionFeedback: '',
     status: 'prospect',
     tags: [],
     description: '',
@@ -180,8 +194,6 @@ export const AddClient: React.FC = () => {
           shortTermGoals: data.short_term_goals || '',
           longTermGoals: data.long_term_goals || '',
           expectations: data.expectations || '',
-          satisfactionScore: data.satisfaction_score || 0,
-          satisfactionFeedback: data.satisfaction_feedback || '',
           status: data.status || 'prospect',
           tags: data.tags || [],
           description: data.description || '',
@@ -401,10 +413,348 @@ export const AddClient: React.FC = () => {
     } catch (error: any) {
       console.error('Error fetching company data:', error);
       showToast('error', error.message || 'Failed to fetch company data. Please try again.');
-    } finally {
-      setAiPrefilling(false);
+      } finally {
+        setAiPrefilling(false);
+      }
+    };
+
+  // ========== NEW DUAL AI CREATE FLOW FUNCTIONS ==========
+  
+  const fetchPerplexityData = async () => {
+    console.log('[FRONTEND] 🚀 Starting Perplexity fetch', inputData);
+    const startTime = Date.now();
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-client-perplexity`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(inputData),
+        }
+      );
+
+      const duration = Date.now() - startTime;
+      console.log(`[FRONTEND] ✅ Perplexity response received`, { 
+        status: response.status, 
+        duration: `${duration}ms` 
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Perplexity fetch failed');
+      }
+
+      const result = await response.json();
+      console.log('[FRONTEND] 📊 Perplexity data received', {
+        success: result.success,
+        completeness: result.metadata?.completenessScore,
+      });
+
+      return {
+        model: 'perplexity' as const,
+        data: result.data,
+        metadata: result.metadata,
+      };
+    } catch (error: any) {
+      console.error('[FRONTEND] ❌ Perplexity fetch error', error);
+      return {
+        model: 'perplexity' as const,
+        data: null,
+        metadata: { completenessScore: 0, processingTime: 0, timestamp: '' },
+        error: error.message,
+      };
     }
   };
+
+  const fetchOpenAIData = async () => {
+    console.log('[FRONTEND] 🚀 Starting OpenAI fetch', inputData);
+    const startTime = Date.now();
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-client-openai`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(inputData),
+        }
+      );
+
+      const duration = Date.now() - startTime;
+      console.log(`[FRONTEND] ✅ OpenAI response received`, { 
+        status: response.status, 
+        duration: `${duration}ms` 
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'OpenAI fetch failed');
+      }
+
+      const result = await response.json();
+      console.log('[FRONTEND] 📊 OpenAI data received', {
+        success: result.success,
+        completeness: result.metadata?.completenessScore,
+      });
+
+      return {
+        model: 'openai' as const,
+        data: result.data,
+        metadata: result.metadata,
+      };
+    } catch (error: any) {
+      console.error('[FRONTEND] ❌ OpenAI fetch error', error);
+      return {
+        model: 'openai' as const,
+        data: null,
+        metadata: { completenessScore: 0, processingTime: 0, timestamp: '' },
+        error: error.message,
+      };
+    }
+  };
+
+  const fetchComparison = async (perplexityResult?: any, openaiResult?: any) => {
+    console.log('[FRONTEND] 🔍 Starting comparison fetch');
+    
+    // Use passed results or fall back to state
+    const perplexityData = perplexityResult?.data || aiResponses.perplexity?.data;
+    const openaiData = openaiResult?.data || aiResponses.openai?.data;
+    
+    if (!perplexityData || !openaiData) {
+      console.error('[FRONTEND] ❌ Cannot compare - missing responses', {
+        hasPerplexity: !!perplexityData,
+        hasOpenAI: !!openaiData,
+        perplexityResult: !!perplexityResult,
+        openaiResult: !!openaiResult,
+        aiResponsesState: aiResponses,
+      });
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compare-ai-responses`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            perplexityResponse: perplexityData,
+            openaiResponse: openaiData,
+            clientName: inputData.clientName,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Comparison failed');
+      }
+
+      const result = await response.json();
+      console.log('[FRONTEND] ✅ Comparison received', {
+        success: result.success,
+        hasComparison: !!result.comparison,
+        fullResult: result,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Comparison failed');
+      }
+
+      if (!result.comparison) {
+        console.error('[FRONTEND] ❌ No comparison data in response', result);
+        throw new Error('Comparison data not found in response');
+      }
+
+      console.log('[FRONTEND] 📊 Setting comparison', {
+        recommended: result.comparison.recommendedModel,
+        scores: result.comparison.score,
+        completeness: result.comparison.completeness,
+        hasStrengths: !!result.comparison.strengths,
+        hasWeaknesses: !!result.comparison.weaknesses,
+      });
+
+      setComparison(result.comparison);
+      setCreateFlowStep('comparing');
+    } catch (error: any) {
+      console.error('[FRONTEND] ❌ Comparison error', error);
+      showToast('error', `Comparison failed: ${error.message}`);
+    }
+  };
+
+  const handleFetchData = async () => {
+    if (!inputData.clientName || !inputData.websiteUrl || !inputData.linkedinUrl) {
+      showToast('error', 'Please fill in all fields');
+      return;
+    }
+
+    console.log('[FRONTEND] === STARTING DUAL AI FETCH ===');
+    setCreateFlowStep('fetching');
+    setAiResponses({ perplexity: null, openai: null });
+    setComparison(null);
+    setSelectedModel(null);
+
+    // Fetch both in parallel
+    const [perplexityResult, openaiResult] = await Promise.all([
+      fetchPerplexityData(),
+      fetchOpenAIData(),
+    ]);
+
+    console.log('[FRONTEND] ✅ Both fetches completed', {
+      perplexitySuccess: !!perplexityResult.data,
+      openaiSuccess: !!openaiResult.data,
+    });
+
+    setAiResponses({
+      perplexity: perplexityResult,
+      openai: openaiResult,
+    });
+
+    // If both succeeded, fetch comparison (pass results directly to avoid state timing issues)
+    if (perplexityResult.data && openaiResult.data) {
+      await fetchComparison(perplexityResult, openaiResult);
+    } else {
+      // If one failed, show what we have
+      setCreateFlowStep('comparing');
+      showToast('warning', 'One or both AI responses failed. Showing available results.');
+    }
+  };
+
+  const handleRegenerate = () => {
+    console.log('[FRONTEND] 🔄 Regenerating responses');
+    handleFetchData();
+  };
+
+  const handleSelectResponse = (model: 'perplexity' | 'openai') => {
+    console.log('[FRONTEND] 👤 User selected response', { model });
+    const selectedResponse = aiResponses[model];
+    
+    if (!selectedResponse?.data) {
+      showToast('error', 'Selected response is not available');
+      return;
+    }
+
+    setSelectedModel(model);
+    const mappedData = mapAIResponseToFormData(selectedResponse.data, model);
+    setFormData(mappedData);
+    setCreateFlowStep('overview');
+  };
+
+  const handleSaveFromAI = async () => {
+    if (!formData.company || !user) {
+      showToast('error', 'No data to save');
+      return;
+    }
+
+    console.log('[FRONTEND] 💾 Saving client from AI', { selectedModel });
+    setSaving(true);
+
+    try {
+      const clientData = {
+        user_id: user.id,
+        name: formData.contactName || formData.company,
+        company: formData.company,
+        website: formData.website,
+        industry: formData.industry,
+        email: formData.primaryEmail,
+        phone: formData.primaryPhone,
+        city: formData.city,
+        country: formData.country,
+        zip_code: formData.zipCode,
+        founded: formData.founded,
+        company_size: formData.companySize,
+        linkedin_url: formData.linkedinUrl,
+        twitter_url: formData.twitterUrl,
+        instagram_url: formData.instagramUrl,
+        facebook_url: formData.facebookUrl,
+        logo_url: formData.logoUrl,
+        contact_name: formData.contactName,
+        primary_email: formData.primaryEmail,
+        alternate_email: formData.alternateEmail,
+        primary_phone: formData.primaryPhone,
+        alternate_phone: formData.alternatePhone,
+        job_title: formData.jobTitle,
+        preferred_contact_method: formData.preferredContactMethod,
+        short_term_goals: formData.shortTermGoals,
+        long_term_goals: formData.longTermGoals,
+        expectations: formData.expectations,
+        status: formData.status,
+        tags: formData.tags,
+        description: formData.description,
+        csm: formData.csm,
+        annual_revenue: formData.annualRevenue,
+        employee_count: formData.employeeCount,
+        services: formData.services,
+        technologies: formData.technologies,
+        blogs: formData.blogs,
+        pain_points: formData.painPoints,
+        competitors: formData.competitors,
+        location: formData.city && formData.country 
+          ? `${formData.city}, ${formData.country}` 
+          : formData.city || formData.country || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { data: newClient, error: insertError } = await supabase
+        .from('clients')
+        .insert(clientData)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      console.log('[FRONTEND] ✅ Client saved successfully', { clientId: newClient.id });
+
+      // Create contact if available
+      if (formData.contactName && formData.primaryEmail) {
+        await supabase.from('contacts').insert({
+          client_id: newClient.id,
+          user_id: user.id,
+          name: formData.contactName,
+          email: formData.primaryEmail,
+          phone: formData.primaryPhone || null,
+          role: formData.jobTitle,
+          is_primary: true,
+          is_decision_maker: false,
+          source: 'ai-enrichment',
+        });
+      }
+
+      await refreshClients();
+      showToast('success', 'Client created successfully!');
+      
+      setTimeout(() => {
+        navigate('/clients');
+      }, 1000);
+    } catch (error: any) {
+      console.error('[FRONTEND] ❌ Save error', error);
+      showToast('error', `Failed to save client: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ========== END NEW DUAL AI CREATE FLOW FUNCTIONS ==========
 
   const handleNext = () => {
     if (activeTab === 'basic' && !validateBasicInfo()) {
@@ -548,8 +898,6 @@ export const AddClient: React.FC = () => {
         short_term_goals: formData.shortTermGoals,
         long_term_goals: formData.longTermGoals,
         expectations: formData.expectations,
-        satisfaction_score: formData.satisfactionScore > 0 ? formData.satisfactionScore : null,
-        satisfaction_feedback: formData.satisfactionFeedback,
         status: formData.status,
         tags: formData.tags,
         description: formData.description,
@@ -691,6 +1039,120 @@ export const AddClient: React.FC = () => {
     );
   }
 
+  // ========== NEW DUAL AI CREATE FLOW RENDER ==========
+  if (!isEditMode) {
+    // Step 1: Input Form
+    if (createFlowStep === 'input') {
+      return (
+        <div className="p-6 space-y-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/clients')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+            <h1 className="text-3xl font-bold">Add New Client</h1>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Client Information
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Enter the basic information and our AI will fetch comprehensive client details
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Client Name <span className="text-red-600">*</span>
+                </label>
+                <Input
+                  placeholder="Acme Corporation"
+                  value={inputData.clientName}
+                  onChange={(e) => setInputData({ ...inputData, clientName: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Website URL <span className="text-red-600">*</span>
+                </label>
+                <Input
+                  placeholder="https://acme.com"
+                  value={inputData.websiteUrl}
+                  onChange={(e) => setInputData({ ...inputData, websiteUrl: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  LinkedIn URL <span className="text-red-600">*</span>
+                </label>
+                <Input
+                  placeholder="https://linkedin.com/company/acme"
+                  value={inputData.linkedinUrl}
+                  onChange={(e) => setInputData({ ...inputData, linkedinUrl: e.target.value })}
+                />
+              </div>
+              <Button 
+                variant="primary" 
+                onClick={handleFetchData}
+                className="w-full"
+                disabled={!inputData.clientName || !inputData.websiteUrl || !inputData.linkedinUrl}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Fetch Client Data with AI
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    // Step 2: Fetching Progress
+    if (createFlowStep === 'fetching') {
+      return (
+        <div className="p-6 space-y-6">
+          <AIFetchProgress
+            perplexityResponse={aiResponses.perplexity}
+            openaiResponse={aiResponses.openai}
+          />
+        </div>
+      );
+    }
+
+    // Step 3: Comparison
+    if (createFlowStep === 'comparing') {
+      return (
+        <div className="p-6 space-y-6">
+          <AIResponseComparison
+            perplexityResponse={aiResponses.perplexity}
+            openaiResponse={aiResponses.openai}
+            comparison={comparison}
+            onSelectResponse={handleSelectResponse}
+            onRegenerate={handleRegenerate}
+          />
+        </div>
+      );
+    }
+
+    // Step 4: Overview
+    if (createFlowStep === 'overview') {
+      return (
+        <div className="p-6 space-y-6">
+          <ClientOverview
+            formData={formData}
+            selectedModel={selectedModel || 'perplexity'}
+            onBack={() => setCreateFlowStep('comparing')}
+            onSave={handleSaveFromAI}
+            saving={saving}
+          />
+        </div>
+      );
+    }
+  }
+
+  // ========== EXISTING EDIT MODE RENDER ==========
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -766,41 +1228,43 @@ export const AddClient: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <p className="text-sm text-blue-900 dark:text-blue-100 mb-3 font-medium">
-                  <Sparkles className="h-4 w-4 inline mr-2" />
-                  AI-Powered Autofill: Enter company website URL and let AI populate the details!
-                </p>
-                <div className="mb-3">
-                  <Input
-                    placeholder="https://company.com"
-                    value={formData.website}
-                    onChange={(e) => handleInputChange('website', e.target.value)}
-                    className={errors.website ? 'border-red-500' : ''}
-                  />
-                  {errors.website && (
-                    <p className="text-xs text-red-600 mt-1">{errors.website}</p>
-                  )}
+              {!isEditMode && (
+                <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm text-blue-900 dark:text-blue-100 mb-3 font-medium">
+                    <Sparkles className="h-4 w-4 inline mr-2" />
+                    AI-Powered Autofill: Enter company website URL and let AI populate the details!
+                  </p>
+                  <div className="mb-3">
+                    <Input
+                      placeholder="https://company.com"
+                      value={formData.website}
+                      onChange={(e) => handleInputChange('website', e.target.value)}
+                      className={errors.website ? 'border-red-500' : ''}
+                    />
+                    {errors.website && (
+                      <p className="text-xs text-red-600 mt-1">{errors.website}</p>
+                    )}
+                  </div>
+                  <Button
+                    variant="primary"
+                    onClick={handleAIPrefill}
+                    disabled={aiPrefilling || !formData.website.trim()}
+                    className="w-full"
+                  >
+                    {aiPrefilling ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Fetching Company Data...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        AI Autofill from Apollo
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  variant="primary"
-                  onClick={handleAIPrefill}
-                  disabled={aiPrefilling || !formData.website.trim()}
-                  className="w-full"
-                >
-                  {aiPrefilling ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Fetching Company Data...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      AI Autofill from Apollo
-                    </>
-                  )}
-                </Button>
-              </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1608,40 +2072,6 @@ export const AddClient: React.FC = () => {
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  <Smile className="h-4 w-4 inline mr-2" />
-                  Client Satisfaction Score (1-10)
-                </label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    value={formData.satisfactionScore}
-                    onChange={(e) => handleInputChange('satisfactionScore', parseInt(e.target.value))}
-                    className="flex-1"
-                  />
-                  <span className="text-2xl font-bold text-primary w-12 text-center">
-                    {formData.satisfactionScore > 0 ? formData.satisfactionScore : '-'}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Rate based on feedback, surveys, or metrics from previous experiences
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Satisfaction Feedback / Notes
-                </label>
-                <textarea
-                  placeholder="Add any feedback, survey results, or notes about client satisfaction..."
-                  value={formData.satisfactionFeedback}
-                  onChange={(e) => handleInputChange('satisfactionFeedback', e.target.value)}
-                  className="w-full min-h-[100px] border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                />
-              </div>
 
               <div className="flex justify-between pt-6 mt-6 border-t border-border">
                 <Button variant="outline" onClick={handlePrevious}>

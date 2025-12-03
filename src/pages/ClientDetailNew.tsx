@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ClientHeader } from '../components/client/ClientHeader';
 import { FinancialOverview } from '../components/client/FinancialOverview';
 import { IntelligenceAgent } from '../components/client/IntelligenceAgent';
-import { QueryResult } from '../components/client/QueryResult';
 import { AIInsightsOverview } from '../components/client/AIInsightsOverview';
 import { PersonaSummary } from '../components/persona/PersonaSummary';
 import { PersonaMetricsCards } from '../components/persona/PersonaMetricsCards';
@@ -18,8 +17,9 @@ import { DocumentUpload } from '../components/data-sources/DocumentUpload';
 import { FathomSync } from '../components/data-sources/FathomSync';
 import { FathomRecordingsList } from '../components/data-sources/FathomRecordingsList';
 import { ProjectDetailPanel } from '../components/project/ProjectDetailPanel';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight, Eye } from 'lucide-react';
-import { PersonaMetrics, EvidenceSnippet, IntelligenceQuery, Client, FinancialData, Contact } from '../types';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight, Eye, Linkedin, Database } from 'lucide-react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { PersonaMetrics, EvidenceSnippet, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
 import { mockContacts, mockOpportunities, mockRelationshipMetrics } from '../data/mockData';
 import { exportPersonaReportAsPDF } from '../utils/pdfExport';
@@ -35,7 +35,7 @@ export const ClientDetailNew: React.FC = () => {
   const { showToast } = useToast();
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'intelligence-agent' | 'relationships' | 'growth' | 'assets' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'relationships' | 'assets' | 'intelligence-agent' | 'growth' | 'apollo' | 'settings'>('overview');
   const [assetsSubTab, setAssetsSubTab] = useState<'meeting-notes' | 'documents' | 'fathom'>('meeting-notes');
   const [projectsSubTab, setProjectsSubTab] = useState<'projects' | 'pitch-history'>('projects');
   const [savedPitches, setSavedPitches] = useState<any[]>([]);
@@ -46,13 +46,15 @@ export const ClientDetailNew: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [queries, setQueries] = useState<IntelligenceQuery[]>([]);
   const [isProcessingQuery, setIsProcessingQuery] = useState(false);
   const [client, setClient] = useState<Client | null>(null);
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [isFetchingPeople, setIsFetchingPeople] = useState(false);
+  const [isFetchingOrg, setIsFetchingOrg] = useState(false);
+  const [apolloOrgData, setApolloOrgData] = useState<any>(null);
   const [newContactForm, setNewContactForm] = useState({
     name: '',
     email: '',
@@ -129,11 +131,11 @@ export const ClientDetailNew: React.FC = () => {
         .from('contacts')
         .select('*')
         .eq('client_id', id)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .eq('user_id', user.id);
 
       if (!contactsError && contactsData) {
-        setContacts(contactsData.map(c => ({
+        // Map contacts and include linkedinUrl
+        const mappedContacts = contactsData.map(c => ({
           id: c.id,
           clientId: c.client_id || '',
           name: c.name,
@@ -146,10 +148,162 @@ export const ClientDetailNew: React.FC = () => {
           influenceLevel: c.influence_level as 'high' | 'medium' | 'low' | undefined,
           source: c.source || undefined,
           lastContact: c.last_contact || undefined,
-        })));
+          linkedinUrl: c.linkedin_url || undefined,
+        }));
+
+        // Sort by seniority level
+        // Priority: 1. Primary contacts, 2. Decision makers, 3. Executive titles, 4. Director titles, 5. Others
+        const sortedContacts = mappedContacts.sort((a, b) => {
+          // Helper function to determine seniority score
+          const getSeniorityScore = (contact: typeof mappedContacts[0]) => {
+            let score = 0;
+            
+            // Primary contacts get highest priority
+            if (contact.isPrimary) score += 1000;
+            
+            // Decision makers get high priority
+            if (contact.isDecisionMaker) score += 500;
+            
+            // Check role/title for executive level
+            const roleLower = (contact.role || '').toLowerCase();
+            if (roleLower.includes('ceo') || roleLower.includes('founder') || roleLower.includes('president') || roleLower.includes('chief')) {
+              score += 300;
+            } else if (roleLower.includes('director') || roleLower.includes('vp') || roleLower.includes('vice president')) {
+              score += 200;
+            } else if (roleLower.includes('manager') || roleLower.includes('head')) {
+              score += 100;
+            }
+            
+            // Influence level
+            if (contact.influenceLevel === 'high') score += 50;
+            else if (contact.influenceLevel === 'medium') score += 25;
+            
+            return score;
+          };
+          
+          const scoreA = getSeniorityScore(a);
+          const scoreB = getSeniorityScore(b);
+          
+          // Sort descending (highest seniority first)
+          return scoreB - scoreA;
+        });
+
+        setContacts(sortedContacts);
       }
     } catch (error) {
       console.error('Error loading contacts:', error);
+    }
+  };
+
+  const handleFetchPeopleFromApollo = async () => {
+    if (!id || !user || !client) {
+      showToast('error', 'Client information is required');
+      return;
+    }
+
+    setIsFetchingPeople(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showToast('error', 'Please log in to use this feature');
+        setIsFetchingPeople(false);
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/fetch-apollo-people`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            clientId: id,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch people from Apollo');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast('success', result.message || `Successfully fetched ${result.contacts?.length || 0} contacts`);
+        // Reload contacts to show the newly fetched ones
+        await loadContacts();
+      } else {
+        throw new Error(result.error || 'Failed to fetch people');
+      }
+    } catch (error: any) {
+      console.error('Error fetching people from Apollo:', error);
+      showToast('error', error.message || 'Failed to fetch people from Apollo');
+    } finally {
+      setIsFetchingPeople(false);
+    }
+  };
+
+
+  const handleFetchOrganizationFromApollo = async () => {
+    if (!id || !user || !client) {
+      showToast('error', 'Client information is required');
+      return;
+    }
+
+    if (!client.website) {
+      showToast('error', 'Client website is required to fetch organization data');
+      return;
+    }
+
+    setIsFetchingOrg(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showToast('error', 'Please log in to use this feature');
+        setIsFetchingOrg(false);
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/fetch-apollo-organization`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            clientId: id,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch organization data from Apollo');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        showToast('success', result.message || 'Company data fetched successfully');
+        // Store the full Apollo response data for display
+        setApolloOrgData(result);
+        // Reload client data to show the newly fetched information
+        await loadClientData();
+      } else {
+        throw new Error(result.error || 'Failed to fetch organization data');
+      }
+    } catch (error: any) {
+      console.error('Error fetching organization from Apollo:', error);
+      showToast('error', error.message || 'Failed to fetch organization data from Apollo');
+    } finally {
+      setIsFetchingOrg(false);
     }
   };
 
@@ -211,6 +365,14 @@ export const ClientDetailNew: React.FC = () => {
           avatar: clientData.avatar || undefined,
           aiInsights: clientData.ai_insights || undefined,
           aiInsightsGeneratedAt: clientData.ai_insights_generated_at || undefined,
+          website: clientData.website || undefined,
+          // Apollo organization fields
+          state: clientData.state || undefined,
+          streetAddress: clientData.street_address || undefined,
+          annualRevenue: clientData.annual_revenue || undefined,
+          totalFunding: clientData.total_funding || undefined,
+          latestFundingStage: clientData.latest_funding_stage || undefined,
+          apolloData: clientData.apollo_data || undefined,
         });
 
         // Set dataGathered if it exists in the insights
@@ -261,6 +423,7 @@ export const ClientDetailNew: React.FC = () => {
           influenceLevel: c.influence_level as 'high' | 'medium' | 'low' | undefined,
           source: c.source || undefined,
           lastContact: c.last_contact || undefined,
+          linkedinUrl: c.linkedin_url || undefined,
         })));
       }
 
@@ -816,48 +979,6 @@ export const ClientDetailNew: React.FC = () => {
     }, 7000);
   };
 
-  const handleQuery = async (query: string, mode: 'quick' | 'deep'): Promise<string> => {
-    setIsProcessingQuery(true);
-
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/answer-client-query`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query,
-          clientId: id,
-          mode,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to process query');
-      }
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to get answer');
-      }
-
-      setIsProcessingQuery(false);
-
-      // Return clean answer without metadata
-      return data.answer;
-    } catch (error) {
-      console.error('Error processing query:', error);
-      setIsProcessingQuery(false);
-      return `An error occurred while processing your query. Please ensure:\n• You have an OpenAI API key configured in Settings\n• Documents have been uploaded for this client\n• You have a stable internet connection\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`;
-    }
-  };
-
   const handleGenerateOpportunity = async () => {
     if (!client || !user || !id) return;
 
@@ -893,6 +1014,53 @@ export const ClientDetailNew: React.FC = () => {
       showToast('error', `Failed to generate opportunity: ${error?.message || 'Unknown error'}`);
     } finally {
       setIsGeneratingOpportunity(false);
+    }
+  };
+
+  const handleQuery = async (query: string, mode: 'quick' | 'deep'): Promise<string> => {
+    if (!id || !user || !client) {
+      showToast('error', 'Client information is required');
+      throw new Error('Client information is required');
+    }
+
+    setIsProcessingQuery(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showToast('error', 'Please log in to use this feature');
+        throw new Error('Not authenticated');
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/intelligence-agent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            query,
+            clientId: id,
+            mode,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.details || 'Failed to process query');
+      }
+
+      const result = await response.json();
+      return result.answer || result.response || 'No response generated.';
+    } catch (error: any) {
+      console.error('Error processing query:', error);
+      showToast('error', error.message || 'Failed to process query');
+      throw error;
+    } finally {
+      setIsProcessingQuery(false);
     }
   };
 
@@ -1196,10 +1364,11 @@ export const ClientDetailNew: React.FC = () => {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Sparkles },
-    { id: 'intelligence-agent', label: 'Intelligence Agent', icon: MessageSquare },
     { id: 'relationships', label: 'Relationships', icon: Users },
+    { id: 'assets', label: 'Assets and Meetings', icon: FileText },
+    { id: 'intelligence-agent', label: 'Intelligence Agent', icon: MessageSquare },
     { id: 'growth', label: 'Growth Opportunities', icon: TrendingUp },
-    { id: 'assets', label: 'Assets', icon: FileText },
+    { id: 'apollo', label: 'Apollo', icon: Database },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -1243,8 +1412,6 @@ export const ClientDetailNew: React.FC = () => {
 
       <ClientHeader
         client={client}
-        onRefreshData={handleRefreshData}
-        isRefreshing={isRefreshing}
         onEditClient={handleEditClient}
         onDeleteClient={handleDeleteClient}
       />
@@ -1404,10 +1571,30 @@ export const ClientDetailNew: React.FC = () => {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Contacts & Decision Makers</CardTitle>
-                  <Button variant="primary" size="sm" onClick={() => setShowAddContactModal(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Contact
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleFetchPeopleFromApollo}
+                      disabled={isFetchingPeople || !client?.website}
+                    >
+                      {isFetchingPeople ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Fetching...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Fetch using AI
+                        </>
+                      )}
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={() => setShowAddContactModal(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Contact
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -1447,6 +1634,17 @@ export const ClientDetailNew: React.FC = () => {
                                   <Phone className="h-3 w-3" />
                                   <span>{contact.phone}</span>
                                 </div>
+                              )}
+                              {contact.linkedinUrl && (
+                                <a
+                                  href={contact.linkedinUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <Linkedin className="h-3 w-3" />
+                                  <span>LinkedIn</span>
+                                </a>
                               )}
                             </div>
                           </div>
@@ -1941,23 +2139,358 @@ export const ClientDetailNew: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'intelligence-agent' && (
+        {activeTab === 'apollo' && (
           <div className="space-y-6">
-            <IntelligenceAgent
-              clientId={client.id}
-              onQuery={handleQuery}
-              isProcessing={isProcessingQuery}
-            />
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Company Intelligence</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleFetchOrganizationFromApollo}
+                    disabled={isFetchingOrg || !client?.website}
+                  >
+                    {isFetchingOrg ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Fetching...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Fetch Company Intelligence from Apollo
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {apolloOrgData || (client.apolloData && Object.keys(client.apolloData).length > 0) ? (
+                  <div className="space-y-6">
+                    {/* Organization Overview */}
+                    {apolloOrgData?.organization && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {apolloOrgData.organization.name && (
+                          <div className="p-4 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Company Name</p>
+                            <p className="text-lg font-semibold">{apolloOrgData.organization.name}</p>
+                          </div>
+                        )}
+                        {apolloOrgData.organization.industry && (
+                          <div className="p-4 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Industry</p>
+                            <p className="text-lg font-semibold">{apolloOrgData.organization.industry}</p>
+                          </div>
+                        )}
+                        {apolloOrgData.organization.employees && (
+                          <div className="p-4 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Employees</p>
+                            <p className="text-lg font-semibold">{apolloOrgData.organization.employees.toLocaleString()}</p>
+                          </div>
+                        )}
+                        {apolloOrgData.organization.founded && (
+                          <div className="p-4 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Founded</p>
+                            <p className="text-lg font-semibold">{apolloOrgData.organization.founded}</p>
+                          </div>
+                        )}
+                        {apolloOrgData.organization.annualRevenue && (
+                          <div className="p-4 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Annual Revenue</p>
+                            <p className="text-lg font-semibold">{apolloOrgData.organization.annualRevenuePrinted || `$${apolloOrgData.organization.annualRevenue.toLocaleString()}`}</p>
+                          </div>
+                        )}
+                        {apolloOrgData.organization.totalFunding && (
+                          <div className="p-4 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Total Funding</p>
+                            <p className="text-lg font-semibold">{apolloOrgData.organization.totalFundingPrinted || `$${apolloOrgData.organization.totalFunding.toLocaleString()}`}</p>
+                          </div>
+                        )}
+                        {apolloOrgData.organization.latestFundingStage && (
+                          <div className="p-4 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Latest Funding Stage</p>
+                            <p className="text-lg font-semibold">{apolloOrgData.organization.latestFundingStage}</p>
+                          </div>
+                        )}
+                        {apolloOrgData.organization.alexaRanking && (
+                          <div className="p-4 bg-muted rounded-lg">
+                            <p className="text-sm text-muted-foreground mb-1">Alexa Ranking</p>
+                            <p className="text-lg font-semibold">#{apolloOrgData.organization.alexaRanking.toLocaleString()}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-            {queries.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-foreground">Query History</h3>
-                {queries.map((query) => (
-                  <QueryResult key={query.id} query={query} />
-                ))}
-              </div>
-            )}
+                    {/* Location & Contact Info */}
+                    {(apolloOrgData?.organization?.city || apolloOrgData?.organization?.state || apolloOrgData?.organization?.country || apolloOrgData?.organization?.website || apolloOrgData?.organization?.linkedin) && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Location & Contact</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {(apolloOrgData?.organization?.city || apolloOrgData?.organization?.state || apolloOrgData?.organization?.country) && (
+                              <div>
+                                <p className="text-sm font-medium mb-2">Location</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {[
+                                    apolloOrgData.organization.city,
+                                    apolloOrgData.organization.state,
+                                    apolloOrgData.organization.country
+                                  ].filter(Boolean).join(', ')}
+                                </p>
+                                {apolloOrgData.organization.streetAddress && (
+                                  <p className="text-sm text-muted-foreground mt-1">{apolloOrgData.organization.streetAddress}</p>
+                                )}
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-sm font-medium mb-2">Links</p>
+                              <div className="space-y-1">
+                                {apolloOrgData?.organization?.website && (
+                                  <a href={apolloOrgData.organization.website} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline block">
+                                    Website
+                                  </a>
+                                )}
+                                {apolloOrgData?.organization?.linkedin && (
+                                  <a href={apolloOrgData.organization.linkedin} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline block">
+                                    LinkedIn
+                                  </a>
+                                )}
+                                {apolloOrgData?.organization?.twitter && (
+                                  <a href={apolloOrgData.organization.twitter} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline block">
+                                    Twitter
+                                  </a>
+                                )}
+                                {apolloOrgData?.organization?.facebook && (
+                                  <a href={apolloOrgData.organization.facebook} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline block">
+                                    Facebook
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Description */}
+                    {apolloOrgData?.organization?.description && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Description</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground whitespace-pre-line">{apolloOrgData.organization.description}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Employee Metrics Graph */}
+                    {apolloOrgData?.dataFetched?.employeeMetrics && apolloOrgData.dataFetched.employeeMetrics.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Employee Growth Over Time</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={apolloOrgData.dataFetched.employeeMetrics.map((metric: any) => ({
+                              date: new Date(metric.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+                              total: metric.departments.find((d: any) => d.functions === null)?.retained || 0,
+                              new: metric.departments.find((d: any) => d.functions === null)?.new || 0,
+                              churned: metric.departments.find((d: any) => d.functions === null)?.churned || 0,
+                            }))}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="date" />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend />
+                              <Line type="monotone" dataKey="total" stroke="#8884d8" name="Total Employees" />
+                              <Line type="monotone" dataKey="new" stroke="#82ca9d" name="New Hires" />
+                              <Line type="monotone" dataKey="churned" stroke="#ffc658" name="Churned" />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Department Distribution */}
+                    {apolloOrgData?.dataFetched?.employeeMetrics && apolloOrgData.dataFetched.employeeMetrics.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Department Distribution (Latest)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={(() => {
+                              const latest = apolloOrgData.dataFetched.employeeMetrics[apolloOrgData.dataFetched.employeeMetrics.length - 1];
+                              return latest.departments
+                                .filter((d: any) => d.functions !== null)
+                                .map((d: any) => ({
+                                  department: d.functions?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Other',
+                                  employees: d.retained || 0,
+                                }))
+                                .sort((a: any, b: any) => b.employees - a.employees)
+                                .slice(0, 10);
+                            })()}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="department" angle={-45} textAnchor="end" height={100} />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="employees" fill="#8884d8" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Keywords */}
+                    {apolloOrgData?.dataFetched?.keywords && apolloOrgData.dataFetched.keywords.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Keywords ({apolloOrgData.dataFetched.keywords.length})</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {apolloOrgData.dataFetched.keywords.map((keyword: string, idx: number) => (
+                              <Badge key={idx} variant="secondary">{keyword}</Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Technologies */}
+                    {apolloOrgData?.dataFetched?.currentTechnologies && apolloOrgData.dataFetched.currentTechnologies.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Technologies ({apolloOrgData.dataFetched.currentTechnologies.length})</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            {/* Group by category */}
+                            {Object.entries(
+                              apolloOrgData.dataFetched.currentTechnologies.reduce((acc: any, tech: any) => {
+                                const category = tech.category || 'Other';
+                                if (!acc[category]) acc[category] = [];
+                                acc[category].push(tech);
+                                return acc;
+                              }, {})
+                            ).map(([category, techs]: [string, any]) => (
+                              <div key={category}>
+                                <p className="text-sm font-medium mb-2">{category}</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {techs.map((tech: any, idx: number) => (
+                                    <Badge key={idx} variant="outline">{tech.name}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Technology Names */}
+                    {apolloOrgData?.dataFetched?.technologyNames && apolloOrgData.dataFetched.technologyNames.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Technology Names ({apolloOrgData.dataFetched.technologyNames.length})</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {apolloOrgData.dataFetched.technologyNames.map((tech: string, idx: number) => (
+                              <Badge key={idx} variant="outline">{tech}</Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Industries */}
+                    {(apolloOrgData?.dataFetched?.industries?.length > 0 || apolloOrgData?.dataFetched?.secondaryIndustries?.length > 0) && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Industries</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            {apolloOrgData.dataFetched.industries?.length > 0 && (
+                              <div>
+                                <p className="text-sm font-medium mb-2">Primary Industries</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {apolloOrgData.dataFetched.industries.map((industry: string, idx: number) => (
+                                    <Badge key={idx} variant="default">{industry}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {apolloOrgData.dataFetched.secondaryIndustries?.length > 0 && (
+                              <div>
+                                <p className="text-sm font-medium mb-2">Secondary Industries</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {apolloOrgData.dataFetched.secondaryIndustries.map((industry: string, idx: number) => (
+                                    <Badge key={idx} variant="secondary">{industry}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Funding Events */}
+                    {apolloOrgData?.dataFetched?.fundingEvents && apolloOrgData.dataFetched.fundingEvents.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Funding Events ({apolloOrgData.dataFetched.fundingEvents.length})</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            {apolloOrgData.dataFetched.fundingEvents.map((event: any, idx: number) => (
+                              <div key={idx} className="p-3 border rounded-lg">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <p className="font-medium">{event.type || 'Funding Round'}</p>
+                                    {event.date && <p className="text-sm text-muted-foreground">{new Date(event.date).toLocaleDateString()}</p>}
+                                    {event.amount && <p className="text-sm font-semibold mt-1">{event.amount}</p>}
+                                    {event.investors && <p className="text-sm text-muted-foreground mt-1">Investors: {event.investors}</p>}
+                                  </div>
+                                  {event.newsUrl && (
+                                    <a href={event.newsUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-sm">
+                                      News
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">
+                      {client?.website 
+                        ? 'Click "Fetch Company Intelligence from Apollo" to get detailed company information, technologies, funding data, and more.'
+                        : 'Add a website URL to the client to enable company intelligence fetching.'}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
+        )}
+
+        {activeTab === 'intelligence-agent' && (
+          <IntelligenceAgent
+            clientId={client.id}
+            onQuery={handleQuery}
+            isProcessing={isProcessingQuery}
+          />
         )}
 
         {activeTab === 'assets' && (

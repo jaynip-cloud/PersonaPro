@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -7,6 +7,9 @@ import { Badge } from '../ui/Badge';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../lib/supabase';
+import { mapAIResponseToFormData } from '../../utils/clientDataMapper';
+import { AIFetchProgress } from '../client/AIFetchProgress';
+import { AIResponseComparison } from '../client/AIResponseComparison';
 import {
   User,
   Building2,
@@ -22,7 +25,6 @@ import {
   Sparkles,
   Target,
   DollarSign,
-  Smile,
   Linkedin,
   Twitter,
   Instagram,
@@ -49,15 +51,15 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [aiPrefilling, setAiPrefilling] = useState(false);
-  const [extractionProgress, setExtractionProgress] = useState(0);
-  const [extractionSteps, setExtractionSteps] = useState<ExtractionStep[]>([
-    { id: 'crawl', label: 'Crawling client website', status: 'pending' },
-    { id: 'company', label: 'Extracting company details', status: 'pending' },
-    { id: 'contact', label: 'Finding contact information', status: 'pending' },
-    { id: 'social', label: 'Discovering social profiles', status: 'pending' },
-    { id: 'business', label: 'Analyzing business goals', status: 'pending' },
-    { id: 'finalize', label: 'Finalizing client data', status: 'pending' },
-  ]);
+  
+  // Dual AI flow state
+  const [aiResponses, setAiResponses] = useState<{
+    perplexity: any | null;
+    openai: any | null;
+  }>({ perplexity: null, openai: null });
+  const [comparison, setComparison] = useState<any | null>(null);
+  const [selectedModel, setSelectedModel] = useState<'perplexity' | 'openai' | null>(null);
+  const [hasAutoFetched, setHasAutoFetched] = useState(false);
   const { user } = useAuth();
   const { refreshClients } = useApp();
   const navigate = useNavigate();
@@ -93,8 +95,6 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     shortTermGoals: '',
     longTermGoals: '',
     expectations: '',
-    satisfactionScore: 0,
-    satisfactionFeedback: '',
     uploadedDocuments: [] as string[]
   });
 
@@ -102,6 +102,17 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
   const totalSteps = 5;
+
+  // Auto-trigger fetch when all 3 fields are entered
+  useEffect(() => {
+    const hasAllFields = formData.company.trim() && formData.website.trim() && formData.linkedinUrl.trim();
+    
+    if (hasAllFields && !hasAutoFetched && !aiPrefilling && !aiResponses.perplexity && !aiResponses.openai) {
+      console.log('[FIRST-CLIENT-WIZARD] Auto-triggering fetch for 3 fields');
+      setHasAutoFetched(true);
+      handleAIPrefill();
+    }
+  }, [formData.company, formData.website, formData.linkedinUrl]);
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -121,189 +132,202 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updateStepStatus = (stepId: string, status: ExtractionStep['status'], message?: string) => {
-    setExtractionSteps(prev => prev.map(step =>
-      step.id === stepId ? { ...step, status, message } : step
-    ));
-  };
 
-  const simulateClientProgress = async () => {
-    const steps = ['crawl', 'company', 'contact', 'social', 'business', 'finalize'];
-
-    for (let i = 0; i < steps.length; i++) {
-      const stepId = steps[i];
-      updateStepStatus(stepId, 'in_progress');
-      setExtractionProgress(((i + 0.5) / steps.length) * 100);
-
-      await new Promise(resolve => setTimeout(resolve, 700 + Math.random() * 400));
-
-      if (i < steps.length - 1) {
-        updateStepStatus(stepId, 'completed');
-        setExtractionProgress(((i + 1) / steps.length) * 100);
-      }
-    }
-  };
-
-  const handleAIPrefill = async () => {
-    const urlToExtract = formData.website || formData.linkedinUrl;
-
-    if (!urlToExtract || !user) return;
-
-    setAiPrefilling(true);
-    setExtractionProgress(0);
-    setExtractionSteps(prev => prev.map(step => ({ ...step, status: 'pending' as const })));
-
-    const progressPromise = simulateClientProgress();
-
+  const fetchPerplexityData = async () => {
+    console.log('[FIRST-CLIENT-WIZARD] 🚀 Starting Perplexity fetch');
     try {
-      // Get user session token for proper authentication
       const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/extract-company-data`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-client-perplexity`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${authToken}`,
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ url: urlToExtract })
+          body: JSON.stringify({
+            clientName: formData.company,
+            websiteUrl: formData.website,
+            linkedinUrl: formData.linkedinUrl,
+          }),
         }
       );
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('AI Prefill error:', errorData);
-        alert(`AI Autofill failed: ${errorData.error || 'Unknown error'}`);
-        setExtractionSteps(prev => prev.map(step =>
-          step.status === 'in_progress'
-            ? { ...step, status: 'error' as const, message: 'Failed' }
-            : step
-        ));
-        return;
+        throw new Error(errorData.error || 'Perplexity fetch failed');
       }
 
-      const data = await response.json();
-
-      await progressPromise;
-
-      updateStepStatus('finalize', 'completed');
-      setExtractionProgress(100);
-
-      if (data.success && data.data) {
-        // Use functional update to ensure we're working with the latest state
-        setFormData(prev => {
-          const updates: any = {};
-
-          // Only update fields that are empty or missing
-          if (data.data.name && !prev.company?.trim()) {
-            updates.company = data.data.name;
-          }
-          if (data.data.industry && !prev.industry?.trim()) {
-            updates.industry = data.data.industry;
-          }
-          if (data.data.description && !prev.companyOverview?.trim()) {
-            updates.companyOverview = data.data.description;
-          }
-          if (data.data.founded && !prev.founded?.trim()) {
-            updates.founded = data.data.founded;
-          }
-          if (data.data.companySize && !prev.companySize?.trim()) {
-            updates.companySize = data.data.companySize;
-          }
-
-          if (data.data.location?.city && !prev.city?.trim()) {
-            updates.city = data.data.location.city;
-          }
-          if (data.data.location?.country && !prev.country?.trim()) {
-            updates.country = data.data.location.country;
-          }
-          if (data.data.location?.zipCode && !prev.zipCode?.trim()) {
-            updates.zipCode = data.data.location.zipCode;
-          }
-
-          if (data.data.contactInfo?.contactName && !prev.contactName?.trim()) {
-            updates.contactName = data.data.contactInfo.contactName;
-          }
-          if (data.data.contactInfo?.jobTitle && !prev.jobTitle?.trim()) {
-            updates.jobTitle = data.data.contactInfo.jobTitle;
-          }
-          if (data.data.contactInfo?.primaryEmail && !prev.primaryEmail?.trim()) {
-            updates.primaryEmail = data.data.contactInfo.primaryEmail;
-          }
-          if (data.data.contactInfo?.alternateEmail && !prev.alternateEmail?.trim()) {
-            updates.alternateEmail = data.data.contactInfo.alternateEmail;
-          }
-          if (data.data.contactInfo?.primaryPhone && !prev.primaryPhone?.trim()) {
-            updates.primaryPhone = data.data.contactInfo.primaryPhone;
-          }
-          if (data.data.contactInfo?.alternatePhone && !prev.alternatePhone?.trim()) {
-            updates.alternatePhone = data.data.contactInfo.alternatePhone;
-          }
-
-          if (data.data.businessInfo?.shortTermGoals && !prev.shortTermGoals?.trim()) {
-            updates.shortTermGoals = data.data.businessInfo.shortTermGoals;
-          }
-          if (data.data.businessInfo?.longTermGoals && !prev.longTermGoals?.trim()) {
-            updates.longTermGoals = data.data.businessInfo.longTermGoals;
-          }
-          if (data.data.businessInfo?.expectations && !prev.expectations?.trim()) {
-            updates.expectations = data.data.businessInfo.expectations;
-          }
-          if (data.data.description && !prev.description?.trim()) {
-            updates.description = data.data.description;
-          }
-
-          if (data.data.socialProfiles?.linkedin && !prev.linkedinUrl?.trim()) {
-            updates.linkedinUrl = data.data.socialProfiles.linkedin;
-          }
-          if (data.data.socialProfiles?.twitter && !prev.twitterUrl?.trim()) {
-            updates.twitterUrl = data.data.socialProfiles.twitter;
-          }
-          if (data.data.socialProfiles?.facebook && !prev.facebookUrl?.trim()) {
-            updates.facebookUrl = data.data.socialProfiles.facebook;
-          }
-          if (data.data.socialProfiles?.instagram && !prev.instagramUrl?.trim()) {
-            updates.instagramUrl = data.data.socialProfiles.instagram;
-          }
-
-          if (data.data.logo && !prev.logoUrl?.trim()) {
-            updates.logoUrl = data.data.logo;
-          }
-
-          // Return updated state only if there are changes
-          if (Object.keys(updates).length > 0) {
-            // Store update count for alert
-            const updateCount = Object.keys(updates).length;
-            setTimeout(() => {
-              alert(`Successfully populated ${updateCount} fields with company data!`);
-            }, 100);
-            return { ...prev, ...updates };
-          }
-          setTimeout(() => {
-            alert('No new data found to populate. All fields are already filled or no data was available.');
-          }, 100);
-          return prev; // Return unchanged state
-        });
-      } else {
-        alert('No company data could be extracted from the website.');
-      }
-    } catch (error) {
-      console.error('AI Prefill error:', error);
-      setExtractionSteps(prev => prev.map(step =>
-        step.status === 'in_progress'
-          ? { ...step, status: 'error' as const, message: 'Failed' }
-          : step
-      ));
-      alert('AI Autofill encountered an error. Please try again or fill in manually.');
-    } finally {
-      setAiPrefilling(false);
-      setTimeout(() => {
-        setExtractionProgress(0);
-        setExtractionSteps(prev => prev.map(step => ({ ...step, status: 'pending' as const, message: undefined })));
-      }, 3000);
+      const result = await response.json();
+      return {
+        model: 'perplexity' as const,
+        data: result.data,
+        metadata: result.metadata,
+      };
+    } catch (error: any) {
+      console.error('[FIRST-CLIENT-WIZARD] ❌ Perplexity error', error);
+      return {
+        model: 'perplexity' as const,
+        data: null,
+        metadata: { completenessScore: 0, processingTime: 0, timestamp: '' },
+        error: error.message,
+      };
     }
+  };
+
+  const fetchOpenAIData = async () => {
+    console.log('[FIRST-CLIENT-WIZARD] 🚀 Starting OpenAI fetch');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-client-openai`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            clientName: formData.company,
+            websiteUrl: formData.website,
+            linkedinUrl: formData.linkedinUrl,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'OpenAI fetch failed');
+      }
+
+      const result = await response.json();
+      return {
+        model: 'openai' as const,
+        data: result.data,
+        metadata: result.metadata,
+      };
+    } catch (error: any) {
+      console.error('[FIRST-CLIENT-WIZARD] ❌ OpenAI error', error);
+      return {
+        model: 'openai' as const,
+        data: null,
+        metadata: { completenessScore: 0, processingTime: 0, timestamp: '' },
+        error: error.message,
+      };
+    }
+  };
+
+  const fetchComparison = async (perplexityResult?: any, openaiResult?: any) => {
+    console.log('[FIRST-CLIENT-WIZARD] 🔍 Starting comparison');
+    
+    // Use passed results or fall back to state
+    const perplexityData = perplexityResult?.data || aiResponses.perplexity?.data;
+    const openaiData = openaiResult?.data || aiResponses.openai?.data;
+    
+    if (!perplexityData || !openaiData) {
+      console.error('[FIRST-CLIENT-WIZARD] ❌ Cannot compare - missing responses');
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compare-ai-responses`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            perplexityResponse: perplexityData,
+            openaiResponse: openaiData,
+            clientName: formData.company,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Comparison failed');
+      }
+
+      const result = await response.json();
+      console.log('[FIRST-CLIENT-WIZARD] ✅ Comparison received', {
+        success: result.success,
+        hasComparison: !!result.comparison,
+      });
+
+      if (!result.success || !result.comparison) {
+        throw new Error('Comparison data not found in response');
+      }
+
+      setComparison(result.comparison);
+    } catch (error: any) {
+      console.error('[FIRST-CLIENT-WIZARD] ❌ Comparison error', error);
+    }
+  };
+
+  const handleAIPrefill = async () => {
+    if (!formData.company || !formData.website || !formData.linkedinUrl) {
+      return;
+    }
+
+    if (!user) return;
+
+    console.log('[FIRST-CLIENT-WIZARD] === STARTING DUAL AI FETCH ===');
+    setAiPrefilling(true);
+    setAiResponses({ perplexity: null, openai: null });
+    setComparison(null);
+    setSelectedModel(null);
+
+    // Fetch both in parallel
+    const [perplexityResult, openaiResult] = await Promise.all([
+      fetchPerplexityData(),
+      fetchOpenAIData(),
+    ]);
+
+    console.log('[FIRST-CLIENT-WIZARD] ✅ Both fetches completed', {
+      perplexitySuccess: !!perplexityResult.data,
+      openaiSuccess: !!openaiResult.data,
+    });
+
+    setAiResponses({
+      perplexity: perplexityResult,
+      openai: openaiResult,
+    });
+
+    // If both succeeded, fetch comparison (pass results directly to avoid state timing issues)
+    if (perplexityResult.data && openaiResult.data) {
+      await fetchComparison(perplexityResult, openaiResult);
+    }
+
+    setAiPrefilling(false);
+  };
+
+  const handleRegenerate = () => {
+    console.log('[FIRST-CLIENT-WIZARD] 🔄 Regenerating responses');
+    setHasAutoFetched(false);
+    handleAIPrefill();
+  };
+
+  const handleSelectResponse = (model: 'perplexity' | 'openai') => {
+    console.log('[FIRST-CLIENT-WIZARD] 👤 User selected response', { model });
+    const selectedResponse = aiResponses[model];
+    
+    if (!selectedResponse?.data) {
+      return;
+    }
+
+    setSelectedModel(model);
+    const mappedData = mapAIResponseToFormData(selectedResponse.data, model);
+    setFormData(prev => ({ ...prev, ...mappedData }));
   };
 
   const addTag = () => {
@@ -443,8 +467,6 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
           short_term_goals: formData.shortTermGoals,
           long_term_goals: formData.longTermGoals,
           expectations: formData.expectations,
-          satisfaction_score: formData.satisfactionScore > 0 ? formData.satisfactionScore : null,
-          satisfaction_feedback: formData.satisfactionFeedback,
           status: formData.status,
           tags: formData.tags,
           description: formData.description,
@@ -520,10 +542,26 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-900 mb-3 font-medium">
                   <Sparkles className="h-4 w-4 inline mr-2" />
-                  Enter company website or LinkedIn URL and let AI populate the details!
+                  Enter the 3 required fields and let AI fetch comprehensive client details!
                 </p>
-                <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="space-y-3 mb-3">
                   <div>
+                    <label className="block text-xs font-medium text-blue-900 mb-1">
+                      Client Name <span className="text-red-600">*</span>
+                    </label>
+                    <Input
+                      placeholder="Acme Corporation"
+                      value={formData.company}
+                      onChange={(e) => handleChange('company', e.target.value)}
+                    />
+                    {errors.company && (
+                      <p className="text-xs text-red-600 mt-1">{errors.company}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-blue-900 mb-1">
+                      Website URL <span className="text-red-600">*</span>
+                    </label>
                     <Input
                       placeholder="https://company.com"
                       value={formData.website}
@@ -534,6 +572,9 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                     )}
                   </div>
                   <div>
+                    <label className="block text-xs font-medium text-blue-900 mb-1">
+                      LinkedIn URL <span className="text-red-600">*</span>
+                    </label>
                     <Input
                       placeholder="https://linkedin.com/company/..."
                       value={formData.linkedinUrl}
@@ -541,63 +582,39 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                     />
                   </div>
                 </div>
-                <Button
-                  variant="primary"
-                  onClick={handleAIPrefill}
-                  disabled={(!formData.website && !formData.linkedinUrl) || aiPrefilling}
-                  className="w-full"
-                >
-                  {aiPrefilling ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Prefilling...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      AI Autofill from {formData.website ? 'Website' : formData.linkedinUrl ? 'LinkedIn' : 'URL'}
-                    </>
-                  )}
-                </Button>
+                {!aiPrefilling && !aiResponses.perplexity && !aiResponses.openai && (
+                  <Button
+                    variant="primary"
+                    onClick={handleAIPrefill}
+                    disabled={!formData.company || !formData.website || !formData.linkedinUrl}
+                    className="w-full"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Fetch Client Data with AI
+                  </Button>
+                )}
               </div>
 
+              {/* Show AI Fetch Progress while fetching */}
               {aiPrefilling && (
-                <div className="bg-white border-2 border-blue-500 rounded-lg p-6 shadow-lg mb-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                    <h4 className="text-lg font-semibold text-slate-900">Extracting Client Data...</h4>
-                  </div>
+                <div className="mb-4">
+                  <AIFetchProgress
+                    perplexityResponse={aiResponses.perplexity}
+                    openaiResponse={aiResponses.openai}
+                  />
+                </div>
+              )}
 
-                  <div className="mb-6">
-                    {(() => {
-                      // Find the current active step (in_progress first, then error, then first pending)
-                      const inProgressStep = extractionSteps.find(step => step.status === 'in_progress');
-                      const errorStep = extractionSteps.find(step => step.status === 'error');
-                      const pendingStep = extractionSteps.find(step => step.status === 'pending');
-                      const currentStep = inProgressStep || errorStep || pendingStep || extractionSteps[0];
-                      
-                      return (
-                        <>
-                          <div className="flex justify-between items-center text-sm mb-2">
-                            <span className="text-slate-700 font-medium">
-                              {currentStep?.label || 'Processing...'}
-                            </span>
-                            <span className="text-slate-600 font-medium">{Math.round(extractionProgress)}%</span>
-                          </div>
-                          <div className="w-full bg-slate-200 rounded-full h-3">
-                            <div
-                              className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
-                              style={{ width: `${extractionProgress}%` }}
-                            />
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-
-                  <p className="text-xs text-slate-500 mt-4 text-center">
-                    This may take 20-30 seconds. Please wait...
-                  </p>
+              {/* Show Comparison after both responses are received */}
+              {!aiPrefilling && (aiResponses.perplexity || aiResponses.openai) && (
+                <div className="mb-4">
+                  <AIResponseComparison
+                    perplexityResponse={aiResponses.perplexity}
+                    openaiResponse={aiResponses.openai}
+                    comparison={comparison}
+                    onSelectResponse={handleSelectResponse}
+                    onRegenerate={handleRegenerate}
+                  />
                 </div>
               )}
 
@@ -955,7 +972,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                 <Target className="h-5 w-5" />
-                Goals & Satisfaction
+                Goals & Expectations
               </h3>
 
               <div>
@@ -990,41 +1007,6 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   placeholder="What specific outcomes or results is the client seeking from your services?"
                   value={formData.expectations}
                   onChange={(e) => handleChange('expectations', e.target.value)}
-                  className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  <Smile className="h-4 w-4 inline mr-2" />
-                  Client Satisfaction Score (1-10)
-                </label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    value={formData.satisfactionScore}
-                    onChange={(e) => handleChange('satisfactionScore', parseInt(e.target.value))}
-                    className="flex-1"
-                  />
-                  <span className="text-2xl font-bold text-blue-600 w-12 text-center">
-                    {formData.satisfactionScore > 0 ? formData.satisfactionScore : '-'}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Rate based on feedback, surveys, or metrics from previous experiences
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Satisfaction Feedback / Notes
-                </label>
-                <textarea
-                  placeholder="Add any feedback, survey results, or notes about client satisfaction..."
-                  value={formData.satisfactionFeedback}
-                  onChange={(e) => handleChange('satisfactionFeedback', e.target.value)}
                   className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
               </div>
