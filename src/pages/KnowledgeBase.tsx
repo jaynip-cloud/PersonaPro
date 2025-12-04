@@ -5,9 +5,6 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard';
-import { AIServiceExtractor } from '../components/knowledge/AIServiceExtractor';
-import { AIBlogExtractor } from '../components/knowledge/AIBlogExtractor';
-import { AITechnologyExtractor } from '../components/knowledge/AITechnologyExtractor';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
@@ -505,11 +502,30 @@ export const KnowledgeBase: React.FC = () => {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate insights');
+        let errorMessage = 'Failed to generate insights';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // If error response is not JSON, try to get text
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      const responseText = await response.text();
+      if (!responseText || responseText.trim().length === 0) {
+        throw new Error('Empty response from server');
+      }
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response:', responseText.substring(0, 200));
+        throw new Error('Invalid response format from server');
+      }
       setAiInsights(data.insights);
       setActiveTab('overview');
     } catch (error: any) {
@@ -961,326 +977,891 @@ export const KnowledgeBase: React.FC = () => {
               )}
 
               {aiInsights && (
-                <div className="space-y-6 mt-8">
-                  {aiInsights.executiveSummary && (
-                    <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg p-8 border-2 border-blue-200">
-                      <div className="flex items-start gap-4 mb-4">
-                        <div className="p-3 bg-blue-600 rounded-lg">
-                          <FileText className="h-6 w-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-2xl font-bold text-slate-900">Executive Summary</h3>
-                          <p className="text-sm text-slate-600 mt-1">Comprehensive overview of your company intelligence</p>
-                        </div>
+                <div className="mt-8">
+                  {/* Main Executive Summary Container - All content inside this blue section */}
+                  <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg p-8 border-2 border-blue-200 space-y-8">
+                    {/* Header */}
+                    <div className="flex items-start gap-4 mb-6">
+                      <div className="p-3 bg-blue-600 rounded-lg">
+                        <FileText className="h-6 w-6 text-white" />
                       </div>
-                      <div className="prose prose-slate max-w-none">
-                        <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">{aiInsights.executiveSummary}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-6 border border-blue-100">
-                    <div className="flex items-start gap-3">
-                      <Lightbulb className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
                       <div>
-                        <h3 className="text-lg font-semibold text-slate-900 mb-2">Summary</h3>
-                        <p className="text-slate-700 leading-relaxed">{aiInsights.summary}</p>
+                        <h3 className="text-2xl font-bold text-slate-900">Executive Summary</h3>
+                        <p className="text-sm text-slate-600 mt-1">Comprehensive overview of your company intelligence</p>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card>
-                      <CardContent className="pt-7 px-6 pb-6">
-                        <div className="flex items-center gap-2 mb-4">
-                          <Zap className="h-5 w-5 text-green-600" />
-                          <h3 className="text-lg font-semibold text-foreground">Strengths</h3>
-                        </div>
-                        <ul className="space-y-2">
-                          {aiInsights.strengths?.map((strength: string, idx: number) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
-                              <span className="text-sm text-muted-foreground">{strength}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
+                    {/* Check if new nested structure or old flat structure */}
+                    {typeof aiInsights.executiveSummary === 'object' && aiInsights.executiveSummary !== null ? (
+                      <>
+                        {/* Overview */}
+                        {aiInsights.executiveSummary.overview && (
+                          <div className="prose prose-slate max-w-none">
+                            <p className="text-slate-800 leading-relaxed whitespace-pre-wrap text-base">{aiInsights.executiveSummary.overview}</p>
+                          </div>
+                        )}
 
-                    <Card>
-                      <CardContent className="pt-7 px-6 pb-6">
-                        <div className="flex items-center gap-2 mb-4">
-                          <TrendingUp className="h-5 w-5 text-blue-600" />
-                          <h3 className="text-lg font-semibold text-foreground">Growth Opportunities</h3>
-                        </div>
-                        <ul className="space-y-2">
-                          {aiInsights.opportunities?.map((opportunity: string, idx: number) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <Target className="h-4 w-4 text-blue-600 flex-shrink-0 mt-1" />
-                              <span className="text-sm text-muted-foreground">{opportunity}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  </div>
+                        {/* Reasoning */}
+                        {aiInsights.executiveSummary.reasoning && (
+                          <div className="bg-blue-100/50 rounded-lg p-4 border border-blue-200">
+                            <h4 className="text-sm font-semibold text-blue-900 mb-2">Analysis Reasoning</h4>
+                            <p className="text-sm text-blue-800 leading-relaxed">{aiInsights.executiveSummary.reasoning}</p>
+                          </div>
+                        )}
 
-                  {aiInsights.marketPosition && (
-                    <Card>
-                      <CardContent className="pt-7 px-6 pb-6">
-                        <h3 className="text-lg font-semibold text-foreground mb-3">Market Position</h3>
-                        <p className="text-muted-foreground leading-relaxed">{aiInsights.marketPosition}</p>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {aiInsights.recommendations && aiInsights.recommendations.length > 0 && (
-                    <Card>
-                      <CardContent className="pt-7 px-6 pb-6">
-                        <h3 className="text-lg font-semibold text-foreground mb-4">Strategic Recommendations</h3>
-                        <div className="space-y-3">
-                          {aiInsights.recommendations.map((rec: string, idx: number) => (
-                            <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-semibold">
-                                {idx + 1}
-                              </span>
-                              <p className="text-sm text-muted-foreground flex-1">{rec}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {aiInsights.contentStrategy && (
-                      <Card>
-                        <CardContent className="pt-7 px-6 pb-6">
-                          <h3 className="text-lg font-semibold text-foreground mb-3">Content Strategy</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed">{aiInsights.contentStrategy}</p>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {aiInsights.techStack && (
-                      <Card>
-                        <CardContent className="pt-7 px-6 pb-6">
-                          <h3 className="text-lg font-semibold text-foreground mb-3">Technology Assessment</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed">{aiInsights.techStack}</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-
-                  {aiInsights.kpis && (
-                    <Card>
-                      <CardContent className="pt-7 px-6 pb-6">
-                        <div className="flex items-center gap-2 mb-6">
-                          <Gauge className="h-5 w-5 text-blue-600" />
-                          <h3 className="text-lg font-semibold text-foreground">Key Performance Indicators</h3>
-                        </div>
-                        <div className="space-y-6">
-                          {['contentScore', 'teamStrength', 'techModernity', 'marketReadiness', 'brandPresence', 'growthPotential'].map((key) => {
-                            const score = aiInsights.kpis[key] || 0;
-                            const reasoning = aiInsights.kpis[`${key}Reasoning`] || '';
-                            const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-                            const getColor = (score: number) => {
-                              if (score >= 75) return 'text-green-600 bg-green-50 border-green-200';
-                              if (score >= 50) return 'text-blue-600 bg-blue-50 border-blue-200';
-                              if (score >= 25) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-                              return 'text-red-600 bg-red-50 border-red-200';
-                            };
-                            return (
-                              <div key={key} className="border-2 border-slate-200 rounded-lg overflow-hidden">
-                                <div className={`p-4 ${getColor(score)} border-b-2 border-current/20`}>
-                                  <div className="flex items-center justify-between">
-                                    <div className="text-sm font-semibold mb-2">{label}</div>
-                                    <div className="flex items-end gap-1">
-                                      <span className="text-3xl font-bold">{score}</span>
-                                      <span className="text-sm pb-1">/100</span>
+                        {/* All Sections */}
+                        {aiInsights.executiveSummary.sections && (
+                          <div className="space-y-8 pt-4 border-t border-blue-200">
+                            {(() => {
+                              const sections = aiInsights.executiveSummary.sections;
+                              return (
+                                <>
+                              {/* Company Profile */}
+                              {sections.companyProfile && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Building2 className="h-5 w-5 text-blue-600" />
+                                    Company Profile
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.companyProfile.companyOverview && (
+                                      <p className="text-sm text-slate-700 leading-relaxed">{sections.companyProfile.companyOverview}</p>
+                                    )}
+                                    {sections.companyProfile.keyCharacteristics && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Key Characteristics</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.companyProfile.keyCharacteristics}</p>
+                                      </div>
+                                    )}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Maturity</div>
+                                        <div className="text-sm font-semibold text-slate-900 capitalize">{sections.companyProfile.maturityLevel}</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Sophistication</div>
+                                        <div className="text-sm font-semibold text-slate-900">{sections.companyProfile.sophisticationScore}/100</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Market Readiness</div>
+                                        <div className="text-sm font-semibold text-slate-900">{sections.companyProfile.marketReadiness}/100</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Strategic Value</div>
+                                        <div className="text-sm font-semibold text-slate-900">{sections.companyProfile.strategicValue}/100</div>
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="mt-2 h-2 bg-white rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full bg-current transition-all"
-                                      style={{ width: `${score}%` }}
-                                    />
+                                    {sections.companyProfile.reasoning && (
+                                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.companyProfile.reasoning}</p>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                                {reasoning && (
-                                  <div className="p-4 bg-white">
-                                    <p className="text-sm text-slate-700 leading-relaxed">{reasoning}</p>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                              )}
 
-                  {aiInsights.sentiment && (
-                    <Card>
-                      <CardContent className="pt-7 px-6 pb-6">
-                        <div className="flex items-center gap-2 mb-6">
-                          <Activity className="h-5 w-5 text-purple-600" />
-                          <h3 className="text-lg font-semibold text-foreground">Sentiment Analysis</h3>
-                        </div>
-                        <div className="space-y-6">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                  {aiInsights.sentiment.overall === 'positive' && <Smile className="h-8 w-8 text-green-600" />}
-                                  {aiInsights.sentiment.overall === 'neutral' && <Meh className="h-8 w-8 text-yellow-600" />}
-                                  {aiInsights.sentiment.overall === 'negative' && <Frown className="h-8 w-8 text-red-600" />}
-                                  <div>
-                                    <div className="text-sm text-muted-foreground">Overall Sentiment</div>
-                                    <div className="text-lg font-semibold text-foreground capitalize">
-                                      {aiInsights.sentiment.overall}
+                              {/* Market Intelligence */}
+                              {sections.marketIntelligence && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                                    Market Intelligence
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.marketIntelligence.industryPosition && (
+                                      <p className="text-sm text-slate-700 leading-relaxed">{sections.marketIntelligence.industryPosition}</p>
+                                    )}
+                                    {sections.marketIntelligence.recentNews && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Recent News & Updates</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.marketIntelligence.recentNews}</p>
+                                      </div>
+                                    )}
+                                    {sections.marketIntelligence.competitiveLandscape && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Competitive Landscape</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.marketIntelligence.competitiveLandscape}</p>
+                                      </div>
+                                    )}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Competitive Pressure</div>
+                                        <div className="text-sm font-semibold text-slate-900 capitalize">{sections.marketIntelligence.competitivePressure}</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Growth Trajectory</div>
+                                        <div className="text-sm font-semibold text-slate-900 capitalize">{sections.marketIntelligence.growthTrajectory}</div>
+                                      </div>
                                     </div>
+                                    {sections.marketIntelligence.marketChallenges && sections.marketIntelligence.marketChallenges.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Market Challenges</h5>
+                                        <ul className="space-y-2">
+                                          {sections.marketIntelligence.marketChallenges.map((challenge: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <AlertCircle className="h-4 w-4 text-orange-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700">{challenge}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.marketIntelligence.marketOpportunities && sections.marketIntelligence.marketOpportunities.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Market Opportunities</h5>
+                                        <ul className="space-y-2">
+                                          {sections.marketIntelligence.marketOpportunities.map((opportunity: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <Target className="h-4 w-4 text-blue-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700">{opportunity}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.marketIntelligence.reasoning && (
+                                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.marketIntelligence.reasoning}</p>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                                <div className="text-right">
-                                  <div className="text-2xl font-bold text-foreground">{aiInsights.sentiment.score}</div>
-                                  <div className="text-xs text-muted-foreground">Score</div>
-                                </div>
-                              </div>
-                              <div className="p-4 bg-slate-50 rounded-lg">
-                                <div className="text-sm text-muted-foreground mb-1">Brand Tone</div>
-                                <div className="text-base font-semibold text-foreground capitalize">
-                                  {aiInsights.sentiment.brandTone}
-                                </div>
-                              </div>
-                              <div className="p-4 bg-slate-50 rounded-lg">
-                                <div className="text-sm text-muted-foreground mb-1">Confidence Level</div>
-                                <div className="text-base font-semibold text-foreground capitalize">
-                                  {aiInsights.sentiment.confidenceLevel}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center">
-                              <div className="w-full">
-                                <div className="text-sm font-medium text-foreground mb-2">Market Perception</div>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                  {aiInsights.sentiment.marketPerception}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          {aiInsights.sentiment.reasoning && (
-                            <div className="border-t pt-4">
-                              <div className="text-sm font-medium text-foreground mb-2">Reasoning</div>
-                              <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-lg">
-                                {aiInsights.sentiment.reasoning}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                              )}
 
-                  {aiInsights.behaviorAnalysis && (
-                    <Card>
-                      <CardContent className="pt-7 px-6 pb-6">
-                        <div className="flex items-center gap-2 mb-6">
-                          <Brain className="h-5 w-5 text-indigo-600" />
-                          <h3 className="text-lg font-semibold text-foreground">Behavioral Analysis</h3>
-                        </div>
-                        <div className="space-y-4">
-                          {aiInsights.behaviorAnalysis.contentBehavior && (
-                            <div className="p-4 bg-slate-50 rounded-lg">
-                              <div className="text-sm font-medium text-foreground mb-2">Content Behavior</div>
-                              <p className="text-sm text-muted-foreground leading-relaxed">
-                                {aiInsights.behaviorAnalysis.contentBehavior}
-                              </p>
-                            </div>
-                          )}
-                          {aiInsights.behaviorAnalysis.marketApproach && (
-                            <div className="p-4 bg-slate-50 rounded-lg">
-                              <div className="text-sm font-medium text-foreground mb-2">Market Approach</div>
-                              <p className="text-sm text-muted-foreground leading-relaxed">
-                                {aiInsights.behaviorAnalysis.marketApproach}
-                              </p>
-                            </div>
-                          )}
-                          <div className="grid grid-cols-1 gap-4">
-                            {aiInsights.behaviorAnalysis.innovationLevel && (
-                              <div className="p-4 bg-slate-50 rounded-lg">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="text-sm font-medium text-foreground">Innovation Level</div>
-                                  <Badge variant="default" className="capitalize">
-                                    {aiInsights.behaviorAnalysis.innovationLevel}
-                                  </Badge>
+                              {/* Strengths */}
+                              {sections.strengths && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Zap className="h-5 w-5 text-green-600" />
+                                    Core Strengths
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.strengths.uniqueValuePropositions && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Unique Value Propositions</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.strengths.uniqueValuePropositions}</p>
+                                      </div>
+                                    )}
+                                    {sections.strengths.coreStrengths && sections.strengths.coreStrengths.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Core Strengths</h5>
+                                        <ul className="space-y-3">
+                                          {sections.strengths.coreStrengths.map((strength: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700 leading-relaxed">{strength}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.strengths.competitiveAdvantages && sections.strengths.competitiveAdvantages.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Competitive Advantages</h5>
+                                        <ul className="space-y-3">
+                                          {sections.strengths.competitiveAdvantages.map((advantage: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <Award className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700 leading-relaxed">{advantage}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.strengths.reasoning && (
+                                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.strengths.reasoning}</p>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                                {aiInsights.behaviorAnalysis.innovationReasoning && (
-                                  <p className="text-sm text-muted-foreground leading-relaxed">
-                                    {aiInsights.behaviorAnalysis.innovationReasoning}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                            {aiInsights.behaviorAnalysis.customerFocus && (
-                              <div className="p-4 bg-slate-50 rounded-lg">
-                                <div className="text-sm font-medium text-foreground mb-2">Customer Focus</div>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                  {aiInsights.behaviorAnalysis.customerFocus}
-                                </p>
-                              </div>
-                            )}
-                            {aiInsights.behaviorAnalysis.growthOrientation && (
-                              <div className="p-4 bg-slate-50 rounded-lg">
-                                <div className="text-sm font-medium text-foreground mb-2">Growth Orientation</div>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                  {aiInsights.behaviorAnalysis.growthOrientation}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                              )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {aiInsights.riskFactors && aiInsights.riskFactors.length > 0 && (
-                      <Card>
-                        <CardContent className="pt-7 px-6 pb-6">
-                          <div className="flex items-center gap-2 mb-4">
-                            <Shield className="h-5 w-5 text-orange-600" />
-                            <h3 className="text-lg font-semibold text-foreground">Risk Factors</h3>
-                          </div>
-                          <ul className="space-y-2">
-                            {aiInsights.riskFactors.map((risk: string, idx: number) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <AlertCircle className="h-4 w-4 text-orange-600 flex-shrink-0 mt-1" />
-                                <span className="text-sm text-muted-foreground">{risk}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    )}
+                              {/* Opportunities */}
+                              {sections.opportunities && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Target className="h-5 w-5 text-blue-600" />
+                                    Growth Opportunities
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.opportunities.expansionAreas && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Expansion Areas</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.opportunities.expansionAreas}</p>
+                                      </div>
+                                    )}
+                                    {sections.opportunities.strategicPartnerships && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Strategic Partnerships</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.opportunities.strategicPartnerships}</p>
+                                      </div>
+                                    )}
+                                    {sections.opportunities.growthOpportunities && sections.opportunities.growthOpportunities.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Growth Opportunities</h5>
+                                        <ul className="space-y-3">
+                                          {sections.opportunities.growthOpportunities.map((opportunity: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <TrendingUp className="h-4 w-4 text-blue-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700 leading-relaxed">{opportunity}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.opportunities.recommendedApproach && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Recommended Approach</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.opportunities.recommendedApproach}</p>
+                                      </div>
+                                    )}
+                                    {sections.opportunities.reasoning && (
+                                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.opportunities.reasoning}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
 
-                    {aiInsights.competitiveEdge && aiInsights.competitiveEdge.length > 0 && (
-                      <Card>
-                        <CardContent className="pt-7 px-6 pb-6">
-                          <div className="flex items-center gap-2 mb-4">
-                            <Award className="h-5 w-5 text-yellow-600" />
-                            <h3 className="text-lg font-semibold text-foreground">Competitive Edge</h3>
+                              {/* Technology Assessment */}
+                              {sections.technologyAssessment && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Code className="h-5 w-5 text-blue-600" />
+                                    Technology Assessment
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.technologyAssessment.techStackAnalysis && (
+                                      <p className="text-sm text-slate-700 leading-relaxed">{sections.technologyAssessment.techStackAnalysis}</p>
+                                    )}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Tech Modernity Score</div>
+                                        <div className="text-2xl font-bold text-slate-900">{sections.technologyAssessment.techModernityScore}/100</div>
+                                        {sections.technologyAssessment.techModernityReasoning && (
+                                          <p className="text-xs text-slate-600 mt-2 leading-relaxed">{sections.technologyAssessment.techModernityReasoning}</p>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Innovation Level</div>
+                                        <div className="text-sm font-semibold text-slate-900 capitalize">{sections.technologyAssessment.innovationLevel}</div>
+                                        {sections.technologyAssessment.innovationReasoning && (
+                                          <p className="text-xs text-slate-600 mt-2 leading-relaxed">{sections.technologyAssessment.innovationReasoning}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {sections.technologyAssessment.partnersAnalysis && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Partners Analysis</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.technologyAssessment.partnersAnalysis}</p>
+                                      </div>
+                                    )}
+                                    {sections.technologyAssessment.integrationsAnalysis && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Integrations Analysis</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.technologyAssessment.integrationsAnalysis}</p>
+                                      </div>
+                                    )}
+                                    {sections.technologyAssessment.techRecommendations && sections.technologyAssessment.techRecommendations.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Technology Recommendations</h5>
+                                        <ul className="space-y-2">
+                                          {sections.technologyAssessment.techRecommendations.map((rec: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <Lightbulb className="h-4 w-4 text-blue-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700 leading-relaxed">{rec}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.technologyAssessment.reasoning && (
+                                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.technologyAssessment.reasoning}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Content Strategy */}
+                              {sections.contentStrategy && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <FileText className="h-5 w-5 text-blue-600" />
+                                    Content Strategy
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.contentStrategy.contentAnalysis && (
+                                      <p className="text-sm text-slate-700 leading-relaxed">{sections.contentStrategy.contentAnalysis}</p>
+                                    )}
+                                    <div className="flex items-center gap-4">
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Content Score</div>
+                                        <div className="text-2xl font-bold text-slate-900">{sections.contentStrategy.contentScore}/100</div>
+                                      </div>
+                                    </div>
+                                    {sections.contentStrategy.contentScoreReasoning && (
+                                      <div className="p-3 bg-slate-50 rounded-lg">
+                                        <p className="text-xs text-slate-700 leading-relaxed">{sections.contentStrategy.contentScoreReasoning}</p>
+                                      </div>
+                                    )}
+                                    {sections.contentStrategy.contentBehavior && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Content Behavior</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.contentStrategy.contentBehavior}</p>
+                                      </div>
+                                    )}
+                                    {sections.contentStrategy.contentGaps && sections.contentStrategy.contentGaps.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Content Gaps</h5>
+                                        <ul className="space-y-2">
+                                          {sections.contentStrategy.contentGaps.map((gap: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <AlertCircle className="h-4 w-4 text-orange-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700 leading-relaxed">{gap}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.contentStrategy.contentRecommendations && sections.contentStrategy.contentRecommendations.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Content Recommendations</h5>
+                                        <ul className="space-y-2">
+                                          {sections.contentStrategy.contentRecommendations.map((rec: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700 leading-relaxed">{rec}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.contentStrategy.reasoning && (
+                                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.contentStrategy.reasoning}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Leadership Team */}
+                              {sections.leadershipTeam && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Users className="h-5 w-5 text-blue-600" />
+                                    Leadership Team
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.leadershipTeam.teamAnalysis && (
+                                      <p className="text-sm text-slate-700 leading-relaxed">{sections.leadershipTeam.teamAnalysis}</p>
+                                    )}
+                                    <div>
+                                      <div className="text-xs text-slate-500 mb-1">Team Strength Score</div>
+                                      <div className="text-2xl font-bold text-slate-900">{sections.leadershipTeam.teamStrengthScore}/100</div>
+                                    </div>
+                                    {sections.leadershipTeam.teamStrengthReasoning && (
+                                      <div className="p-3 bg-slate-50 rounded-lg">
+                                        <p className="text-xs text-slate-700 leading-relaxed">{sections.leadershipTeam.teamStrengthReasoning}</p>
+                                      </div>
+                                    )}
+                                    {sections.leadershipTeam.leadershipGaps && sections.leadershipTeam.leadershipGaps.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Leadership Gaps</h5>
+                                        <ul className="space-y-2">
+                                          {sections.leadershipTeam.leadershipGaps.map((gap: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <AlertCircle className="h-4 w-4 text-orange-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700 leading-relaxed">{gap}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.leadershipTeam.teamRecommendations && sections.leadershipTeam.teamRecommendations.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Team Recommendations</h5>
+                                        <ul className="space-y-2">
+                                          {sections.leadershipTeam.teamRecommendations.map((rec: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700 leading-relaxed">{rec}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.leadershipTeam.reasoning && (
+                                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.leadershipTeam.reasoning}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Brand Presence */}
+                              {sections.brandPresence && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Globe className="h-5 w-5 text-blue-600" />
+                                    Brand Presence
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.brandPresence.brandAnalysis && (
+                                      <p className="text-sm text-slate-700 leading-relaxed">{sections.brandPresence.brandAnalysis}</p>
+                                    )}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Brand Presence Score</div>
+                                        <div className="text-2xl font-bold text-slate-900">{sections.brandPresence.brandPresenceScore}/100</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-slate-500 mb-1">Brand Tone</div>
+                                        <div className="text-sm font-semibold text-slate-900 capitalize">{sections.brandPresence.brandTone}</div>
+                                      </div>
+                                    </div>
+                                    {sections.brandPresence.brandPresenceReasoning && (
+                                      <div className="p-3 bg-slate-50 rounded-lg">
+                                        <p className="text-xs text-slate-700 leading-relaxed">{sections.brandPresence.brandPresenceReasoning}</p>
+                                      </div>
+                                    )}
+                                    {sections.brandPresence.marketPerception && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Market Perception</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.brandPresence.marketPerception}</p>
+                                      </div>
+                                    )}
+                                    {sections.brandPresence.brandRecommendations && sections.brandPresence.brandRecommendations.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Brand Recommendations</h5>
+                                        <ul className="space-y-2">
+                                          {sections.brandPresence.brandRecommendations.map((rec: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700 leading-relaxed">{rec}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.brandPresence.reasoning && (
+                                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.brandPresence.reasoning}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Key Metrics */}
+                              {sections.keyMetrics && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Gauge className="h-5 w-5 text-blue-600" />
+                                    Key Performance Indicators
+                                  </h4>
+                                  <div className="space-y-6">
+                                    {['contentScore', 'teamStrength', 'techModernity', 'marketReadiness', 'brandPresence', 'growthPotential', 'engagementScore', 'collaborationScore', 'communicationScore', 'alignmentScore', 'momentumScore', 'valueRealizationScore', 'overallHealthScore'].map((key) => {
+                                      const score = sections.keyMetrics[key];
+                                      if (score === undefined || score === null) return null;
+                                      const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                                      const getColor = (score: number) => {
+                                        if (score >= 75) return 'text-green-600 bg-green-50 border-green-200';
+                                        if (score >= 50) return 'text-blue-600 bg-blue-50 border-blue-200';
+                                        if (score >= 25) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+                                        return 'text-red-600 bg-red-50 border-red-200';
+                                      };
+                                      return (
+                                        <div key={key} className="border-2 border-slate-200 rounded-lg overflow-hidden">
+                                          <div className={`p-4 ${getColor(score)} border-b-2 border-current/20`}>
+                                            <div className="flex items-center justify-between">
+                                              <div className="text-sm font-semibold mb-2">{label}</div>
+                                              <div className="flex items-end gap-1">
+                                                <span className="text-3xl font-bold">{score}</span>
+                                                <span className="text-sm pb-1">/100</span>
+                                              </div>
+                                            </div>
+                                            <div className="mt-2 h-2 bg-white rounded-full overflow-hidden">
+                                              <div
+                                                className="h-full bg-current transition-all"
+                                                style={{ width: `${score}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    {sections.keyMetrics.overallScoreReasoning && (
+                                      <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                                        <h5 className="text-sm font-semibold text-blue-900 mb-2">Overall Score Reasoning</h5>
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.keyMetrics.overallScoreReasoning}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Sentiment Analysis */}
+                              {sections.sentimentAnalysis && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Activity className="h-5 w-5 text-purple-600" />
+                                    Sentiment Analysis
+                                  </h4>
+                                  <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                          {sections.sentimentAnalysis.overallSentiment === 'very positive' || sections.sentimentAnalysis.overallSentiment === 'positive' ? <Smile className="h-8 w-8 text-green-600" /> : null}
+                                          {sections.sentimentAnalysis.overallSentiment === 'neutral' ? <Meh className="h-8 w-8 text-yellow-600" /> : null}
+                                          {(sections.sentimentAnalysis.overallSentiment === 'concerned' || sections.sentimentAnalysis.overallSentiment === 'negative') ? <Frown className="h-8 w-8 text-red-600" /> : null}
+                                          <div>
+                                            <div className="text-xs text-slate-500">Overall Sentiment</div>
+                                            <div className="text-sm font-semibold text-slate-900 capitalize">
+                                              {sections.sentimentAnalysis.overallSentiment}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-2xl font-bold text-slate-900">{sections.sentimentAnalysis.sentimentScore}</div>
+                                          <div className="text-xs text-slate-500">Score</div>
+                                        </div>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <div className="p-3 bg-slate-50 rounded-lg">
+                                          <div className="text-xs text-slate-500 mb-1">Brand Tone</div>
+                                          <div className="text-sm font-semibold text-slate-900 capitalize">
+                                            {sections.sentimentAnalysis.brandTone}
+                                          </div>
+                                        </div>
+                                        <div className="p-3 bg-slate-50 rounded-lg">
+                                          <div className="text-xs text-slate-500 mb-1">Confidence Level</div>
+                                          <div className="text-sm font-semibold text-slate-900 capitalize">
+                                            {sections.sentimentAnalysis.confidenceLevel}
+                                          </div>
+                                        </div>
+                                        <div className="p-3 bg-slate-50 rounded-lg">
+                                          <div className="text-xs text-slate-500 mb-1">Sentiment Trend</div>
+                                          <div className="text-sm font-semibold text-slate-900 capitalize">
+                                            {sections.sentimentAnalysis.sentimentTrend}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    {sections.sentimentAnalysis.marketPerception && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Market Perception</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.sentimentAnalysis.marketPerception}</p>
+                                      </div>
+                                    )}
+                                    {sections.sentimentAnalysis.reasoning && (
+                                      <div className="p-3 bg-blue-50 rounded-lg">
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.sentimentAnalysis.reasoning}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Behavior Analysis */}
+                              {sections.behaviorAnalysis && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Brain className="h-5 w-5 text-indigo-600" />
+                                    Behavioral Analysis
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.behaviorAnalysis.contentBehavior && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Content Behavior</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.behaviorAnalysis.contentBehavior}</p>
+                                      </div>
+                                    )}
+                                    {sections.behaviorAnalysis.marketApproach && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Market Approach</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.behaviorAnalysis.marketApproach}</p>
+                                      </div>
+                                    )}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div className="p-3 bg-slate-50 rounded-lg">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <div className="text-sm font-semibold text-slate-900">Innovation Level</div>
+                                          <Badge variant="default" className="capitalize text-xs">
+                                            {sections.behaviorAnalysis.innovationLevel}
+                                          </Badge>
+                                        </div>
+                                        {sections.behaviorAnalysis.innovationReasoning && (
+                                          <p className="text-xs text-slate-600 leading-relaxed mt-2">
+                                            {sections.behaviorAnalysis.innovationReasoning}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <div className="p-3 bg-slate-50 rounded-lg">
+                                        <div className="text-sm font-semibold text-slate-900 mb-2">Customer Focus</div>
+                                        <p className="text-xs text-slate-600 leading-relaxed">{sections.behaviorAnalysis.customerFocus}</p>
+                                      </div>
+                                    </div>
+                                    {sections.behaviorAnalysis.growthOrientation && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Growth Orientation</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.behaviorAnalysis.growthOrientation}</p>
+                                      </div>
+                                    )}
+                                    {sections.behaviorAnalysis.evidence && (
+                                      <div className="p-3 bg-blue-50 rounded-lg">
+                                        <h5 className="text-xs font-semibold text-blue-900 mb-2">Supporting Evidence</h5>
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.behaviorAnalysis.evidence}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Risk Factors */}
+                              {sections.riskFactors && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Shield className="h-5 w-5 text-orange-600" />
+                                    Risk Factors
+                                  </h4>
+                                  <div className="space-y-4">
+                                    <div className="flex items-center gap-2 mb-3">
+                                      <div className="text-xs text-slate-500">Risk Level:</div>
+                                      <Badge variant={sections.riskFactors.riskLevel === 'high' ? 'destructive' : sections.riskFactors.riskLevel === 'medium' ? 'default' : 'secondary'} className="capitalize">
+                                        {sections.riskFactors.riskLevel}
+                                      </Badge>
+                                    </div>
+                                    {sections.riskFactors.identifiedRisks && sections.riskFactors.identifiedRisks.length > 0 && (
+                                      <ul className="space-y-3">
+                                        {sections.riskFactors.identifiedRisks.map((risk: string, idx: number) => (
+                                          <li key={idx} className="flex items-start gap-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                                            <AlertCircle className="h-4 w-4 text-orange-600 flex-shrink-0 mt-1" />
+                                            <span className="text-sm text-slate-700 leading-relaxed">{risk}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                    {sections.riskFactors.riskMitigation && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Risk Mitigation Strategy</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.riskFactors.riskMitigation}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Strategic Recommendations */}
+                              {sections.strategicRecommendations && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Lightbulb className="h-5 w-5 text-blue-600" />
+                                    Strategic Recommendations
+                                  </h4>
+                                  <div className="space-y-6">
+                                    {sections.strategicRecommendations.immediatePriorities && sections.strategicRecommendations.immediatePriorities.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-3">Immediate Priorities (Next 30-60 Days)</h5>
+                                        <div className="space-y-3">
+                                          {sections.strategicRecommendations.immediatePriorities.map((priority: string, idx: number) => (
+                                            <div key={idx} className="flex items-start gap-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-semibold">
+                                                {idx + 1}
+                                              </span>
+                                              <p className="text-sm text-slate-700 leading-relaxed flex-1">{priority}</p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {sections.strategicRecommendations.strategicInitiatives && sections.strategicRecommendations.strategicInitiatives.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-3">Long-Term Strategic Initiatives</h5>
+                                        <div className="space-y-3">
+                                          {sections.strategicRecommendations.strategicInitiatives.map((initiative: string, idx: number) => (
+                                            <div key={idx} className="flex items-start gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-600 text-white text-xs flex items-center justify-center font-semibold">
+                                                {idx + 1}
+                                              </span>
+                                              <p className="text-sm text-slate-700 leading-relaxed flex-1">{initiative}</p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {sections.strategicRecommendations.communicationStrategy && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Communication Strategy</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.strategicRecommendations.communicationStrategy}</p>
+                                      </div>
+                                    )}
+                                    {sections.strategicRecommendations.growthStrategy && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Growth Strategy</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.strategicRecommendations.growthStrategy}</p>
+                                      </div>
+                                    )}
+                                    {sections.strategicRecommendations.reasoning && (
+                                      <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                                        <h5 className="text-sm font-semibold text-blue-900 mb-2">Recommendation Reasoning</h5>
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.strategicRecommendations.reasoning}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Signals */}
+                              {sections.signals && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <Activity className="h-5 w-5 text-blue-600" />
+                                    Key Signals
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.signals.greenFlags && sections.signals.greenFlags.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-green-700 mb-2 flex items-center gap-2">
+                                          <CheckCircle className="h-4 w-4" />
+                                          Green Flags (Positive Signals)
+                                        </h5>
+                                        <ul className="space-y-2">
+                                          {sections.signals.greenFlags.map((flag: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2 p-2 bg-green-50 rounded-lg">
+                                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700">{flag}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.signals.redFlags && sections.signals.redFlags.length > 0 && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
+                                          <AlertCircle className="h-4 w-4" />
+                                          Red Flags (Concerning Signals)
+                                        </h5>
+                                        <ul className="space-y-2">
+                                          {sections.signals.redFlags.map((flag: string, idx: number) => (
+                                            <li key={idx} className="flex items-start gap-2 p-2 bg-red-50 rounded-lg">
+                                              <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-1" />
+                                              <span className="text-sm text-slate-700">{flag}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {sections.signals.predictiveInsights && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Predictive Insights</h5>
+                                        <div className="p-3 bg-slate-50 rounded-lg space-y-2">
+                                          {sections.signals.predictiveInsights.likelyNextStep && (
+                                            <div>
+                                              <div className="text-xs text-slate-500 mb-1">Likely Next Step</div>
+                                              <p className="text-sm text-slate-700">{sections.signals.predictiveInsights.likelyNextStep}</p>
+                                            </div>
+                                          )}
+                                          <div className="grid grid-cols-3 gap-2">
+                                            <div>
+                                              <div className="text-xs text-slate-500 mb-1">Retention Probability</div>
+                                              <div className="text-sm font-semibold text-slate-900">{sections.signals.predictiveInsights.retentionProbability}%</div>
+                                            </div>
+                                            <div>
+                                              <div className="text-xs text-slate-500 mb-1">Growth Probability</div>
+                                              <div className="text-sm font-semibold text-slate-900">{sections.signals.predictiveInsights.growthProbability}%</div>
+                                            </div>
+                                            <div>
+                                              <div className="text-xs text-slate-500 mb-1">Time to Decision</div>
+                                              <div className="text-sm font-semibold text-slate-900 capitalize">{sections.signals.predictiveInsights.timeToDecision}</div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {sections.signals.reasoning && (
+                                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.signals.reasoning}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Data Analysis */}
+                              {sections.dataAnalysis && (
+                                <div className="bg-white rounded-lg p-6 border border-blue-200">
+                                  <h4 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                                    Data Analysis & Methodology
+                                  </h4>
+                                  <div className="space-y-4">
+                                    {sections.dataAnalysis.companyProfileUsage && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Company Profile Data Usage</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.dataAnalysis.companyProfileUsage}</p>
+                                      </div>
+                                    )}
+                                    {sections.dataAnalysis.marketIntelligenceUsage && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Market Intelligence Usage</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.dataAnalysis.marketIntelligenceUsage}</p>
+                                      </div>
+                                    )}
+                                    {sections.dataAnalysis.internalDataUsage && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Internal Data Usage</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.dataAnalysis.internalDataUsage}</p>
+                                      </div>
+                                    )}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div className="p-3 bg-slate-50 rounded-lg">
+                                        <div className="text-xs text-slate-500 mb-1">Data Confidence</div>
+                                        <div className="text-sm font-semibold text-slate-900 capitalize">{sections.dataAnalysis.dataConfidence}</div>
+                                      </div>
+                                    </div>
+                                    {sections.dataAnalysis.dataConfidenceReasoning && (
+                                      <div className="p-3 bg-blue-50 rounded-lg">
+                                        <h5 className="text-xs font-semibold text-blue-900 mb-2">Confidence Reasoning</h5>
+                                        <p className="text-xs text-blue-800 leading-relaxed">{sections.dataAnalysis.dataConfidenceReasoning}</p>
+                                      </div>
+                                    )}
+                                    {sections.dataAnalysis.dataGaps && (
+                                      <div>
+                                        <h5 className="text-sm font-semibold text-slate-900 mb-2">Data Gaps</h5>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{sections.dataAnalysis.dataGaps}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                                </>
+                              );
+                            })()}
                           </div>
-                          <ul className="space-y-2">
-                            {aiInsights.competitiveEdge.map((edge: string, idx: number) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <Award className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-1" />
-                                <span className="text-sm text-muted-foreground">{edge}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
+                        )}
+                      </>
+                    ) : (
+                      /* Fallback for old structure (string executiveSummary) */
+                      <>
+                        {typeof aiInsights.executiveSummary === 'string' && (
+                          <div className="prose prose-slate max-w-none">
+                            <p className="text-slate-800 leading-relaxed whitespace-pre-wrap text-base">{aiInsights.executiveSummary}</p>
+                          </div>
+                        )}
+                        {aiInsights.summary && (
+                          <div className="bg-blue-100/50 rounded-lg p-4 border border-blue-200">
+                            <h4 className="text-sm font-semibold text-blue-900 mb-2">Summary</h4>
+                            <p className="text-sm text-blue-800 leading-relaxed">{aiInsights.summary}</p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1540,25 +2121,6 @@ export const KnowledgeBase: React.FC = () => {
 
       {isEditing && activeTab === 'services' && (
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                AI Service Extractor
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Extract service information automatically from your service page URL
-              </p>
-            </CardHeader>
-            <CardContent>
-              <AIServiceExtractor
-                onServicesExtracted={(extractedServices) => {
-                  setServices([...services, ...extractedServices]);
-                }}
-              />
-            </CardContent>
-          </Card>
-
           <div className="flex justify-end">
             <Button variant="primary" onClick={addService}>
               <Plus className="h-4 w-4 mr-2" />
@@ -1824,25 +2386,6 @@ export const KnowledgeBase: React.FC = () => {
 
       {isEditing && activeTab === 'blogs' && (
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                AI Blog Extractor
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Extract blog articles automatically from your blog page URL
-              </p>
-            </CardHeader>
-            <CardContent>
-              <AIBlogExtractor
-                onBlogsExtracted={(extractedBlogs) => {
-                  setBlogs([...blogs, ...extractedBlogs]);
-                }}
-              />
-            </CardContent>
-          </Card>
-
           <div className="flex justify-end">
             <Button variant="primary" onClick={addBlog}>
               <Plus className="h-4 w-4 mr-2" />
@@ -1978,29 +2521,6 @@ export const KnowledgeBase: React.FC = () => {
 
       {isEditing && activeTab === 'technology' && (
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                AI Technology Extractor
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Extract technology stack, partners, and integrations automatically from your website
-              </p>
-            </CardHeader>
-            <CardContent>
-              <AITechnologyExtractor
-                onDataExtracted={(data) => {
-                  setTechnology({
-                    stack: [...technology.stack, ...data.techStack],
-                    partners: [...technology.partners, ...data.partners],
-                    integrations: [...technology.integrations, ...data.integrations],
-                  });
-                }}
-              />
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
               <CardTitle>Technology & Partners</CardTitle>

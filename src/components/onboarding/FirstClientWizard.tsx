@@ -101,18 +101,21 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
-  const totalSteps = 5;
+  const totalSteps = 3;
 
-  // Auto-trigger fetch when all 3 fields are entered
+  // Trigger AI fetch when moving to Step 2 (if all 3 fields are filled)
   useEffect(() => {
-    const hasAllFields = formData.company.trim() && formData.website.trim() && formData.linkedinUrl.trim();
-    
-    if (hasAllFields && !hasAutoFetched && !aiPrefilling && !aiResponses.perplexity && !aiResponses.openai) {
-      console.log('[FIRST-CLIENT-WIZARD] Auto-triggering fetch for 3 fields');
-      setHasAutoFetched(true);
-      handleAIPrefill();
+    if (currentStep === 2 && !hasAutoFetched) {
+      const hasAllFields = formData.company.trim() && formData.website.trim() && formData.linkedinUrl.trim();
+      
+      if (hasAllFields && !aiPrefilling && !aiResponses.perplexity && !aiResponses.openai) {
+        console.log('[FIRST-CLIENT-WIZARD] Triggering AI fetch on Step 2');
+        setHasAutoFetched(true);
+        handleAIPrefill();
+      }
     }
-  }, [formData.company, formData.website, formData.linkedinUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -322,12 +325,70 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     const selectedResponse = aiResponses[model];
     
     if (!selectedResponse?.data) {
+      console.error('[FIRST-CLIENT-WIZARD] ❌ No data in selected response');
       return;
     }
 
+    console.log('[FIRST-CLIENT-WIZARD] 📦 Raw AI response data:', selectedResponse.data);
+    
     setSelectedModel(model);
     const mappedData = mapAIResponseToFormData(selectedResponse.data, model);
-    setFormData(prev => ({ ...prev, ...mappedData }));
+    
+    console.log('[FIRST-CLIENT-WIZARD] 🗺️ Mapped data from mapper:', mappedData);
+    
+    // Map the data to FirstClientWizard's formData structure
+    const wizardFormData = {
+      company: mappedData.company || '',
+      website: mappedData.website || '',
+      industry: mappedData.industry || '',
+      city: mappedData.city || '',
+      country: mappedData.country || '',
+      zipCode: mappedData.zipCode || '',
+      founded: mappedData.founded || '',
+      companySize: mappedData.companySize || '',
+      companyOverview: mappedData.description || '', // Map description to companyOverview
+      contactName: mappedData.contactName || '',
+      primaryEmail: mappedData.primaryEmail || '',
+      alternateEmail: mappedData.alternateEmail || '',
+      primaryPhone: mappedData.primaryPhone || '',
+      alternatePhone: mappedData.alternatePhone || '',
+      jobTitle: mappedData.jobTitle || '',
+      preferredContactMethod: mappedData.preferredContactMethod || 'email',
+      linkedinUrl: mappedData.linkedinUrl || '',
+      twitterUrl: mappedData.twitterUrl || '',
+      instagramUrl: mappedData.instagramUrl || '',
+      facebookUrl: mappedData.facebookUrl || '',
+      logoUrl: mappedData.logoUrl || '',
+      description: mappedData.description || '',
+      shortTermGoals: mappedData.shortTermGoals || '',
+      longTermGoals: mappedData.longTermGoals || '',
+      expectations: mappedData.expectations || '',
+      status: mappedData.status || 'prospect',
+      tags: mappedData.tags || [],
+      tagInput: '',
+      uploadedDocuments: [],
+      budgetRange: '',
+      csm: mappedData.csm || '',
+    };
+    
+    console.log('[FIRST-CLIENT-WIZARD] 📋 Final wizard form data:', wizardFormData);
+    console.log('[FIRST-CLIENT-WIZARD] 📊 Populated fields count:', {
+      company: !!wizardFormData.company,
+      website: !!wizardFormData.website,
+      industry: !!wizardFormData.industry,
+      city: !!wizardFormData.city,
+      country: !!wizardFormData.country,
+      companySize: !!wizardFormData.companySize,
+      companyOverview: !!wizardFormData.companyOverview,
+      contactName: !!wizardFormData.contactName,
+      primaryEmail: !!wizardFormData.primaryEmail,
+      primaryPhone: !!wizardFormData.primaryPhone,
+    });
+    
+    setFormData(prev => ({ ...prev, ...wizardFormData }));
+    
+    // Automatically navigate to Step 3 to show details
+    setCurrentStep(3);
   };
 
   const addTag = () => {
@@ -352,23 +413,24 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
 
     if (currentStep === 1) {
       if (!formData.company.trim()) newErrors.company = 'Company is required';
-      if (!formData.industry.trim()) newErrors.industry = 'Industry is required';
+      if (!formData.website.trim()) newErrors.website = 'Website is required';
+      if (!formData.linkedinUrl.trim()) newErrors.linkedinUrl = 'LinkedIn URL is required';
       if (formData.website && !/^https?:\/\/.+/.test(formData.website)) {
         newErrors.website = 'Please enter a valid URL';
       }
     }
 
     if (currentStep === 2) {
-      if (!formData.contactName.trim()) newErrors.contactName = 'Contact name is required';
-      if (!formData.primaryEmail.trim()) {
-        newErrors.primaryEmail = 'Email is required';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.primaryEmail)) {
-        newErrors.primaryEmail = 'Invalid email format';
+      // AI Enrichment step - require a response to be selected
+      if (!selectedModel) {
+        // Don't set an error, but prevent proceeding
+        return false;
       }
-      if (formData.alternateEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.alternateEmail)) {
-        newErrors.alternateEmail = 'Invalid email format';
-      }
-      if (!formData.jobTitle.trim()) newErrors.jobTitle = 'Job title is required';
+    }
+
+    if (currentStep === 3) {
+      // Review step - no validation needed, just showing read-only details
+      // User can proceed to save the client
     }
 
     setErrors(newErrors);
@@ -539,50 +601,70 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                 Company Information
               </h3>
 
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900 mb-3 font-medium">
-                  <Sparkles className="h-4 w-4 inline mr-2" />
-                  Enter the 3 required fields and let AI fetch comprehensive client details!
-                </p>
-                <div className="space-y-3 mb-3">
-                  <div>
-                    <label className="block text-xs font-medium text-blue-900 mb-1">
-                      Client Name <span className="text-red-600">*</span>
-                    </label>
-                    <Input
-                      placeholder="Acme Corporation"
-                      value={formData.company}
-                      onChange={(e) => handleChange('company', e.target.value)}
-                    />
-                    {errors.company && (
-                      <p className="text-xs text-red-600 mt-1">{errors.company}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-blue-900 mb-1">
-                      Website URL <span className="text-red-600">*</span>
-                    </label>
-                    <Input
-                      placeholder="https://company.com"
-                      value={formData.website}
-                      onChange={(e) => handleChange('website', e.target.value)}
-                    />
-                    {errors.website && (
-                      <p className="text-xs text-red-600 mt-1">{errors.website}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-blue-900 mb-1">
-                      LinkedIn URL <span className="text-red-600">*</span>
-                    </label>
-                    <Input
-                      placeholder="https://linkedin.com/company/..."
-                      value={formData.linkedinUrl}
-                      onChange={(e) => handleChange('linkedinUrl', e.target.value)}
-                    />
-                  </div>
-                </div>
-                {!aiPrefilling && !aiResponses.perplexity && !aiResponses.openai && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Company Name <span className="text-red-600">*</span>
+                </label>
+                <Input
+                  placeholder="e.g., White Label IQ"
+                  value={formData.company}
+                  onChange={(e) => handleChange('company', e.target.value)}
+                />
+                {errors.company && (
+                  <p className="text-xs text-red-600 mt-1">{errors.company}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Website URL <span className="text-red-600">*</span>
+                </label>
+                <Input
+                  placeholder="https://company.com"
+                  value={formData.website}
+                  onChange={(e) => handleChange('website', e.target.value)}
+                />
+                {errors.website && (
+                  <p className="text-xs text-red-600 mt-1">{errors.website}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  LinkedIn URL <span className="text-red-600">*</span>
+                </label>
+                <Input
+                  placeholder="https://linkedin.com/company/..."
+                  value={formData.linkedinUrl}
+                  onChange={(e) => handleChange('linkedinUrl', e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-end mb-4">
+                {!aiPrefilling && (aiResponses.perplexity || aiResponses.openai) && (
+                  <Button
+                    variant="outline"
+                    onClick={handleRegenerate}
+                    type="button"
+                    className="flex items-center gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Regenerate
+                  </Button>
+                )}
+              </div>
+
+              {/* Show button to trigger fetch if not started yet */}
+              {!aiPrefilling && !aiResponses.perplexity && !aiResponses.openai && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-900 mb-3 font-medium">
+                    <Sparkles className="h-4 w-4 inline mr-2" />
+                    Click the button below to fetch comprehensive client details using AI
+                  </p>
                   <Button
                     variant="primary"
                     onClick={handleAIPrefill}
@@ -592,8 +674,8 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                     <Sparkles className="h-4 w-4 mr-2" />
                     Fetch Client Data with AI
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Show AI Fetch Progress while fetching */}
               {aiPrefilling && (
@@ -605,9 +687,17 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                 </div>
               )}
 
-              {/* Show Comparison after both responses are received */}
+              {/* Show Comparison after both responses are received - keep visible even after selection */}
               {!aiPrefilling && (aiResponses.perplexity || aiResponses.openai) && (
                 <div className="mb-4">
+                  {selectedModel && (
+                    <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-900">
+                        Using {selectedModel === 'perplexity' ? 'Perplexity' : 'OpenAI'} response. Click "Next" to view details.
+                      </span>
+                    </div>
+                  )}
                   <AIResponseComparison
                     perplexityResponse={aiResponses.perplexity}
                     openaiResponse={aiResponses.openai}
@@ -618,400 +708,219 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Company Name <span className="text-red-600">*</span>
-                  </label>
-                  <Input
-                    placeholder="Acme Corporation"
-                    value={formData.company}
-                    onChange={(e) => handleChange('company', e.target.value)}
-                  />
-                  {errors.company && (
-                    <p className="text-xs text-red-600 mt-1">{errors.company}</p>
-                  )}
+              {/* Show waiting message if no responses yet */}
+              {!aiPrefilling && !aiResponses.perplexity && !aiResponses.openai && !selectedModel && (
+                <div className="text-center py-8">
+                  <Sparkles className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Click the button above to fetch AI responses
+                  </p>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Industry <span className="text-red-600">*</span>
-                  </label>
-                  <Input
-                    placeholder="e.g., Technology, Healthcare, Finance"
-                    value={formData.industry}
-                    onChange={(e) => handleChange('industry', e.target.value)}
-                  />
-                  {errors.industry && (
-                    <p className="text-xs text-red-600 mt-1">{errors.industry}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Company Size
-                  </label>
-                  <Input
-                    placeholder="e.g., 50-200 employees, 1000+ employees"
-                    value={formData.companySize}
-                    onChange={(e) => handleChange('companySize', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    City
-                  </label>
-                  <Input
-                    placeholder="San Francisco"
-                    value={formData.city}
-                    onChange={(e) => handleChange('city', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Country
-                  </label>
-                  <Input
-                    placeholder="United States"
-                    value={formData.country}
-                    onChange={(e) => handleChange('country', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Zip Code
-                  </label>
-                  <Input
-                    placeholder="94102"
-                    value={formData.zipCode}
-                    onChange={(e) => handleChange('zipCode', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Founded Year
-                  </label>
-                  <Input
-                    placeholder="2020"
-                    value={formData.founded}
-                    onChange={(e) => handleChange('founded', e.target.value)}
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Company Overview
-                  </label>
-                  <textarea
-                    placeholder="Brief overview of the company..."
-                    value={formData.companyOverview}
-                    onChange={(e) => handleChange('companyOverview', e.target.value)}
-                    className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {currentStep === 2 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Contact Details
-              </h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Contact Name <span className="text-red-600">*</span>
-                  </label>
-                  <Input
-                    placeholder="John Doe"
-                    value={formData.contactName}
-                    onChange={(e) => handleChange('contactName', e.target.value)}
-                  />
-                  {errors.contactName && (
-                    <p className="text-xs text-red-600 mt-1">{errors.contactName}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Job Title / Role <span className="text-red-600">*</span>
-                  </label>
-                  <Input
-                    placeholder="VP of Engineering"
-                    value={formData.jobTitle}
-                    onChange={(e) => handleChange('jobTitle', e.target.value)}
-                  />
-                  {errors.jobTitle && (
-                    <p className="text-xs text-red-600 mt-1">{errors.jobTitle}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Primary Email <span className="text-red-600">*</span>
-                  </label>
-                  <Input
-                    type="email"
-                    placeholder="john@acme.com"
-                    value={formData.primaryEmail}
-                    onChange={(e) => handleChange('primaryEmail', e.target.value)}
-                  />
-                  {errors.primaryEmail && (
-                    <p className="text-xs text-red-600 mt-1">{errors.primaryEmail}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Alternate Email
-                  </label>
-                  <Input
-                    type="email"
-                    placeholder="john.doe@personal.com"
-                    value={formData.alternateEmail}
-                    onChange={(e) => handleChange('alternateEmail', e.target.value)}
-                  />
-                  {errors.alternateEmail && (
-                    <p className="text-xs text-red-600 mt-1">{errors.alternateEmail}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Primary Phone
-                  </label>
-                  <Input
-                    type="tel"
-                    placeholder="+1 (555) 123-4567"
-                    value={formData.primaryPhone}
-                    onChange={(e) => handleChange('primaryPhone', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Alternate Phone
-                  </label>
-                  <Input
-                    type="tel"
-                    placeholder="+1 (555) 987-6543"
-                    value={formData.alternatePhone}
-                    onChange={(e) => handleChange('alternatePhone', e.target.value)}
-                  />
-                </div>
-              </div>
+              )}
             </div>
           )}
 
           {currentStep === 3 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                Social Media Profiles
-              </h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    <Linkedin className="h-4 w-4 inline mr-2" />
-                    LinkedIn Profile
-                  </label>
-                  <Input
-                    placeholder="https://linkedin.com/company/acme"
-                    value={formData.linkedinUrl}
-                    onChange={(e) => handleChange('linkedinUrl', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    <Twitter className="h-4 w-4 inline mr-2" />
-                    Twitter Handle
-                  </label>
-                  <Input
-                    placeholder="@acmecorp or https://twitter.com/acmecorp"
-                    value={formData.twitterUrl}
-                    onChange={(e) => handleChange('twitterUrl', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    <Instagram className="h-4 w-4 inline mr-2" />
-                    Instagram Profile
-                  </label>
-                  <Input
-                    placeholder="https://instagram.com/acmecorp"
-                    value={formData.instagramUrl}
-                    onChange={(e) => handleChange('instagramUrl', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    <Facebook className="h-4 w-4 inline mr-2" />
-                    Facebook Page
-                  </label>
-                  <Input
-                    placeholder="https://facebook.com/acmecorp"
-                    value={formData.facebookUrl}
-                    onChange={(e) => handleChange('facebookUrl', e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {currentStep === 4 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <Tag className="h-5 w-5" />
-                Additional Information
-              </h3>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Tags
-                </label>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {formData.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="gap-1">
-                      {tag}
-                      <button
-                        onClick={() => removeTag(tag)}
-                        className="hover:text-red-600"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Add tag (e.g., decision-maker, technical)"
-                    value={formData.tagInput}
-                    onChange={(e) => handleChange('tagInput', e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addTag();
-                      }
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Review Client Details
+                </h3>
+                {selectedModel && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedModel(null);
+                      setCurrentStep(2);
                     }}
-                  />
-                  <Button onClick={addTag} variant="outline" type="button">
-                    <Plus className="h-4 w-4" />
+                    type="button"
+                  >
+                    Change Selection
                   </Button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Notes / Description
-                </label>
-                <textarea
-                  placeholder="Add any additional notes or context about this client..."
-                  value={formData.description}
-                  onChange={(e) => handleChange('description', e.target.value)}
-                  className="w-full min-h-[120px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  <Upload className="h-4 w-4 inline mr-2" />
-                  Upload Documents (Optional)
-                </label>
-                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
-                  <input
-                    type="file"
-                    multiple
-                    accept=".pdf,.doc,.docx,.txt,.csv,.xlsx"
-                    className="hidden"
-                    id="document-upload-wizard"
-                    onChange={handleFileChange}
-                  />
-                  <label htmlFor="document-upload-wizard" className="cursor-pointer">
-                    <FileText className="h-8 w-8 mx-auto mb-2 text-slate-400" />
-                    <p className="text-sm text-slate-600 mb-1">Click to upload documents</p>
-                    <p className="text-xs text-slate-500">PDF, DOC, DOCX, TXT, CSV, XLSX (Max 10MB)</p>
-                  </label>
-                </div>
-                {uploadedFiles.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-sm font-medium text-slate-700">{uploadedFiles.length} file(s) selected:</p>
-                    {uploadedFiles.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded-md">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-slate-400" />
-                          <span className="text-sm text-slate-700">{file.name}</span>
-                          <span className="text-xs text-slate-500">({(file.size / 1024).toFixed(1)} KB)</span>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveFile(index)}
-                          className="text-slate-400 hover:text-red-600"
-                          type="button"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
                 )}
               </div>
+
+              {!selectedModel && (
+                <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-sm text-yellow-900">
+                    Please go back to Step 2 and select an AI response to view the details.
+                  </p>
+                </div>
+              )}
+
+              {selectedModel && (
+                <div className="space-y-6">
+                  {/* Company Information */}
+                  <div>
+                    <h4 className="text-md font-semibold text-slate-900 mb-4">Company Information</h4>
+                    <div className="bg-slate-50 rounded-lg p-6 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">
+                            Company Name
+                          </label>
+                          <p className="text-sm font-medium text-slate-900">{formData.company || '—'}</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">
+                            Industry
+                          </label>
+                          <p className="text-sm font-medium text-slate-900">{formData.industry || '—'}</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">
+                            Company Size
+                          </label>
+                          <p className="text-sm font-medium text-slate-900">{formData.companySize || '—'}</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">
+                            City
+                          </label>
+                          <p className="text-sm font-medium text-slate-900">{formData.city || '—'}</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">
+                            Country
+                          </label>
+                          <p className="text-sm font-medium text-slate-900">{formData.country || '—'}</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">
+                            Zip Code
+                          </label>
+                          <p className="text-sm font-medium text-slate-900">{formData.zipCode || '—'}</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">
+                            Founded Year
+                          </label>
+                          <p className="text-sm font-medium text-slate-900">{formData.founded || '—'}</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">
+                            Website
+                          </label>
+                          <p className="text-sm font-medium text-slate-900 break-words">{formData.website || '—'}</p>
+                        </div>
+                      </div>
+
+                      {formData.companyOverview && (
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">
+                            Company Overview
+                          </label>
+                          <p className="text-sm text-slate-900 whitespace-pre-wrap">{formData.companyOverview}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Contact Information */}
+                  {(formData.contactName || formData.primaryEmail || formData.primaryPhone) && (
+                    <div>
+                      <h4 className="text-md font-semibold text-slate-900 mb-4">Contact Information</h4>
+                      <div className="bg-slate-50 rounded-lg p-6 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          {formData.contactName && (
+                            <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Contact Name
+                              </label>
+                              <p className="text-sm font-medium text-slate-900">{formData.contactName}</p>
+                            </div>
+                          )}
+
+                          {formData.jobTitle && (
+                            <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Job Title
+                              </label>
+                              <p className="text-sm font-medium text-slate-900">{formData.jobTitle}</p>
+                            </div>
+                          )}
+
+                          {formData.primaryEmail && (
+                            <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Primary Email
+                              </label>
+                              <p className="text-sm font-medium text-slate-900">{formData.primaryEmail}</p>
+                            </div>
+                          )}
+
+                          {formData.primaryPhone && (
+                            <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Primary Phone
+                              </label>
+                              <p className="text-sm font-medium text-slate-900">{formData.primaryPhone}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Social Media */}
+                  {(formData.linkedinUrl || formData.twitterUrl || formData.instagramUrl || formData.facebookUrl) && (
+                    <div>
+                      <h4 className="text-md font-semibold text-slate-900 mb-4">Social Media</h4>
+                      <div className="bg-slate-50 rounded-lg p-6">
+                        <div className="grid grid-cols-2 gap-4">
+                          {formData.linkedinUrl && (
+                            <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                LinkedIn
+                              </label>
+                              <p className="text-sm font-medium text-slate-900 break-words">{formData.linkedinUrl}</p>
+                            </div>
+                          )}
+
+                          {formData.twitterUrl && (
+                            <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Twitter/X
+                              </label>
+                              <p className="text-sm font-medium text-slate-900 break-words">{formData.twitterUrl}</p>
+                            </div>
+                          )}
+
+                          {formData.instagramUrl && (
+                            <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Instagram
+                              </label>
+                              <p className="text-sm font-medium text-slate-900 break-words">{formData.instagramUrl}</p>
+                            </div>
+                          )}
+
+                          {formData.facebookUrl && (
+                            <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">
+                                Facebook
+                              </label>
+                              <p className="text-sm font-medium text-slate-900 break-words">{formData.facebookUrl}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {currentStep === 5 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Goals & Expectations
-              </h3>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Short-Term Goals
-                </label>
-                <textarea
-                  placeholder="What are the client's immediate goals? (next 3-6 months)"
-                  value={formData.shortTermGoals}
-                  onChange={(e) => handleChange('shortTermGoals', e.target.value)}
-                  className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Long-Term Goals
-                </label>
-                <textarea
-                  placeholder="What are the client's long-term objectives? (1+ years)"
-                  value={formData.longTermGoals}
-                  onChange={(e) => handleChange('longTermGoals', e.target.value)}
-                  className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Client Expectations
-                </label>
-                <textarea
-                  placeholder="What specific outcomes or results is the client seeking from your services?"
-                  value={formData.expectations}
-                  onChange={(e) => handleChange('expectations', e.target.value)}
-                  className="w-full min-h-[100px] border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="mt-8 flex items-center justify-between pt-6 border-t border-slate-200">

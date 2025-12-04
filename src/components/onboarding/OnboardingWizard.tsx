@@ -6,6 +6,8 @@ import { Input } from '../ui/Input';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { FirstClientWizard } from './FirstClientWizard';
+import { CompanyAIFetchProgress } from './CompanyAIFetchProgress';
+import { CompanyAIResponseComparison } from './CompanyAIResponseComparison';
 import {
   Building2,
   Globe,
@@ -84,6 +86,17 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null);
   const [showOnboardingSuccessModal, setShowOnboardingSuccessModal] = useState(false);
+  
+  // Dual AI flow state
+  const [aiResponses, setAiResponses] = useState<{
+    perplexity: any | null;
+    openai: any | null;
+  }>({ perplexity: null, openai: null });
+  const [comparison, setComparison] = useState<any | null>(null);
+  const [selectedModel, setSelectedModel] = useState<'perplexity' | 'openai' | null>(null);
+  const [hasAutoFetched, setHasAutoFetched] = useState(false);
+  const [aiPrefilling, setAiPrefilling] = useState(false);
+  
   const { user, checkKnowledgeBaseStatus } = useAuth();
   const navigate = useNavigate();
 
@@ -190,6 +203,27 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     }
   }, [formData.leadership]);
 
+  // Trigger AI fetch when moving to Step 2 (if all 3 fields are filled)
+  useEffect(() => {
+    if (currentStep === 2 && !hasAutoFetched && user) {
+      const hasAllFields = 
+        formData.companyName.trim() && 
+        formData.website.trim() && 
+        formData.linkedinUrl.trim();
+      
+      if (hasAllFields && !aiPrefilling && !aiResponses.perplexity && !aiResponses.openai) {
+        console.log('[ONBOARDING-WIZARD] ✅ Triggering dual AI fetch on Step 2', {
+          companyName: formData.companyName,
+          website: formData.website,
+          linkedinUrl: formData.linkedinUrl
+        });
+        setHasAutoFetched(true);
+        handleAIPrefill();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, user]);
+
   const loadExistingData = async () => {
     if (!user) return;
 
@@ -279,17 +313,18 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
     }
   };
 
-  const totalSteps = 8;
+  const totalSteps = 9;
 
   const steps = [
     { number: 1, title: 'Company', icon: Building2 },
-    { number: 2, title: 'Contact', icon: Globe },
-    { number: 3, title: 'Social', icon: Globe },
-    { number: 4, title: 'Services', icon: Briefcase },
-    { number: 5, title: 'Leadership', icon: Users },
-    { number: 6, title: 'Blogs', icon: Newspaper },
-    { number: 7, title: 'Technology', icon: Code },
-    { number: 8, title: 'Review', icon: CheckCircle }
+    { number: 2, title: 'AI Enrichment', icon: Sparkles },
+    { number: 3, title: 'Contact', icon: Globe },
+    { number: 4, title: 'Social', icon: Globe },
+    { number: 5, title: 'Services', icon: Briefcase },
+    { number: 6, title: 'Leadership', icon: Users },
+    { number: 7, title: 'Blogs', icon: Newspaper },
+    { number: 8, title: 'Technology', icon: Code },
+    { number: 9, title: 'Review', icon: CheckCircle }
   ];
 
   const handleChange = (field: string, value: any) => {
@@ -410,17 +445,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        return formData.companyName && formData.website;
+        return formData.companyName && formData.website && formData.linkedinUrl;
       case 2:
-        return formData.email;
+        // AI Enrichment step - can proceed if response is selected or user wants to skip
+        return selectedModel !== null || (aiResponses.perplexity && aiResponses.openai);
       case 3:
-        return true;
+        return formData.email;
       case 4:
-        return formData.services.length > 0;
+        return true; // Social media is optional
       case 5:
+        return formData.services.length > 0;
       case 6:
       case 7:
       case 8:
+      case 9:
         return true;
       default:
         return false;
@@ -510,6 +548,223 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         setExtractionProgress(((i + 1) / steps.length) * 100);
       }
     }
+  };
+
+  // Dual AI fetch functions
+  const fetchPerplexityData = async () => {
+    console.log('[ONBOARDING-WIZARD] 🚀 Starting Perplexity fetch');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-company-perplexity`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            companyName: formData.companyName,
+            website: formData.website,
+            linkedinUrl: formData.linkedinUrl,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Perplexity fetch failed');
+      }
+
+      const result = await response.json();
+      return {
+        model: 'perplexity' as const,
+        data: result.data,
+        metadata: result.metadata,
+      };
+    } catch (error: any) {
+      console.error('[ONBOARDING-WIZARD] ❌ Perplexity error', error);
+      return {
+        model: 'perplexity' as const,
+        data: null,
+        metadata: { completenessScore: 0, processingTime: 0, timestamp: '' },
+        error: error.message,
+      };
+    }
+  };
+
+  const fetchOpenAIData = async () => {
+    console.log('[ONBOARDING-WIZARD] 🚀 Starting OpenAI fetch');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-company-openai`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            companyName: formData.companyName,
+            website: formData.website,
+            linkedinUrl: formData.linkedinUrl,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'OpenAI fetch failed');
+      }
+
+      const result = await response.json();
+      return {
+        model: 'openai' as const,
+        data: result.data,
+        metadata: result.metadata,
+      };
+    } catch (error: any) {
+      console.error('[ONBOARDING-WIZARD] ❌ OpenAI error', error);
+      return {
+        model: 'openai' as const,
+        data: null,
+        metadata: { completenessScore: 0, processingTime: 0, timestamp: '' },
+        error: error.message,
+      };
+    }
+  };
+
+  const fetchComparison = async (perplexityResult?: any, openaiResult?: any) => {
+    console.log('[ONBOARDING-WIZARD] 🔍 Starting comparison');
+    
+    const perplexityData = perplexityResult?.data || aiResponses.perplexity?.data;
+    const openaiData = openaiResult?.data || aiResponses.openai?.data;
+    
+    if (!perplexityData || !openaiData) {
+      console.error('[ONBOARDING-WIZARD] ❌ Cannot compare - missing responses');
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compare-ai-responses`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            dataType: 'company',
+            perplexityResponse: perplexityData,
+            openaiResponse: openaiData,
+            companyName: formData.companyName,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Comparison failed');
+      }
+
+      const result = await response.json();
+      setComparison(result.comparison);
+    } catch (error: any) {
+      console.error('[ONBOARDING-WIZARD] ❌ Comparison error', error);
+    }
+  };
+
+  const handleAIPrefill = async () => {
+    if (!formData.companyName || !formData.website || !formData.linkedinUrl) {
+      return;
+    }
+
+    if (!user) return;
+
+    console.log('[ONBOARDING-WIZARD] === STARTING DUAL AI FETCH ===');
+    setAiPrefilling(true);
+    setAiResponses({ perplexity: null, openai: null });
+    setComparison(null);
+    setSelectedModel(null);
+
+    // Fetch both in parallel
+    const [perplexityResult, openaiResult] = await Promise.all([
+      fetchPerplexityData(),
+      fetchOpenAIData(),
+    ]);
+
+    console.log('[ONBOARDING-WIZARD] ✅ Both fetches completed', {
+      perplexitySuccess: !!perplexityResult.data,
+      openaiSuccess: !!openaiResult.data,
+    });
+
+    setAiResponses({
+      perplexity: perplexityResult,
+      openai: openaiResult,
+    });
+
+    // If both succeeded, fetch comparison (pass results directly to avoid state timing issues)
+    if (perplexityResult.data && openaiResult.data) {
+      await fetchComparison(perplexityResult, openaiResult);
+    }
+
+    setAiPrefilling(false);
+  };
+
+  const handleRegenerate = () => {
+    console.log('[ONBOARDING-WIZARD] 🔄 Regenerating responses');
+    setHasAutoFetched(false);
+    handleAIPrefill();
+  };
+
+  const mapAIResponseToFormData = (data: any) => {
+    return {
+      companyName: data.companyName || '',
+      website: data.website || '',
+      industry: data.industry || '',
+      description: data.description || '',
+      founded: data.founded || '',
+      location: data.location || '',
+      size: data.size || '',
+      mission: data.mission || '',
+      vision: data.vision || '',
+      email: data.email || '',
+      phone: data.phone || '',
+      address: data.address || '',
+      linkedinUrl: data.linkedinUrl || '',
+      twitterUrl: data.twitterUrl || '',
+      facebookUrl: data.facebookUrl || '',
+      instagramUrl: data.instagramUrl || '',
+      youtubeUrl: data.youtubeUrl || '',
+      services: data.services || [],
+      leadership: data.leadership || [],
+      blogs: data.blogs || [],
+      techStack: data.technology?.stack || [],
+      partners: data.technology?.partners || [],
+      integrations: data.technology?.integrations || [],
+    };
+  };
+
+  const handleSelectResponse = (model: 'perplexity' | 'openai') => {
+    console.log('[ONBOARDING-WIZARD] 👤 User selected response', { model });
+    const selectedResponse = aiResponses[model];
+    
+    if (!selectedResponse?.data) {
+      return;
+    }
+
+    setSelectedModel(model);
+    const mappedData = mapAIResponseToFormData(selectedResponse.data);
+    setFormData(prev => ({ ...prev, ...mappedData }));
   };
 
   const handleAutoFill = async () => {
@@ -804,91 +1059,23 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
         <div className="min-h-[500px] max-h-[500px] overflow-y-auto pr-8">
           {currentStep === 1 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  Company Information
-                </h3>
-                <Button
-                  variant="outline"
-                  onClick={handleAutoFill}
-                  disabled={!formData.website || extracting}
-                  type="button"
-                  className="flex items-center gap-2"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  {extracting ? 'Extracting...' : 'AI Autofill'}
-                </Button>
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Company Information
+              </h3>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Company Name *
+                </label>
+                <Input
+                  type="text"
+                  value={formData.companyName}
+                  onChange={(e) => handleChange('companyName', e.target.value)}
+                  placeholder="e.g., Google"
+                  required
+                  className="pr-6"
+                />
               </div>
-
-              {extracting && (
-                <div className="bg-white border-2 border-blue-500 rounded-lg p-6 shadow-lg">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                    <h4 className="text-lg font-semibold text-slate-900">Extracting Company Data...</h4>
-                  </div>
-
-                  <div className="mb-6">
-                    {(() => {
-                      // Find the current active step (in_progress first, then error, then first pending)
-                      const inProgressStep = extractionSteps.find(step => step.status === 'in_progress');
-                      const errorStep = extractionSteps.find(step => step.status === 'error');
-                      const pendingStep = extractionSteps.find(step => step.status === 'pending');
-                      const currentStep = inProgressStep || errorStep || pendingStep || extractionSteps[0];
-                      
-                      return (
-                        <>
-                          <div className="flex justify-between items-center text-sm mb-2">
-                            <span className="text-slate-700 font-medium">
-                              {currentStep?.label || 'Processing...'}
-                            </span>
-                            <span className="text-slate-600 font-medium">{Math.round(extractionProgress)}%</span>
-                          </div>
-                          <div className="w-full bg-slate-200 rounded-full h-3">
-                            <div
-                              className="bg-blue-600 h-3 rounded-full transition-all duration-500 ease-out"
-                              style={{ width: `${extractionProgress}%` }}
-                            />
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-
-                  <p className="text-xs text-slate-500 mt-4 text-center">
-                    This may take 30-60 seconds. Please don't close this window.
-                  </p>
-                </div>
-              )}
-
-              {showApiKeyInput && !perplexityKey && !extracting && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-                  <p className="text-sm text-blue-900">
-                    To use AI autofill, please enter your Perplexity API key. Your key is stored locally for future use.
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      type="password"
-                      value={perplexityKey}
-                      onChange={(e) => {
-                        setPerplexityKey(e.target.value);
-                        localStorage.setItem('perplexity_key', e.target.value);
-                      }}
-                      placeholder="pplx-..."
-                      className="flex-1"
-                    />
-                    <Button
-                      variant="primary"
-                      onClick={() => {
-                        setShowApiKeyInput(false);
-                        if (perplexityKey) handleAutoFill();
-                      }}
-                      disabled={!perplexityKey}
-                    >
-                      Continue
-                    </Button>
-                  </div>
-                </div>
-              )}
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -898,24 +1085,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
                   type="url"
                   value={formData.website}
                   onChange={(e) => handleChange('website', e.target.value)}
-                  placeholder="https://yourcompany.com"
-                  required
-                  className="pr-6"
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  Enter your website and click AI Autofill to automatically extract ALL information across all 8 steps
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Company Name *
-                </label>
-                <Input
-                  type="text"
-                  value={formData.companyName}
-                  onChange={(e) => handleChange('companyName', e.target.value)}
-                  placeholder="e.g., TechSolutions Inc."
+                  placeholder="https://www.google.com/"
                   required
                   className="pr-6"
                 />
@@ -923,97 +1093,205 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Industry
+                  LinkedIn URL *
                 </label>
                 <Input
-                  type="text"
-                  value={formData.industry}
-                  onChange={(e) => handleChange('industry', e.target.value)}
-                  placeholder="e.g., Technology, Healthcare, Finance"
+                  type="url"
+                  value={formData.linkedinUrl}
+                  onChange={(e) => handleChange('linkedinUrl', e.target.value)}
+                  placeholder="https://www.linkedin.com/company/google"
+                  required
                   className="pr-6"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  className="w-full min-h-[80px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  value={formData.description}
-                  onChange={(e) => handleChange('description', e.target.value)}
-                  placeholder="Brief description of what your company does..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Founded
-                  </label>
-                  <Input
-                    type="text"
-                    value={formData.founded}
-                    onChange={(e) => handleChange('founded', e.target.value)}
-                    placeholder="e.g., 2020"
-                    className="pr-6"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Company Size
-                  </label>
-                  <Input
-                    type="text"
-                    value={formData.size}
-                    onChange={(e) => handleChange('size', e.target.value)}
-                    placeholder="e.g., 50-100 employees"
-                    className="pr-6"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Location
-                </label>
-                <Input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => handleChange('location', e.target.value)}
-                  placeholder="e.g., San Francisco, CA"
-                  className="pr-6"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Mission Statement
-                </label>
-                <textarea
-                  className="w-full min-h-[60px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  value={formData.mission}
-                  onChange={(e) => handleChange('mission', e.target.value)}
-                  placeholder="Your company's mission..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Vision Statement
-                </label>
-                <textarea
-                  className="w-full min-h-[60px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  value={formData.vision}
-                  onChange={(e) => handleChange('vision', e.target.value)}
-                  placeholder="Your company's vision..."
                 />
               </div>
             </div>
           )}
 
           {currentStep === 2 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  AI Data Enrichment
+                </h3>
+                {!selectedModel && !aiPrefilling && (aiResponses.perplexity || aiResponses.openai) && (
+                  <Button
+                    variant="outline"
+                    onClick={handleRegenerate}
+                    type="button"
+                    className="flex items-center gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Regenerate
+                  </Button>
+                )}
+              </div>
+
+              {/* Dual AI Fetch Progress */}
+              {aiPrefilling && (
+                <div className="mb-4">
+                  <CompanyAIFetchProgress
+                    perplexityResponse={aiResponses.perplexity}
+                    openaiResponse={aiResponses.openai}
+                  />
+                </div>
+              )}
+
+              {/* Show Comparison after both responses are received */}
+              {!aiPrefilling && (aiResponses.perplexity || aiResponses.openai) && !selectedModel && (
+                <div className="mb-4">
+                  <CompanyAIResponseComparison
+                    perplexityResponse={aiResponses.perplexity}
+                    openaiResponse={aiResponses.openai}
+                    comparison={comparison}
+                    onSelectResponse={handleSelectResponse}
+                    onRegenerate={handleRegenerate}
+                  />
+                </div>
+              )}
+
+              {/* Show detailed form view after response is selected */}
+              {selectedModel && (
+                <>
+                  <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm text-green-900">
+                      Using {selectedModel === 'perplexity' ? 'Perplexity' : 'OpenAI'} response. Review and edit the details below.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Website URL *
+                    </label>
+                    <Input
+                      type="url"
+                      value={formData.website}
+                      onChange={(e) => handleChange('website', e.target.value)}
+                      placeholder="https://yourcompany.com"
+                      required
+                      className="pr-6"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Company Name *
+                    </label>
+                    <Input
+                      type="text"
+                      value={formData.companyName}
+                      onChange={(e) => handleChange('companyName', e.target.value)}
+                      placeholder="e.g., TechSolutions Inc."
+                      required
+                      className="pr-6"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Industry
+                    </label>
+                    <Input
+                      type="text"
+                      value={formData.industry}
+                      onChange={(e) => handleChange('industry', e.target.value)}
+                      placeholder="e.g., Technology, Healthcare, Finance"
+                      className="pr-6"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      className="w-full min-h-[80px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      value={formData.description}
+                      onChange={(e) => handleChange('description', e.target.value)}
+                      placeholder="Brief description of what your company does..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Founded
+                      </label>
+                      <Input
+                        type="text"
+                        value={formData.founded}
+                        onChange={(e) => handleChange('founded', e.target.value)}
+                        placeholder="e.g., 2020"
+                        className="pr-6"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Company Size
+                      </label>
+                      <Input
+                        type="text"
+                        value={formData.size}
+                        onChange={(e) => handleChange('size', e.target.value)}
+                        placeholder="e.g., 50-100 employees"
+                        className="pr-6"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Location
+                    </label>
+                    <Input
+                      type="text"
+                      value={formData.location}
+                      onChange={(e) => handleChange('location', e.target.value)}
+                      placeholder="e.g., San Francisco, CA"
+                      className="pr-6"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Mission Statement
+                    </label>
+                    <textarea
+                      className="w-full min-h-[60px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      value={formData.mission}
+                      onChange={(e) => handleChange('mission', e.target.value)}
+                      placeholder="Your company's mission..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Vision Statement
+                    </label>
+                    <textarea
+                      className="w-full min-h-[60px] p-3 pr-6 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      value={formData.vision}
+                      onChange={(e) => handleChange('vision', e.target.value)}
+                      placeholder="Your company's vision..."
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Show waiting message if no responses yet */}
+              {!aiPrefilling && !aiResponses.perplexity && !aiResponses.openai && !selectedModel && (
+                <div className="text-center py-8">
+                  <Sparkles className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Fetching AI responses... This may take a few moments.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentStep === 3 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">
                 Contact Information
@@ -1060,7 +1338,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             </div>
           )}
 
-          {currentStep === 3 && (
+          {currentStep === 4 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">
                 Social Media Profiles
@@ -1133,7 +1411,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             </div>
           )}
 
-          {currentStep === 4 && (
+          {currentStep === 5 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-slate-900">
@@ -1272,7 +1550,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             </div>
           )}
 
-          {currentStep === 5 && (
+          {currentStep === 6 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-slate-900">
@@ -1340,7 +1618,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             </div>
           )}
 
-          {currentStep === 6 && (
+          {currentStep === 7 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-slate-900">
@@ -1413,7 +1691,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             </div>
           )}
 
-          {currentStep === 7 && (
+          {currentStep === 8 && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">
                 Technology & Partners
@@ -1553,7 +1831,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ isOpen, onCo
             </div>
           )}
 
-          {currentStep === 8 && (
+          {currentStep === 9 && (
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-slate-900 mb-4">
                 Review Your Information

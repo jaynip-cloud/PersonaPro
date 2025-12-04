@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
-import { Loader2, CheckCircle2, XCircle, ChevronDown, ChevronUp, ExternalLink, Mail, Phone, MapPin, Building2, Users, Calendar, Target, TrendingUp, Code, Globe, FileText } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ChevronDown, ChevronUp, Building2, Users, Calendar, MapPin, Mail, Phone, Globe, Code, FileText } from 'lucide-react';
 
 interface AIResponse {
   model: 'perplexity' | 'openai';
@@ -13,7 +13,7 @@ interface AIResponse {
   error?: string;
 }
 
-interface AIFetchProgressProps {
+interface CompanyAIFetchProgressProps {
   perplexityResponse: AIResponse | null;
   openaiResponse: AIResponse | null;
 }
@@ -77,7 +77,7 @@ const ResponseCard: React.FC<{
         {isLoading && (
           <div className="text-center py-8">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
-            <p className="text-sm text-muted-foreground">Fetching...</p>
+            <p className="text-sm text-muted-foreground">Fetching company data...</p>
           </div>
         )}
 
@@ -90,7 +90,6 @@ const ResponseCard: React.FC<{
 
         {isComplete && data && (
           <div className="space-y-4">
-            {/* Status */}
             <div className="flex items-center gap-2 text-green-600 pb-2 border-b">
               <CheckCircle2 className="h-5 w-5" />
               <span className="text-sm font-medium">Complete</span>
@@ -99,41 +98,32 @@ const ResponseCard: React.FC<{
               </span>
             </div>
 
-            {/* Company Information */}
             <DataSection title="Company Information" defaultExpanded={true}>
-              <DataField label="Company" value={data.company} icon={<Building2 className="h-4 w-4" />} />
+              <DataField label="Company Name" value={data.companyName} icon={<Building2 className="h-4 w-4" />} />
               <DataField label="Industry" value={data.industry} />
               <DataField label="Description" value={data.description} />
+              <DataField label="Value Proposition" value={data.valueProposition} />
               <DataField label="Founded" value={data.founded} icon={<Calendar className="h-4 w-4" />} />
-              <DataField label="Company Size" value={data.companySize} icon={<Users className="h-4 w-4" />} />
-              <DataField label="Employees" value={data.employeeCount} />
-              <DataField label="Revenue" value={data.annualRevenue} icon={<TrendingUp className="h-4 w-4" />} />
+              <DataField label="Company Size" value={data.size} icon={<Users className="h-4 w-4" />} />
+              <DataField label="Location" value={data.location} icon={<MapPin className="h-4 w-4" />} />
+              <DataField label="Mission" value={data.mission} />
+              <DataField label="Vision" value={data.vision} />
             </DataSection>
 
-            {/* Location */}
-            <DataSection title="Location">
-              <DataField label="City" value={data.city} icon={<MapPin className="h-4 w-4" />} />
-              <DataField label="Country" value={data.country} />
-              <DataField label="ZIP Code" value={data.zipCode} />
-            </DataSection>
-
-            {/* Contact Information */}
             <DataSection title="Contact Information">
-              <DataField label="Contact Name" value={data.contactName} />
-              <DataField label="Job Title" value={data.jobTitle} />
-              <DataField label="Email" value={data.primaryEmail} icon={<Mail className="h-4 w-4" />} />
-              <DataField label="Phone" value={data.primaryPhone} icon={<Phone className="h-4 w-4" />} />
+              <DataField label="Email" value={data.email} icon={<Mail className="h-4 w-4" />} />
+              <DataField label="Phone" value={data.phone} icon={<Phone className="h-4 w-4" />} />
+              <DataField label="Address" value={data.address} icon={<MapPin className="h-4 w-4" />} />
             </DataSection>
 
-            {/* Social Media */}
             <DataSection title="Social Media">
               <DataField label="LinkedIn" value={data.linkedinUrl} icon={<Globe className="h-4 w-4" />} />
               <DataField label="Twitter/X" value={data.twitterUrl} icon={<Globe className="h-4 w-4" />} />
               <DataField label="Facebook" value={data.facebookUrl} icon={<Globe className="h-4 w-4" />} />
               <DataField label="Instagram" value={data.instagramUrl} icon={<Globe className="h-4 w-4" />} />
+              <DataField label="YouTube" value={data.youtubeUrl} icon={<Globe className="h-4 w-4" />} />
             </DataSection>
 
-            {/* Services */}
             {data.services && Array.isArray(data.services) && data.services.length > 0 && (
               <DataSection title={`Services (${data.services.length})`}>
                 {data.services.map((service: any, idx: number) => (
@@ -147,43 +137,30 @@ const ResponseCard: React.FC<{
               </DataSection>
             )}
 
-            {/* Technologies */}
-            {data.technologies && Array.isArray(data.technologies) && data.technologies.length > 0 && (
-              <DataSection title={`Technologies (${data.technologies.length})`}>
-                <div className="flex flex-wrap gap-2">
-                  {data.technologies.map((tech: any, idx: number) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs"
-                    >
-                      <Code className="h-3 w-3" />
-                      <span>{tech.name}</span>
-                      {tech.category && (
-                        <span className="text-muted-foreground">({tech.category})</span>
-                      )}
-                    </span>
-                  ))}
-                </div>
+            {data.leadership && Array.isArray(data.leadership) && data.leadership.length > 0 && (
+              <DataSection title={`Leadership (${data.leadership.length})`}>
+                {data.leadership.slice(0, 3).map((leader: any, idx: number) => (
+                  <div key={idx} className="py-1.5">
+                    <div className="font-medium text-sm">{leader.name}</div>
+                    <div className="text-xs text-muted-foreground">{leader.role}</div>
+                  </div>
+                ))}
+                {data.leadership.length > 3 && (
+                  <div className="text-xs text-muted-foreground pt-1">
+                    +{data.leadership.length - 3} more members
+                  </div>
+                )}
               </DataSection>
             )}
 
-            {/* Blogs */}
             {data.blogs && Array.isArray(data.blogs) && data.blogs.length > 0 && (
               <DataSection title={`Blog Posts (${data.blogs.length})`}>
-                {data.blogs.slice(0, 5).map((blog: any, idx: number) => (
+                {data.blogs.slice(0, 3).map((blog: any, idx: number) => (
                   <div key={idx} className="py-1.5">
                     <div className="flex items-start gap-2">
                       <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <a
-                          href={blog.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium hover:text-primary flex items-center gap-1"
-                        >
-                          {blog.title}
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
+                        <div className="text-sm font-medium">{blog.title}</div>
                         {blog.date && (
                           <div className="text-xs text-muted-foreground mt-0.5">{blog.date}</div>
                         )}
@@ -191,42 +168,34 @@ const ResponseCard: React.FC<{
                     </div>
                   </div>
                 ))}
-                {data.blogs.length > 5 && (
+                {data.blogs.length > 3 && (
                   <div className="text-xs text-muted-foreground pt-1">
-                    +{data.blogs.length - 5} more posts
+                    +{data.blogs.length - 3} more posts
                   </div>
                 )}
               </DataSection>
             )}
 
-            {/* Competitors */}
-            {data.competitors && Array.isArray(data.competitors) && data.competitors.length > 0 && (
-              <DataSection title={`Competitors (${data.competitors.length})`}>
-                {data.competitors.map((competitor: any, idx: number) => (
-                  <div key={idx} className="py-1.5">
-                    <div className="font-medium text-sm">{competitor.name}</div>
-                    {competitor.comparison && (
-                      <div className="text-xs text-muted-foreground mt-0.5">{competitor.comparison}</div>
-                    )}
-                  </div>
-                ))}
+            {data.technology?.stack && Array.isArray(data.technology.stack) && data.technology.stack.length > 0 && (
+              <DataSection title={`Technology Stack (${data.technology.stack.length})`}>
+                <div className="flex flex-wrap gap-2">
+                  {data.technology.stack.slice(0, 10).map((tech: string, idx: number) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs"
+                    >
+                      <Code className="h-3 w-3" />
+                      <span>{tech}</span>
+                    </span>
+                  ))}
+                  {data.technology.stack.length > 10 && (
+                    <span className="text-xs text-muted-foreground">
+                      +{data.technology.stack.length - 10} more
+                    </span>
+                  )}
+                </div>
               </DataSection>
             )}
-
-            {/* Pain Points */}
-            {data.painPoints && Array.isArray(data.painPoints) && data.painPoints.length > 0 && (
-              <DataSection title={`Pain Points (${data.painPoints.length})`}>
-                {data.painPoints.map((point: string, idx: number) => (
-                  <div key={idx} className="text-sm py-1">• {point}</div>
-                ))}
-              </DataSection>
-            )}
-
-            {/* Goals */}
-            <DataSection title="Goals">
-              <DataField label="Short-term Goals" value={data.shortTermGoals} icon={<Target className="h-4 w-4" />} />
-              <DataField label="Long-term Goals" value={data.longTermGoals} icon={<Target className="h-4 w-4" />} />
-            </DataSection>
           </div>
         )}
       </CardContent>
@@ -234,7 +203,7 @@ const ResponseCard: React.FC<{
   );
 };
 
-export const AIFetchProgress: React.FC<AIFetchProgressProps> = ({
+export const CompanyAIFetchProgress: React.FC<CompanyAIFetchProgressProps> = ({
   perplexityResponse,
   openaiResponse,
 }) => {
@@ -243,7 +212,7 @@ export const AIFetchProgress: React.FC<AIFetchProgressProps> = ({
   return (
     <div className="space-y-6">
       {allComplete && (
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
             Both responses completed successfully
           </div>
@@ -251,12 +220,12 @@ export const AIFetchProgress: React.FC<AIFetchProgressProps> = ({
       )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ResponseCard 
-          title="Response 1" 
+          title="Response 1 (Perplexity)" 
           response={perplexityResponse} 
           color="blue"
         />
         <ResponseCard 
-          title="Response 2" 
+          title="Response 2 (OpenAI)" 
           response={openaiResponse} 
           color="purple"
         />

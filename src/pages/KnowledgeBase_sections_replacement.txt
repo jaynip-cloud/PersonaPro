@@ -1,0 +1,25 @@
+This is a reference file showing the complete sections structure that should replace the old sections display code.
+
+The structure should be:
+1. All sections nested inside the blue executive summary container
+2. Each section displayed with proper formatting
+3. All details shown with reasoning where available
+
+The sections to display are:
+- companyProfile
+- marketIntelligence  
+- strengths
+- opportunities
+- technologyAssessment
+- contentStrategy
+- leadershipTeam
+- brandPresence
+- keyMetrics
+- sentimentAnalysis
+- behaviorAnalysis
+- riskFactors
+- strategicRecommendations
+- dataAnalysis
+
+Each section should be displayed inside the blue container that starts at line 982.
+

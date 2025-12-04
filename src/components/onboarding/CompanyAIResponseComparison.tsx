@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { CheckCircle2, XCircle, TrendingUp, RefreshCw, Star, AlertCircle, Lightbulb, ArrowRight, Building2, Users, Calendar, Target, Mail, Phone, MapPin, Globe, Code, FileText, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, XCircle, TrendingUp, RefreshCw, Star, AlertCircle, Lightbulb, ArrowRight, Building2, Users, Calendar, Target, Mail, Phone, MapPin, Globe, Code, FileText, ExternalLink, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 
 interface AIResponse {
   model: 'perplexity' | 'openai';
@@ -25,7 +25,7 @@ interface ComparisonResult {
   keyDifferences?: string[];
 }
 
-interface AIResponseComparisonProps {
+interface CompanyAIResponseComparisonProps {
   perplexityResponse: AIResponse | null;
   openaiResponse: AIResponse | null;
   comparison: ComparisonResult | null;
@@ -62,35 +62,25 @@ const DataSection: React.FC<{ title: string; children: React.ReactNode; defaultE
   );
 };
 
-export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
+export const CompanyAIResponseComparison: React.FC<CompanyAIResponseComparisonProps> = ({
   perplexityResponse,
   openaiResponse,
   comparison,
   onSelectResponse,
   onRegenerate,
 }) => {
-  // Debug logging
-  React.useEffect(() => {
-    console.log('[AIResponseComparison] Component rendered', {
-      hasComparison: !!comparison,
-      comparison: comparison,
-      perplexityResponse: !!perplexityResponse,
-      openaiResponse: !!openaiResponse,
-    });
-  }, [comparison, perplexityResponse, openaiResponse]);
-
   const recommended = comparison?.recommendedModel;
 
   return (
     <div className="space-y-6">
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Response 1 - Full Data */}
+        {/* Response 1 - Perplexity */}
         <Card className={recommended === 'perplexity' ? 'border-2 border-green-500 shadow-lg' : ''}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg">
-                Response 1
+                Response 1 (Perplexity)
                 {comparison && (
                   <Badge variant="outline" className="ml-2">
                     {comparison.score.perplexity}/100
@@ -113,7 +103,6 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
           <CardContent className="space-y-4">
             {perplexityResponse?.data ? (
               <div className="space-y-4">
-                {/* Status */}
                 <div className="flex items-center gap-2 text-green-600 pb-2 border-b">
                   <CheckCircle2 className="h-5 w-5" />
                   <span className="text-sm font-medium">Complete</span>
@@ -122,41 +111,32 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                   </span>
                 </div>
 
-                {/* Company Information */}
                 <DataSection title="Company Information" defaultExpanded={true}>
-                  <DataField label="Company" value={perplexityResponse.data.company} icon={<Building2 className="h-4 w-4" />} />
+                  <DataField label="Company Name" value={perplexityResponse.data.companyName} icon={<Building2 className="h-4 w-4" />} />
                   <DataField label="Industry" value={perplexityResponse.data.industry} />
                   <DataField label="Description" value={perplexityResponse.data.description} />
+                  <DataField label="Value Proposition" value={perplexityResponse.data.valueProposition} />
                   <DataField label="Founded" value={perplexityResponse.data.founded} icon={<Calendar className="h-4 w-4" />} />
-                  <DataField label="Company Size" value={perplexityResponse.data.companySize} icon={<Users className="h-4 w-4" />} />
-                  <DataField label="Employees" value={perplexityResponse.data.employeeCount} />
-                  <DataField label="Revenue" value={perplexityResponse.data.annualRevenue} icon={<TrendingUp className="h-4 w-4" />} />
+                  <DataField label="Company Size" value={perplexityResponse.data.size} icon={<Users className="h-4 w-4" />} />
+                  <DataField label="Location" value={perplexityResponse.data.location} icon={<MapPin className="h-4 w-4" />} />
+                  <DataField label="Mission" value={perplexityResponse.data.mission} />
+                  <DataField label="Vision" value={perplexityResponse.data.vision} />
                 </DataSection>
 
-                {/* Location */}
-                <DataSection title="Location">
-                  <DataField label="City" value={perplexityResponse.data.city} icon={<MapPin className="h-4 w-4" />} />
-                  <DataField label="Country" value={perplexityResponse.data.country} />
-                  <DataField label="ZIP Code" value={perplexityResponse.data.zipCode} />
-                </DataSection>
-
-                {/* Contact Information */}
                 <DataSection title="Contact Information">
-                  <DataField label="Contact Name" value={perplexityResponse.data.contactName} />
-                  <DataField label="Job Title" value={perplexityResponse.data.jobTitle} />
-                  <DataField label="Email" value={perplexityResponse.data.primaryEmail} icon={<Mail className="h-4 w-4" />} />
-                  <DataField label="Phone" value={perplexityResponse.data.primaryPhone} icon={<Phone className="h-4 w-4" />} />
+                  <DataField label="Email" value={perplexityResponse.data.email} icon={<Mail className="h-4 w-4" />} />
+                  <DataField label="Phone" value={perplexityResponse.data.phone} icon={<Phone className="h-4 w-4" />} />
+                  <DataField label="Address" value={perplexityResponse.data.address} icon={<MapPin className="h-4 w-4" />} />
                 </DataSection>
 
-                {/* Social Media */}
                 <DataSection title="Social Media">
                   <DataField label="LinkedIn" value={perplexityResponse.data.linkedinUrl} icon={<Globe className="h-4 w-4" />} />
                   <DataField label="Twitter/X" value={perplexityResponse.data.twitterUrl} icon={<Globe className="h-4 w-4" />} />
                   <DataField label="Facebook" value={perplexityResponse.data.facebookUrl} icon={<Globe className="h-4 w-4" />} />
                   <DataField label="Instagram" value={perplexityResponse.data.instagramUrl} icon={<Globe className="h-4 w-4" />} />
+                  <DataField label="YouTube" value={perplexityResponse.data.youtubeUrl} icon={<Globe className="h-4 w-4" />} />
                 </DataSection>
 
-                {/* Services */}
                 {perplexityResponse.data.services && Array.isArray(perplexityResponse.data.services) && perplexityResponse.data.services.length > 0 && (
                   <DataSection title={`Services (${perplexityResponse.data.services.length})`}>
                     {perplexityResponse.data.services.map((service: any, idx: number) => (
@@ -170,27 +150,20 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                   </DataSection>
                 )}
 
-                {/* Technologies */}
-                {perplexityResponse.data.technologies && Array.isArray(perplexityResponse.data.technologies) && perplexityResponse.data.technologies.length > 0 && (
-                  <DataSection title={`Technologies (${perplexityResponse.data.technologies.length})`}>
-                    <div className="flex flex-wrap gap-2">
-                      {perplexityResponse.data.technologies.map((tech: any, idx: number) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs"
-                        >
-                          <Code className="h-3 w-3" />
-                          <span>{tech.name}</span>
-                          {tech.category && (
-                            <span className="text-muted-foreground">({tech.category})</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
+                {perplexityResponse.data.leadership && Array.isArray(perplexityResponse.data.leadership) && perplexityResponse.data.leadership.length > 0 && (
+                  <DataSection title={`Leadership (${perplexityResponse.data.leadership.length})`}>
+                    {perplexityResponse.data.leadership.map((leader: any, idx: number) => (
+                      <div key={idx} className="py-1.5">
+                        <div className="font-medium text-sm">{leader.name}</div>
+                        <div className="text-xs text-muted-foreground">{leader.role}</div>
+                        {leader.bio && (
+                          <div className="text-xs text-muted-foreground mt-0.5">{leader.bio}</div>
+                        )}
+                      </div>
+                    ))}
                   </DataSection>
                 )}
 
-                {/* Blogs */}
                 {perplexityResponse.data.blogs && Array.isArray(perplexityResponse.data.blogs) && perplexityResponse.data.blogs.length > 0 && (
                   <DataSection title={`Blog Posts (${perplexityResponse.data.blogs.length})`}>
                     {perplexityResponse.data.blogs.slice(0, 5).map((blog: any, idx: number) => (
@@ -222,36 +195,22 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                   </DataSection>
                 )}
 
-                {/* Competitors */}
-                {perplexityResponse.data.competitors && Array.isArray(perplexityResponse.data.competitors) && perplexityResponse.data.competitors.length > 0 && (
-                  <DataSection title={`Competitors (${perplexityResponse.data.competitors.length})`}>
-                    {perplexityResponse.data.competitors.map((competitor: any, idx: number) => (
-                      <div key={idx} className="py-1.5">
-                        <div className="font-medium text-sm">{competitor.name}</div>
-                        {competitor.comparison && (
-                          <div className="text-xs text-muted-foreground mt-0.5">{competitor.comparison}</div>
-                        )}
-                      </div>
-                    ))}
+                {perplexityResponse.data.technology?.stack && Array.isArray(perplexityResponse.data.technology.stack) && perplexityResponse.data.technology.stack.length > 0 && (
+                  <DataSection title={`Technology Stack (${perplexityResponse.data.technology.stack.length})`}>
+                    <div className="flex flex-wrap gap-2">
+                      {perplexityResponse.data.technology.stack.map((tech: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs"
+                        >
+                          <Code className="h-3 w-3" />
+                          <span>{tech}</span>
+                        </span>
+                      ))}
+                    </div>
                   </DataSection>
                 )}
 
-                {/* Pain Points */}
-                {perplexityResponse.data.painPoints && Array.isArray(perplexityResponse.data.painPoints) && perplexityResponse.data.painPoints.length > 0 && (
-                  <DataSection title={`Pain Points (${perplexityResponse.data.painPoints.length})`}>
-                    {perplexityResponse.data.painPoints.map((point: string, idx: number) => (
-                      <div key={idx} className="text-sm py-1">• {point}</div>
-                    ))}
-                  </DataSection>
-                )}
-
-                {/* Goals */}
-                <DataSection title="Goals">
-                  <DataField label="Short-term Goals" value={perplexityResponse.data.shortTermGoals} icon={<Target className="h-4 w-4" />} />
-                  <DataField label="Long-term Goals" value={perplexityResponse.data.longTermGoals} icon={<Target className="h-4 w-4" />} />
-                </DataSection>
-
-                {/* Action Button */}
                 <Button
                   variant={recommended === 'perplexity' ? 'primary' : 'outline'}
                   className="w-full mt-4"
@@ -280,12 +239,12 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
           </CardContent>
         </Card>
 
-        {/* Response 2 - Full Data */}
+        {/* Response 2 - OpenAI */}
         <Card className={recommended === 'openai' ? 'border-2 border-green-500 shadow-lg' : ''}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg">
-                Response 2
+                Response 2 (OpenAI)
                 {comparison && (
                   <Badge variant="outline" className="ml-2">
                     {comparison.score.openai}/100
@@ -308,7 +267,6 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
           <CardContent className="space-y-4">
             {openaiResponse?.data ? (
               <div className="space-y-4">
-                {/* Status */}
                 <div className="flex items-center gap-2 text-green-600 pb-2 border-b">
                   <CheckCircle2 className="h-5 w-5" />
                   <span className="text-sm font-medium">Complete</span>
@@ -317,41 +275,32 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                   </span>
                 </div>
 
-                {/* Company Information */}
                 <DataSection title="Company Information" defaultExpanded={true}>
-                  <DataField label="Company" value={openaiResponse.data.company} icon={<Building2 className="h-4 w-4" />} />
+                  <DataField label="Company Name" value={openaiResponse.data.companyName} icon={<Building2 className="h-4 w-4" />} />
                   <DataField label="Industry" value={openaiResponse.data.industry} />
                   <DataField label="Description" value={openaiResponse.data.description} />
+                  <DataField label="Value Proposition" value={openaiResponse.data.valueProposition} />
                   <DataField label="Founded" value={openaiResponse.data.founded} icon={<Calendar className="h-4 w-4" />} />
-                  <DataField label="Company Size" value={openaiResponse.data.companySize} icon={<Users className="h-4 w-4" />} />
-                  <DataField label="Employees" value={openaiResponse.data.employeeCount} />
-                  <DataField label="Revenue" value={openaiResponse.data.annualRevenue} icon={<TrendingUp className="h-4 w-4" />} />
+                  <DataField label="Company Size" value={openaiResponse.data.size} icon={<Users className="h-4 w-4" />} />
+                  <DataField label="Location" value={openaiResponse.data.location} icon={<MapPin className="h-4 w-4" />} />
+                  <DataField label="Mission" value={openaiResponse.data.mission} />
+                  <DataField label="Vision" value={openaiResponse.data.vision} />
                 </DataSection>
 
-                {/* Location */}
-                <DataSection title="Location">
-                  <DataField label="City" value={openaiResponse.data.city} icon={<MapPin className="h-4 w-4" />} />
-                  <DataField label="Country" value={openaiResponse.data.country} />
-                  <DataField label="ZIP Code" value={openaiResponse.data.zipCode} />
-                </DataSection>
-
-                {/* Contact Information */}
                 <DataSection title="Contact Information">
-                  <DataField label="Contact Name" value={openaiResponse.data.contactName} />
-                  <DataField label="Job Title" value={openaiResponse.data.jobTitle} />
-                  <DataField label="Email" value={openaiResponse.data.primaryEmail} icon={<Mail className="h-4 w-4" />} />
-                  <DataField label="Phone" value={openaiResponse.data.primaryPhone} icon={<Phone className="h-4 w-4" />} />
+                  <DataField label="Email" value={openaiResponse.data.email} icon={<Mail className="h-4 w-4" />} />
+                  <DataField label="Phone" value={openaiResponse.data.phone} icon={<Phone className="h-4 w-4" />} />
+                  <DataField label="Address" value={openaiResponse.data.address} icon={<MapPin className="h-4 w-4" />} />
                 </DataSection>
 
-                {/* Social Media */}
                 <DataSection title="Social Media">
                   <DataField label="LinkedIn" value={openaiResponse.data.linkedinUrl} icon={<Globe className="h-4 w-4" />} />
                   <DataField label="Twitter/X" value={openaiResponse.data.twitterUrl} icon={<Globe className="h-4 w-4" />} />
                   <DataField label="Facebook" value={openaiResponse.data.facebookUrl} icon={<Globe className="h-4 w-4" />} />
                   <DataField label="Instagram" value={openaiResponse.data.instagramUrl} icon={<Globe className="h-4 w-4" />} />
+                  <DataField label="YouTube" value={openaiResponse.data.youtubeUrl} icon={<Globe className="h-4 w-4" />} />
                 </DataSection>
 
-                {/* Services */}
                 {openaiResponse.data.services && Array.isArray(openaiResponse.data.services) && openaiResponse.data.services.length > 0 && (
                   <DataSection title={`Services (${openaiResponse.data.services.length})`}>
                     {openaiResponse.data.services.map((service: any, idx: number) => (
@@ -365,27 +314,20 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                   </DataSection>
                 )}
 
-                {/* Technologies */}
-                {openaiResponse.data.technologies && Array.isArray(openaiResponse.data.technologies) && openaiResponse.data.technologies.length > 0 && (
-                  <DataSection title={`Technologies (${openaiResponse.data.technologies.length})`}>
-                    <div className="flex flex-wrap gap-2">
-                      {openaiResponse.data.technologies.map((tech: any, idx: number) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs"
-                        >
-                          <Code className="h-3 w-3" />
-                          <span>{tech.name}</span>
-                          {tech.category && (
-                            <span className="text-muted-foreground">({tech.category})</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
+                {openaiResponse.data.leadership && Array.isArray(openaiResponse.data.leadership) && openaiResponse.data.leadership.length > 0 && (
+                  <DataSection title={`Leadership (${openaiResponse.data.leadership.length})`}>
+                    {openaiResponse.data.leadership.map((leader: any, idx: number) => (
+                      <div key={idx} className="py-1.5">
+                        <div className="font-medium text-sm">{leader.name}</div>
+                        <div className="text-xs text-muted-foreground">{leader.role}</div>
+                        {leader.bio && (
+                          <div className="text-xs text-muted-foreground mt-0.5">{leader.bio}</div>
+                        )}
+                      </div>
+                    ))}
                   </DataSection>
                 )}
 
-                {/* Blogs */}
                 {openaiResponse.data.blogs && Array.isArray(openaiResponse.data.blogs) && openaiResponse.data.blogs.length > 0 && (
                   <DataSection title={`Blog Posts (${openaiResponse.data.blogs.length})`}>
                     {openaiResponse.data.blogs.slice(0, 5).map((blog: any, idx: number) => (
@@ -417,36 +359,22 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                   </DataSection>
                 )}
 
-                {/* Competitors */}
-                {openaiResponse.data.competitors && Array.isArray(openaiResponse.data.competitors) && openaiResponse.data.competitors.length > 0 && (
-                  <DataSection title={`Competitors (${openaiResponse.data.competitors.length})`}>
-                    {openaiResponse.data.competitors.map((competitor: any, idx: number) => (
-                      <div key={idx} className="py-1.5">
-                        <div className="font-medium text-sm">{competitor.name}</div>
-                        {competitor.comparison && (
-                          <div className="text-xs text-muted-foreground mt-0.5">{competitor.comparison}</div>
-                        )}
-                      </div>
-                    ))}
+                {openaiResponse.data.technology?.stack && Array.isArray(openaiResponse.data.technology.stack) && openaiResponse.data.technology.stack.length > 0 && (
+                  <DataSection title={`Technology Stack (${openaiResponse.data.technology.stack.length})`}>
+                    <div className="flex flex-wrap gap-2">
+                      {openaiResponse.data.technology.stack.map((tech: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs"
+                        >
+                          <Code className="h-3 w-3" />
+                          <span>{tech}</span>
+                        </span>
+                      ))}
+                    </div>
                   </DataSection>
                 )}
 
-                {/* Pain Points */}
-                {openaiResponse.data.painPoints && Array.isArray(openaiResponse.data.painPoints) && openaiResponse.data.painPoints.length > 0 && (
-                  <DataSection title={`Pain Points (${openaiResponse.data.painPoints.length})`}>
-                    {openaiResponse.data.painPoints.map((point: string, idx: number) => (
-                      <div key={idx} className="text-sm py-1">• {point}</div>
-                    ))}
-                  </DataSection>
-                )}
-
-                {/* Goals */}
-                <DataSection title="Goals">
-                  <DataField label="Short-term Goals" value={openaiResponse.data.shortTermGoals} icon={<Target className="h-4 w-4" />} />
-                  <DataField label="Long-term Goals" value={openaiResponse.data.longTermGoals} icon={<Target className="h-4 w-4" />} />
-                </DataSection>
-
-                {/* Action Button */}
                 <Button
                   variant={recommended === 'openai' ? 'primary' : 'outline'}
                   className="w-full mt-4"
@@ -476,7 +404,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
         </Card>
       </div>
 
-      {/* Recommendation Card - Below Both Responses */}
+      {/* Recommendation Card */}
       {comparison ? (
         <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-2 border-blue-200 dark:border-blue-800 shadow-lg">
           <CardHeader>
@@ -486,9 +414,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* First Row: KPIs on Left, Reasoning on Right */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b">
-              {/* Left Side: Two KPIs stacked */}
               <div className="space-y-3">
                 <div className={`p-4 rounded-lg relative ${
                   recommended === 'perplexity' 
@@ -503,7 +429,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                       </Badge>
                     </div>
                   )}
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Response 1</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Response 1 (Perplexity)</p>
                   <p className="text-3xl font-bold text-blue-600 inline">{comparison.score.perplexity}</p>
                   <span className="text-sm text-muted-foreground ml-1">/100 points</span>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -523,7 +449,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                       </Badge>
                     </div>
                   )}
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Response 2</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Response 2 (OpenAI)</p>
                   <p className="text-3xl font-bold text-purple-600 inline">{comparison.score.openai}</p>
                   <span className="text-sm text-muted-foreground ml-1">/100 points</span>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -532,7 +458,6 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                 </div>
               </div>
 
-              {/* Right Side: Reasoning */}
               <div className="p-4 bg-white dark:bg-gray-800 rounded-lg">
                 <div className="flex items-start gap-2 mb-2">
                   <Lightbulb className="h-5 w-5 text-yellow-500 mt-0.5" />
@@ -544,9 +469,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
               </div>
             </div>
 
-            {/* Strengths and Weaknesses Side by Side */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Strengths */}
               {comparison.strengths && (comparison.strengths.perplexity.length > 0 || comparison.strengths.openai.length > 0) && (
                 <div className="border rounded-lg overflow-hidden">
                   <div className="p-4 bg-white dark:bg-gray-800 border-b">
@@ -586,7 +509,6 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                 </div>
               )}
 
-              {/* Weaknesses */}
               {comparison.weaknesses && (comparison.weaknesses.perplexity.length > 0 || comparison.weaknesses.openai.length > 0) && (
                 <div className="border rounded-lg overflow-hidden">
                   <div className="p-4 bg-white dark:bg-gray-800 border-b">

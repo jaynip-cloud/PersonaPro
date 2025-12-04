@@ -11,7 +11,9 @@ const corsHeaders = {
 interface RequestBody {
   perplexityResponse: any; // Can be full response with {success, data, metadata} or just the data object
   openaiResponse: any; // Can be full response with {success, data, metadata} or just the data object
-  clientName: string;
+  clientName?: string;
+  companyName?: string;
+  dataType?: 'client' | 'company'; // Type of data being compared
 }
 
 interface ComparisonResult {
@@ -85,7 +87,7 @@ Deno.serve(async (req) => {
     // Step 2: Parse request
     logger.step('PARSE', 'Parsing request body', context);
     const body: RequestBody = await req.json();
-    let { perplexityResponse, openaiResponse, clientName } = body;
+    let { perplexityResponse, openaiResponse, clientName, companyName, dataType } = body;
 
     if (!perplexityResponse || !openaiResponse) {
       logger.error('Missing response data', context);
@@ -93,6 +95,16 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Both perplexityResponse and openaiResponse are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Determine data type if not provided
+    if (!dataType) {
+      // Auto-detect based on response structure
+      if (perplexityResponse.companyName || openaiResponse.companyName || companyName) {
+        dataType = 'company';
+      } else {
+        dataType = 'client';
+      }
     }
 
     // Extract data field if responses are wrapped (from enrich functions)
@@ -105,13 +117,19 @@ Deno.serve(async (req) => {
       logger.debug('Extracted data from openai response', context);
     }
 
-    if (!clientName) {
-      clientName = perplexityResponse.company || openaiResponse.company || 'Unknown Company';
+    // Get entity name based on data type
+    let entityName: string;
+    if (dataType === 'company') {
+      entityName = companyName || perplexityResponse.companyName || openaiResponse.companyName || 'Unknown Company';
+      context.companyName = entityName;
+    } else {
+      entityName = clientName || perplexityResponse.company || openaiResponse.company || 'Unknown Company';
+      context.clientName = entityName;
     }
 
-    context.clientName = clientName;
     logger.info('Request validated', context, { 
-      clientName,
+      dataType,
+      entityName,
       perplexityFields: Object.keys(perplexityResponse).length,
       openaiFields: Object.keys(openaiResponse).length
     });
@@ -130,35 +148,98 @@ Deno.serve(async (req) => {
 
     // Step 4: Calculate completeness scores
     logger.step('CALCULATE_COMPLETENESS', 'Calculating completeness scores', context);
-    const calculateCompleteness = (data: any): { score: number; details: any } => {
-      const fields = Object.keys(data);
-      const populated = fields.filter(key => {
-        const value = data[key];
-        if (Array.isArray(value)) return value.length > 0;
-        if (typeof value === 'string') return value.trim().length > 0;
-        return value !== null && value !== undefined;
-      });
-      
-      // Calculate detailed metrics
-      const arrayFields = fields.filter(key => Array.isArray(data[key]));
-      const populatedArrays = arrayFields.filter(key => Array.isArray(data[key]) && data[key].length > 0);
-      
-      return {
-        score: Math.round((populated.length / fields.length) * 100),
-        details: {
-          totalFields: fields.length,
-          populatedFields: populated.length,
-          arrayFields: arrayFields.length,
-          populatedArrays: populatedArrays.length,
-          arrayCompleteness: arrayFields.length > 0 
-            ? Math.round((populatedArrays.length / arrayFields.length) * 100)
-            : 100
-        }
-      };
+    const calculateCompleteness = (data: any, type: 'client' | 'company'): { score: number; details: any } => {
+      if (type === 'company') {
+        // Company profile specific completeness calculation
+        const basicFields = [
+          'companyName', 'website', 'industry', 'description', 'valueProposition',
+          'founded', 'location', 'size', 'mission', 'vision'
+        ];
+        const contactFields = ['email', 'phone', 'address'];
+        const socialFields = ['linkedinUrl', 'twitterUrl', 'facebookUrl', 'instagramUrl', 'youtubeUrl'];
+        
+        let populatedBasicFields = 0;
+        basicFields.forEach(field => {
+          const value = data[field];
+          if (typeof value === 'string' && value.trim().length > 0) populatedBasicFields++;
+        });
+        
+        let populatedContactFields = 0;
+        contactFields.forEach(field => {
+          const value = data[field];
+          if (typeof value === 'string' && value.trim().length > 0) populatedContactFields++;
+        });
+        
+        let populatedSocialFields = 0;
+        socialFields.forEach(field => {
+          const value = data[field];
+          if (typeof value === 'string' && value.trim().length > 0) populatedSocialFields++;
+        });
+        
+        const hasServices = Array.isArray(data.services) && data.services.length > 0;
+        const hasLeadership = Array.isArray(data.leadership) && data.leadership.length > 0;
+        const hasBlogs = Array.isArray(data.blogs) && data.blogs.length > 0;
+        const hasTechStack = data.technology?.stack && Array.isArray(data.technology.stack) && data.technology.stack.length > 0;
+        const hasPartners = data.technology?.partners && Array.isArray(data.technology.partners) && data.technology.partners.length > 0;
+        const hasIntegrations = data.technology?.integrations && Array.isArray(data.technology.integrations) && data.technology.integrations.length > 0;
+        
+        const totalFields = 10 + 3 + 5 + 6; // basic + contact + social + complex
+        const populatedFields = populatedBasicFields + populatedContactFields + populatedSocialFields +
+          (hasServices ? 1 : 0) + (hasLeadership ? 1 : 0) + (hasBlogs ? 1 : 0) +
+          (hasTechStack ? 1 : 0) + (hasPartners ? 1 : 0) + (hasIntegrations ? 1 : 0);
+        
+        const arrayFields = ['services', 'leadership', 'blogs', 'technology'];
+        const populatedArrays = [
+          hasServices, hasLeadership, hasBlogs, (hasTechStack || hasPartners || hasIntegrations)
+        ].filter(Boolean).length;
+        
+        return {
+          score: Math.round((populatedFields / totalFields) * 100),
+          details: {
+            totalFields,
+            populatedFields,
+            arrayFields: arrayFields.length,
+            populatedArrays,
+            arrayCompleteness: arrayFields.length > 0 
+              ? Math.round((populatedArrays / arrayFields.length) * 100)
+              : 100,
+            servicesCount: hasServices ? data.services.length : 0,
+            leadershipCount: hasLeadership ? data.leadership.length : 0,
+            blogsCount: hasBlogs ? data.blogs.length : 0,
+            techStackCount: hasTechStack ? data.technology.stack.length : 0
+          }
+        };
+      } else {
+        // Client data completeness calculation (original logic)
+        const fields = Object.keys(data);
+        const populated = fields.filter(key => {
+          const value = data[key];
+          if (Array.isArray(value)) return value.length > 0;
+          if (typeof value === 'string') return value.trim().length > 0;
+          return value !== null && value !== undefined;
+        });
+        
+        // Calculate detailed metrics
+        const arrayFields = fields.filter(key => Array.isArray(data[key]));
+        const populatedArrays = arrayFields.filter(key => Array.isArray(data[key]) && data[key].length > 0);
+        
+        return {
+          score: Math.round((populated.length / fields.length) * 100),
+          details: {
+            totalFields: fields.length,
+            populatedFields: populated.length,
+            arrayFields: arrayFields.length,
+            populatedArrays: populatedArrays.length,
+            arrayCompleteness: arrayFields.length > 0 
+              ? Math.round((populatedArrays.length / arrayFields.length) * 100)
+              : 100
+          }
+        };
+      }
     };
 
-    const perplexityCompleteness = calculateCompleteness(perplexityResponse);
-    const openaiCompleteness = calculateCompleteness(openaiResponse);
+    const perplexityCompleteness = calculateCompleteness(perplexityResponse, dataType);
+    const openaiCompleteness = calculateCompleteness(openaiResponse, dataType);
 
     logger.info('Completeness calculated', context, { 
       perplexity: `${perplexityCompleteness.score}%`,
@@ -169,7 +250,8 @@ Deno.serve(async (req) => {
 
     // Step 5: Construct comparison prompt
     logger.step('PROMPT', 'Constructing comparison prompt', context);
-    const comparisonPrompt = `You are an expert business intelligence analyst. Compare two AI-generated company profiles for "${clientName}" and determine which provides better, more comprehensive, and more accurate information.
+    const entityType = dataType === 'company' ? 'company profile' : 'client profile';
+    const comparisonPrompt = `You are an expert business intelligence analyst. Compare two AI-generated ${entityType}s for "${entityName}" and determine which provides better, more comprehensive, and more accurate information.
 
 PERPLEXITY RESPONSE:
 ${JSON.stringify(perplexityResponse, null, 2)}
@@ -184,24 +266,24 @@ COMPLETENESS METRICS:
 Evaluate both responses comprehensively based on:
 
 1. COMPLETENESS: How many fields are populated with actual data (not empty strings/arrays)
-   - Check: contact info (email, phone), social media URLs, blog posts, technologies, competitors, services
+   - Check: contact info (email, phone), social media URLs, blog posts, technologies${dataType === 'company' ? ', leadership team, mission/vision, value proposition' : ', competitors'}, services
    - Perplexity: ${perplexityCompleteness.score}% complete
    - OpenAI: ${openaiCompleteness.score}% complete
 
-2. ACCURACY: How accurate the information is based on known facts about "${clientName}"
+2. ACCURACY: How accurate the information is based on known facts about "${entityName}"
    - Verify: company name, industry, description, location, founding year
    - Check if data makes sense and is consistent
 
 3. DETAIL LEVEL: Depth and richness of information provided
-   - Compare: description length, service details, technology lists, blog post counts
+   - Compare: description length, service details, technology lists, blog post counts${dataType === 'company' ? ', leadership team details, mission/vision statements' : ''}
    - Which provides more actionable insights?
 
 4. DATA QUALITY: Structure, consistency, and validity
    - Check: proper JSON structure, valid URLs, consistent formatting
    - Are blog URLs absolute and valid? Are social media URLs complete?
-   - Are arrays properly formatted? Are dates in correct format?
+   - Are arrays properly formatted? Are dates in correct format?${dataType === 'company' ? '\n   - Are leadership members properly structured? Is technology stack comprehensive?' : ''}
 
-5. RELEVANCE: Information is actually about "${clientName}"
+5. RELEVANCE: Information is actually about "${entityName}"
    - Verify: company name matches, website matches, industry is correct
    - Check for any irrelevant or incorrect data
 
