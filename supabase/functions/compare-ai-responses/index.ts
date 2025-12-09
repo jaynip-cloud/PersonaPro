@@ -11,29 +11,34 @@ const corsHeaders = {
 interface RequestBody {
   perplexityResponse: any; // Can be full response with {success, data, metadata} or just the data object
   openaiResponse: any; // Can be full response with {success, data, metadata} or just the data object
+  geminiResponse?: any; // Optional: Can be full response with {success, data, metadata} or just the data object
   clientName?: string;
   companyName?: string;
   dataType?: 'client' | 'company'; // Type of data being compared
 }
 
 interface ComparisonResult {
-  recommendedModel: 'perplexity' | 'openai';
+  recommendedModel: 'perplexity' | 'openai' | 'gemini';
   score: {
     perplexity: number;
     openai: number;
+    gemini?: number;
   };
   reasoning: string;
   strengths: {
     perplexity: string[];
     openai: string[];
+    gemini?: string[];
   };
   weaknesses: {
     perplexity: string[];
     openai: string[];
+    gemini?: string[];
   };
   completeness: {
     perplexity: number;
     openai: number;
+    gemini?: number;
   };
   keyDifferences?: string[];
 }
@@ -87,7 +92,7 @@ Deno.serve(async (req) => {
     // Step 2: Parse request
     logger.step('PARSE', 'Parsing request body', context);
     const body: RequestBody = await req.json();
-    let { perplexityResponse, openaiResponse, clientName, companyName, dataType } = body;
+    let { perplexityResponse, openaiResponse, geminiResponse, clientName, companyName, dataType } = body;
 
     if (!perplexityResponse || !openaiResponse) {
       logger.error('Missing response data', context);
@@ -96,6 +101,8 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const hasGemini = !!geminiResponse;
 
     // Determine data type if not provided
     if (!dataType) {
@@ -116,6 +123,10 @@ Deno.serve(async (req) => {
       openaiResponse = openaiResponse.data;
       logger.debug('Extracted data from openai response', context);
     }
+    if (geminiResponse?.data) {
+      geminiResponse = geminiResponse.data;
+      logger.debug('Extracted data from gemini response', context);
+    }
 
     // Get entity name based on data type
     let entityName: string;
@@ -131,7 +142,9 @@ Deno.serve(async (req) => {
       dataType,
       entityName,
       perplexityFields: Object.keys(perplexityResponse).length,
-      openaiFields: Object.keys(openaiResponse).length
+      openaiFields: Object.keys(openaiResponse).length,
+      hasGemini,
+      geminiFields: hasGemini ? Object.keys(geminiResponse).length : 0
     });
 
     // Step 3: Get API key
@@ -240,35 +253,42 @@ Deno.serve(async (req) => {
 
     const perplexityCompleteness = calculateCompleteness(perplexityResponse, dataType);
     const openaiCompleteness = calculateCompleteness(openaiResponse, dataType);
+    const geminiCompleteness = hasGemini ? calculateCompleteness(geminiResponse, dataType) : null;
 
     logger.info('Completeness calculated', context, { 
       perplexity: `${perplexityCompleteness.score}%`,
       openai: `${openaiCompleteness.score}%`,
+      gemini: hasGemini ? `${geminiCompleteness?.score}%` : 'N/A',
       perplexityDetails: perplexityCompleteness.details,
-      openaiDetails: openaiCompleteness.details
+      openaiDetails: openaiCompleteness.details,
+      geminiDetails: geminiCompleteness?.details
     });
 
     // Step 5: Construct comparison prompt
     logger.step('PROMPT', 'Constructing comparison prompt', context);
     const entityType = dataType === 'company' ? 'company profile' : 'client profile';
-    const comparisonPrompt = `You are an expert business intelligence analyst. Compare two AI-generated ${entityType}s for "${entityName}" and determine which provides better, more comprehensive, and more accurate information.
+    const modelCount = hasGemini ? 'three' : 'two';
+    const comparisonPrompt = `You are an expert business intelligence analyst. Compare ${modelCount} AI-generated ${entityType}s for "${entityName}" and determine which provides better, more comprehensive, and more accurate information.
 
 PERPLEXITY RESPONSE:
 ${JSON.stringify(perplexityResponse, null, 2)}
 
 OPENAI RESPONSE:
 ${JSON.stringify(openaiResponse, null, 2)}
+${hasGemini ? `\nGEMINI RESPONSE:\n${JSON.stringify(geminiResponse, null, 2)}` : ''}
 
 COMPLETENESS METRICS:
 - Perplexity: ${perplexityCompleteness.score}% (${perplexityCompleteness.details.populatedFields}/${perplexityCompleteness.details.totalFields} fields populated, ${perplexityCompleteness.details.populatedArrays}/${perplexityCompleteness.details.arrayFields} arrays populated)
 - OpenAI: ${openaiCompleteness.score}% (${openaiCompleteness.details.populatedFields}/${openaiCompleteness.details.totalFields} fields populated, ${openaiCompleteness.details.populatedArrays}/${openaiCompleteness.details.arrayFields} arrays populated)
+${hasGemini ? `- Gemini: ${geminiCompleteness?.score}% (${geminiCompleteness?.details.populatedFields}/${geminiCompleteness?.details.totalFields} fields populated, ${geminiCompleteness?.details.populatedArrays}/${geminiCompleteness?.details.arrayFields} arrays populated)` : ''}
 
-Evaluate both responses comprehensively based on:
+Evaluate ${modelCount} responses comprehensively based on:
 
 1. COMPLETENESS: How many fields are populated with actual data (not empty strings/arrays)
    - Check: contact info (email, phone), social media URLs, blog posts, technologies${dataType === 'company' ? ', leadership team, mission/vision, value proposition' : ', competitors'}, services
    - Perplexity: ${perplexityCompleteness.score}% complete
    - OpenAI: ${openaiCompleteness.score}% complete
+   ${hasGemini ? `- Gemini: ${geminiCompleteness?.score}% complete` : ''}
 
 2. ACCURACY: How accurate the information is based on known facts about "${entityName}"
    - Verify: company name, industry, description, location, founding year
@@ -291,25 +311,25 @@ Evaluate both responses comprehensively based on:
    - Check: blog post dates, company information freshness
    - Which seems more up-to-date?
 
-7. UNIQUENESS: Which provides unique information the other doesn't have?
+7. UNIQUENESS: Which provides unique information the others don't have?
    - Compare: unique fields, unique blog posts, unique technologies
    - Which adds more value?
 
 Return a JSON object with this EXACT structure:
 {
-  "recommendedModel": "perplexity" or "openai",
+  "recommendedModel": ${hasGemini ? '"perplexity" or "openai" or "gemini"' : '"perplexity" or "openai"'},
   "score": {
     "perplexity": number between 0-100 (overall quality score),
-    "openai": number between 0-100 (overall quality score)
+    "openai": number between 0-100 (overall quality score)${hasGemini ? ',\n    "gemini": number between 0-100 (overall quality score)' : ''}
   },
-  "reasoning": "Detailed explanation (3-4 sentences) of why one model is recommended, including specific examples from the data. Be specific about what data points make one better than the other.",
+  "reasoning": "Detailed explanation (3-4 sentences) of why one model is recommended, including specific examples from the data. Be specific about what data points make one better than the ${hasGemini ? 'others' : 'other'}.",
   "strengths": {
     "perplexity": ["specific strength 1 with example", "specific strength 2 with example", "specific strength 3 with example"],
-    "openai": ["specific strength 1 with example", "specific strength 2 with example", "specific strength 3 with example"]
+    "openai": ["specific strength 1 with example", "specific strength 2 with example", "specific strength 3 with example"]${hasGemini ? ',\n    "gemini": ["specific strength 1 with example", "specific strength 2 with example", "specific strength 3 with example"]' : ''}
   },
   "weaknesses": {
     "perplexity": ["specific weakness 1 with example", "specific weakness 2 with example"],
-    "openai": ["specific weakness 1 with example", "specific weakness 2 with example"]
+    "openai": ["specific weakness 1 with example", "specific weakness 2 with example"]${hasGemini ? ',\n    "gemini": ["specific weakness 1 with example", "specific weakness 2 with example"]' : ''}
   },
   "keyDifferences": [
     "Difference 1: specific example",
@@ -338,7 +358,7 @@ Be objective, thorough, and provide specific examples from the actual data. Focu
         messages: [
           {
             role: 'system',
-            content: 'You are an expert at evaluating business intelligence data quality. Compare two AI-generated company profiles objectively and return ONLY valid JSON. No markdown, no explanations, just JSON. Be thorough, specific, and provide actionable insights.'
+            content: `You are an expert at evaluating business intelligence data quality. Compare ${modelCount} AI-generated ${entityType}s objectively and return ONLY valid JSON. No markdown, no explanations, just JSON. Be thorough, specific, and provide actionable insights.${hasGemini ? ' Include Gemini in your comparison and recommendation.' : ''}`
           },
           {
             role: 'user',
@@ -382,10 +402,26 @@ Be objective, thorough, and provide specific examples from the actual data. Focu
 
     // Step 8: Build result
     logger.step('BUILD_RESULT', 'Building comparison result', context);
+    
+    // Determine recommended model (fallback to highest completeness if not in parsed response)
+    let recommendedModel: 'perplexity' | 'openai' | 'gemini';
+    if (hasGemini && (parsedComparison.recommendedModel === 'perplexity' || parsedComparison.recommendedModel === 'openai' || parsedComparison.recommendedModel === 'gemini')) {
+      recommendedModel = parsedComparison.recommendedModel;
+    } else if (!hasGemini && (parsedComparison.recommendedModel === 'perplexity' || parsedComparison.recommendedModel === 'openai')) {
+      recommendedModel = parsedComparison.recommendedModel;
+    } else {
+      // Fallback: choose based on completeness scores
+      const scores = [
+        { model: 'perplexity' as const, score: perplexityCompleteness.score },
+        { model: 'openai' as const, score: openaiCompleteness.score },
+        ...(hasGemini && geminiCompleteness ? [{ model: 'gemini' as const, score: geminiCompleteness.score }] : [])
+      ];
+      scores.sort((a, b) => b.score - a.score);
+      recommendedModel = scores[0].model;
+    }
+    
     const result: ComparisonResult = {
-      recommendedModel: (parsedComparison.recommendedModel === 'perplexity' || parsedComparison.recommendedModel === 'openai')
-        ? parsedComparison.recommendedModel
-        : (perplexityCompleteness.score >= openaiCompleteness.score ? 'perplexity' : 'openai'),
+      recommendedModel,
       score: {
         perplexity: typeof parsedComparison.score?.perplexity === 'number' 
           ? Math.max(0, Math.min(100, parsedComparison.score.perplexity))
@@ -393,6 +429,11 @@ Be objective, thorough, and provide specific examples from the actual data. Focu
         openai: typeof parsedComparison.score?.openai === 'number'
           ? Math.max(0, Math.min(100, parsedComparison.score.openai))
           : 0,
+        ...(hasGemini ? {
+          gemini: typeof parsedComparison.score?.gemini === 'number'
+            ? Math.max(0, Math.min(100, parsedComparison.score.gemini))
+            : (geminiCompleteness?.score || 0)
+        } : {})
       },
       reasoning: parsedComparison.reasoning || 'Unable to determine recommendation',
       strengths: {
@@ -402,6 +443,11 @@ Be objective, thorough, and provide specific examples from the actual data. Focu
         openai: Array.isArray(parsedComparison.strengths?.openai) 
           ? parsedComparison.strengths.openai 
           : [],
+        ...(hasGemini ? {
+          gemini: Array.isArray(parsedComparison.strengths?.gemini) 
+            ? parsedComparison.strengths.gemini 
+            : []
+        } : {})
       },
       weaknesses: {
         perplexity: Array.isArray(parsedComparison.weaknesses?.perplexity) 
@@ -410,10 +456,18 @@ Be objective, thorough, and provide specific examples from the actual data. Focu
         openai: Array.isArray(parsedComparison.weaknesses?.openai) 
           ? parsedComparison.weaknesses.openai 
           : [],
+        ...(hasGemini ? {
+          gemini: Array.isArray(parsedComparison.weaknesses?.gemini) 
+            ? parsedComparison.weaknesses.gemini 
+            : []
+        } : {})
       },
       completeness: {
         perplexity: perplexityCompleteness.score,
         openai: openaiCompleteness.score,
+        ...(hasGemini && geminiCompleteness ? {
+          gemini: geminiCompleteness.score
+        } : {})
       },
       keyDifferences: Array.isArray(parsedComparison.keyDifferences)
         ? parsedComparison.keyDifferences

@@ -17,7 +17,7 @@ import { DocumentUpload } from '../components/data-sources/DocumentUpload';
 import { FathomSync } from '../components/data-sources/FathomSync';
 import { FathomRecordingsList } from '../components/data-sources/FathomRecordingsList';
 import { ProjectDetailPanel } from '../components/project/ProjectDetailPanel';
-import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight, Eye, Linkedin, Database } from 'lucide-react';
+import { Sparkles, Users, Target, Briefcase, MessageSquare, Settings, ArrowLeft, Download, Loader2, FileText, TrendingUp, Plus, User, Mail, Phone, Upload, Save, Edit2, Trash2, ChevronRight, ChevronDown, ChevronUp, Eye, Linkedin, Database } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { PersonaMetrics, EvidenceSnippet, Client, FinancialData, Contact } from '../types';
 import { generatePersonaMetrics } from '../utils/personaGenerator';
@@ -79,6 +79,7 @@ export const ClientDetailNew: React.FC = () => {
   const [projects, setProjects] = useState<any[]>([]);
   const [isGeneratingOpportunity, setIsGeneratingOpportunity] = useState(false);
   const [showAddOpportunityModal, setShowAddOpportunityModal] = useState(false);
+  const [expandedOpportunities, setExpandedOpportunities] = useState<Set<string>>(new Set());
   const [showEditOpportunityModal, setShowEditOpportunityModal] = useState(false);
   const [newOpportunityForm, setNewOpportunityForm] = useState({ title: '', description: '' });
   const [editOpportunityForm, setEditOpportunityForm] = useState<{ id: string; title: string; description: string } | null>(null);
@@ -1737,6 +1738,97 @@ export const ClientDetailNew: React.FC = () => {
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">{opp.description}</p>
+                          
+                          {(opp.ai_analysis?.reasoning || opp.ai_analysis?.successFactors || opp.ai_analysis?.recommendedApproach) && (
+                            <button
+                              onClick={() => {
+                                const oppId = opp.id;
+                                setExpandedOpportunities(prev => {
+                                  const newSet = new Set(prev);
+                                  if (newSet.has(oppId)) {
+                                    newSet.delete(oppId);
+                                  } else {
+                                    newSet.add(oppId);
+                                  }
+                                  return newSet;
+                                });
+                              }}
+                              className="mt-2 flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                            >
+                              {expandedOpportunities.has(opp.id) ? (
+                                <>
+                                  <ChevronUp className="h-3 w-3" />
+                                  Hide Details
+                                </>
+                              ) : (
+                                <>
+                                  <ChevronDown className="h-3 w-3" />
+                                  Show Details
+                                </>
+                              )}
+                            </button>
+                          )}
+
+                          {expandedOpportunities.has(opp.id) && (
+                            <div className="mt-3 pt-3 border-t border-border space-y-3">
+                              {opp.ai_analysis?.reasoning && (
+                                <div className="space-y-2">
+                                  <h5 className="text-xs font-semibold text-foreground mb-2">Reasoning</h5>
+                                  {opp.ai_analysis.reasoning.clientNeed && (
+                                    <div>
+                                      <span className="text-xs font-medium text-foreground">Client Need: </span>
+                                      <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.clientNeed}</span>
+                                    </div>
+                                  )}
+                                  {opp.ai_analysis.reasoning.marketContext && (
+                                    <div>
+                                      <span className="text-xs font-medium text-foreground">Market Context: </span>
+                                      <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.marketContext}</span>
+                                    </div>
+                                  )}
+                                  {opp.ai_analysis.reasoning.capabilityMatch && (
+                                    <div>
+                                      <span className="text-xs font-medium text-foreground">Solution Match: </span>
+                                      <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.capabilityMatch}</span>
+                                    </div>
+                                  )}
+                                  {opp.ai_analysis.reasoning.timing && (
+                                    <div>
+                                      <span className="text-xs font-medium text-foreground">Timing: </span>
+                                      <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.timing}</span>
+                                    </div>
+                                  )}
+                                  {opp.ai_analysis.reasoning.valueProposition && (
+                                    <div>
+                                      <span className="text-xs font-medium text-foreground">Value Proposition: </span>
+                                      <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.valueProposition}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {opp.ai_analysis?.successFactors && opp.ai_analysis.successFactors.length > 0 && (
+                                <div>
+                                  <h5 className="text-xs font-semibold text-foreground mb-2">Success Factors</h5>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {opp.ai_analysis.successFactors.map((factor: string, idx: number) => (
+                                      <Badge key={idx} variant="outline" size="sm" className="text-xs">
+                                        {factor}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {opp.ai_analysis?.recommendedApproach && (
+                                <div>
+                                  <h5 className="text-xs font-semibold text-foreground mb-1">Recommended Approach</h5>
+                                  <p className="text-xs text-muted-foreground">{opp.ai_analysis.recommendedApproach}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <p className="text-xs text-muted-foreground mt-3">
                             Created {new Date(opp.created_at).toLocaleDateString()}
                           </p>

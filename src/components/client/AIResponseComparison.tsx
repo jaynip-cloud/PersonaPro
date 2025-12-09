@@ -5,7 +5,7 @@ import { Badge } from '../ui/Badge';
 import { CheckCircle2, XCircle, TrendingUp, RefreshCw, Star, AlertCircle, Lightbulb, ArrowRight, Building2, Users, Calendar, Target, Mail, Phone, MapPin, Globe, Code, FileText, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface AIResponse {
-  model: 'perplexity' | 'openai';
+  model: 'perplexity' | 'openai' | 'gemini';
   data: any;
   metadata: {
     completenessScore: number;
@@ -28,8 +28,9 @@ interface ComparisonResult {
 interface AIResponseComparisonProps {
   perplexityResponse: AIResponse | null;
   openaiResponse: AIResponse | null;
+  geminiResponse?: AIResponse | null;
   comparison: ComparisonResult | null;
-  onSelectResponse: (model: 'perplexity' | 'openai') => void;
+  onSelectResponse: (model: 'perplexity' | 'openai' | 'gemini') => void;
   onRegenerate: () => void;
 }
 
@@ -65,6 +66,7 @@ const DataSection: React.FC<{ title: string; children: React.ReactNode; defaultE
 export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
   perplexityResponse,
   openaiResponse,
+  geminiResponse,
   comparison,
   onSelectResponse,
   onRegenerate,
@@ -76,407 +78,228 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
       comparison: comparison,
       perplexityResponse: !!perplexityResponse,
       openaiResponse: !!openaiResponse,
+      geminiResponse: !!geminiResponse,
     });
-  }, [comparison, perplexityResponse, openaiResponse]);
+  }, [comparison, perplexityResponse, openaiResponse, geminiResponse]);
 
   const recommended = comparison?.recommendedModel;
 
+  // Helper function to render a response card (to avoid duplication)
+  const renderResponseCard = (
+    response: AIResponse | null,
+    title: string,
+    model: 'perplexity' | 'openai' | 'gemini',
+    color: 'blue' | 'purple' | 'green'
+  ) => {
+    const isRecommended = comparison && recommended === model;
+    const score = comparison?.score?.[model as 'perplexity' | 'openai' | 'gemini'] || 0;
+    
+    return (
+      <Card className={isRecommended ? 'border-2 border-green-500 shadow-lg' : ''}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              {title}
+              {comparison && score > 0 && (
+                <Badge variant="outline" className="ml-2">
+                  {score}/100
+                </Badge>
+              )}
+              {isRecommended && (
+                <Badge variant="default" className="bg-green-500 text-white flex items-center gap-1 ml-2">
+                  <Star className="h-3 w-3 fill-white" />
+                  Recommended
+                </Badge>
+              )}
+            </CardTitle>
+            {response && !response.error && (
+              <div className="text-sm text-muted-foreground">
+                {response.metadata.completenessScore}% complete
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {response?.data ? (
+            <div className="space-y-4">
+              {/* Status */}
+              <div className="flex items-center gap-2 text-green-600 pb-2 border-b">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="text-sm font-medium">Complete</span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {response.metadata.processingTime}ms
+                </span>
+              </div>
+
+              {/* Company Information */}
+              <DataSection title="Company Information" defaultExpanded={true}>
+                <DataField label="Company" value={response.data.company} icon={<Building2 className="h-4 w-4" />} />
+                <DataField label="Industry" value={response.data.industry} />
+                <DataField label="Description" value={response.data.description} />
+                <DataField label="Founded" value={response.data.founded} icon={<Calendar className="h-4 w-4" />} />
+                <DataField label="Company Size" value={response.data.companySize} icon={<Users className="h-4 w-4" />} />
+                <DataField label="Employees" value={response.data.employeeCount} />
+                <DataField label="Revenue" value={response.data.annualRevenue} icon={<TrendingUp className="h-4 w-4" />} />
+              </DataSection>
+
+              {/* Location */}
+              <DataSection title="Location">
+                <DataField label="City" value={response.data.city} icon={<MapPin className="h-4 w-4" />} />
+                <DataField label="Country" value={response.data.country} />
+                <DataField label="ZIP Code" value={response.data.zipCode} />
+              </DataSection>
+
+              {/* Contact Information */}
+              <DataSection title="Contact Information">
+                <DataField label="Contact Name" value={response.data.contactName} />
+                <DataField label="Job Title" value={response.data.jobTitle} />
+                <DataField label="Email" value={response.data.primaryEmail} icon={<Mail className="h-4 w-4" />} />
+                <DataField label="Phone" value={response.data.primaryPhone} icon={<Phone className="h-4 w-4" />} />
+              </DataSection>
+
+              {/* Social Media */}
+              <DataSection title="Social Media">
+                <DataField label="LinkedIn" value={response.data.linkedinUrl} icon={<Globe className="h-4 w-4" />} />
+                <DataField label="Twitter/X" value={response.data.twitterUrl} icon={<Globe className="h-4 w-4" />} />
+                <DataField label="Facebook" value={response.data.facebookUrl} icon={<Globe className="h-4 w-4" />} />
+                <DataField label="Instagram" value={response.data.instagramUrl} icon={<Globe className="h-4 w-4" />} />
+              </DataSection>
+
+              {/* Services */}
+              {response.data.services && Array.isArray(response.data.services) && response.data.services.length > 0 && (
+                <DataSection title={`Services (${response.data.services.length})`}>
+                  {response.data.services.map((service: any, idx: number) => (
+                    <div key={idx} className="py-1.5 border-l-2 border-primary pl-2">
+                      <div className="font-medium text-sm">{service.name}</div>
+                      {service.description && (
+                        <div className="text-xs text-muted-foreground mt-0.5">{service.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </DataSection>
+              )}
+
+              {/* Technologies */}
+              {response.data.technologies && Array.isArray(response.data.technologies) && response.data.technologies.length > 0 && (
+                <DataSection title={`Technologies (${response.data.technologies.length})`}>
+                  <div className="flex flex-wrap gap-2">
+                    {response.data.technologies.map((tech: any, idx: number) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs"
+                      >
+                        <Code className="h-3 w-3" />
+                        <span>{tech.name}</span>
+                        {tech.category && (
+                          <span className="text-muted-foreground">({tech.category})</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </DataSection>
+              )}
+
+              {/* Blogs */}
+              {response.data.blogs && Array.isArray(response.data.blogs) && response.data.blogs.length > 0 && (
+                <DataSection title={`Blog Posts (${response.data.blogs.length})`}>
+                  {response.data.blogs.slice(0, 5).map((blog: any, idx: number) => (
+                    <div key={idx} className="py-1.5">
+                      <div className="flex items-start gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <a
+                            href={blog.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium hover:text-primary flex items-center gap-1"
+                          >
+                            {blog.title}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                          {blog.date && (
+                            <div className="text-xs text-muted-foreground mt-0.5">{blog.date}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {response.data.blogs.length > 5 && (
+                    <div className="text-xs text-muted-foreground pt-1">
+                      +{response.data.blogs.length - 5} more posts
+                    </div>
+                  )}
+                </DataSection>
+              )}
+
+              {/* Competitors */}
+              {response.data.competitors && Array.isArray(response.data.competitors) && response.data.competitors.length > 0 && (
+                <DataSection title={`Competitors (${response.data.competitors.length})`}>
+                  {response.data.competitors.map((competitor: any, idx: number) => (
+                    <div key={idx} className="py-1.5">
+                      <div className="font-medium text-sm">{competitor.name}</div>
+                      {competitor.comparison && (
+                        <div className="text-xs text-muted-foreground mt-0.5">{competitor.comparison}</div>
+                      )}
+                    </div>
+                  ))}
+                </DataSection>
+              )}
+
+              {/* Pain Points */}
+              {response.data.painPoints && Array.isArray(response.data.painPoints) && response.data.painPoints.length > 0 && (
+                <DataSection title={`Pain Points (${response.data.painPoints.length})`}>
+                  {response.data.painPoints.map((point: string, idx: number) => (
+                    <div key={idx} className="text-sm py-1">• {point}</div>
+                  ))}
+                </DataSection>
+              )}
+
+              {/* Goals */}
+              <DataSection title="Goals">
+                <DataField label="Short-term Goals" value={response.data.shortTermGoals} icon={<Target className="h-4 w-4" />} />
+                <DataField label="Long-term Goals" value={response.data.longTermGoals} icon={<Target className="h-4 w-4" />} />
+              </DataSection>
+
+              {/* Action Button */}
+              <Button
+                variant={isRecommended ? 'primary' : 'outline'}
+                className="w-full mt-4"
+                onClick={() => onSelectResponse(model)}
+              >
+                {isRecommended ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Use This Response
+                  </>
+                ) : (
+                  'I Prefer This Response'
+                )}
+              </Button>
+            </div>
+          ) : response?.error ? (
+            <div className="text-center py-8">
+              <XCircle className="h-8 w-8 text-red-600 mx-auto mb-2" />
+              <p className="text-red-600">{response.error}</p>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No data available</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-6">
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Response 1 - Full Data */}
-        <Card className={recommended === 'perplexity' ? 'border-2 border-green-500 shadow-lg' : ''}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                Response 1
-                {comparison && (
-                  <Badge variant="outline" className="ml-2">
-                    {comparison.score.perplexity}/100
-                  </Badge>
-                )}
-                {recommended === 'perplexity' && (
-                  <Badge variant="default" className="bg-green-500 text-white flex items-center gap-1 ml-2">
-                    <Star className="h-3 w-3 fill-white" />
-                    Recommended
-                  </Badge>
-                )}
-              </CardTitle>
-              {perplexityResponse && !perplexityResponse.error && (
-                <div className="text-sm text-muted-foreground">
-                  {perplexityResponse.metadata.completenessScore}% complete
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {perplexityResponse?.data ? (
-              <div className="space-y-4">
-                {/* Status */}
-                <div className="flex items-center gap-2 text-green-600 pb-2 border-b">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span className="text-sm font-medium">Complete</span>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {perplexityResponse.metadata.processingTime}ms
-                  </span>
-                </div>
-
-                {/* Company Information */}
-                <DataSection title="Company Information" defaultExpanded={true}>
-                  <DataField label="Company" value={perplexityResponse.data.company} icon={<Building2 className="h-4 w-4" />} />
-                  <DataField label="Industry" value={perplexityResponse.data.industry} />
-                  <DataField label="Description" value={perplexityResponse.data.description} />
-                  <DataField label="Founded" value={perplexityResponse.data.founded} icon={<Calendar className="h-4 w-4" />} />
-                  <DataField label="Company Size" value={perplexityResponse.data.companySize} icon={<Users className="h-4 w-4" />} />
-                  <DataField label="Employees" value={perplexityResponse.data.employeeCount} />
-                  <DataField label="Revenue" value={perplexityResponse.data.annualRevenue} icon={<TrendingUp className="h-4 w-4" />} />
-                </DataSection>
-
-                {/* Location */}
-                <DataSection title="Location">
-                  <DataField label="City" value={perplexityResponse.data.city} icon={<MapPin className="h-4 w-4" />} />
-                  <DataField label="Country" value={perplexityResponse.data.country} />
-                  <DataField label="ZIP Code" value={perplexityResponse.data.zipCode} />
-                </DataSection>
-
-                {/* Contact Information */}
-                <DataSection title="Contact Information">
-                  <DataField label="Contact Name" value={perplexityResponse.data.contactName} />
-                  <DataField label="Job Title" value={perplexityResponse.data.jobTitle} />
-                  <DataField label="Email" value={perplexityResponse.data.primaryEmail} icon={<Mail className="h-4 w-4" />} />
-                  <DataField label="Phone" value={perplexityResponse.data.primaryPhone} icon={<Phone className="h-4 w-4" />} />
-                </DataSection>
-
-                {/* Social Media */}
-                <DataSection title="Social Media">
-                  <DataField label="LinkedIn" value={perplexityResponse.data.linkedinUrl} icon={<Globe className="h-4 w-4" />} />
-                  <DataField label="Twitter/X" value={perplexityResponse.data.twitterUrl} icon={<Globe className="h-4 w-4" />} />
-                  <DataField label="Facebook" value={perplexityResponse.data.facebookUrl} icon={<Globe className="h-4 w-4" />} />
-                  <DataField label="Instagram" value={perplexityResponse.data.instagramUrl} icon={<Globe className="h-4 w-4" />} />
-                </DataSection>
-
-                {/* Services */}
-                {perplexityResponse.data.services && Array.isArray(perplexityResponse.data.services) && perplexityResponse.data.services.length > 0 && (
-                  <DataSection title={`Services (${perplexityResponse.data.services.length})`}>
-                    {perplexityResponse.data.services.map((service: any, idx: number) => (
-                      <div key={idx} className="py-1.5 border-l-2 border-primary pl-2">
-                        <div className="font-medium text-sm">{service.name}</div>
-                        {service.description && (
-                          <div className="text-xs text-muted-foreground mt-0.5">{service.description}</div>
-                        )}
-                      </div>
-                    ))}
-                  </DataSection>
-                )}
-
-                {/* Technologies */}
-                {perplexityResponse.data.technologies && Array.isArray(perplexityResponse.data.technologies) && perplexityResponse.data.technologies.length > 0 && (
-                  <DataSection title={`Technologies (${perplexityResponse.data.technologies.length})`}>
-                    <div className="flex flex-wrap gap-2">
-                      {perplexityResponse.data.technologies.map((tech: any, idx: number) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs"
-                        >
-                          <Code className="h-3 w-3" />
-                          <span>{tech.name}</span>
-                          {tech.category && (
-                            <span className="text-muted-foreground">({tech.category})</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  </DataSection>
-                )}
-
-                {/* Blogs */}
-                {perplexityResponse.data.blogs && Array.isArray(perplexityResponse.data.blogs) && perplexityResponse.data.blogs.length > 0 && (
-                  <DataSection title={`Blog Posts (${perplexityResponse.data.blogs.length})`}>
-                    {perplexityResponse.data.blogs.slice(0, 5).map((blog: any, idx: number) => (
-                      <div key={idx} className="py-1.5">
-                        <div className="flex items-start gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <a
-                              href={blog.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-medium hover:text-primary flex items-center gap-1"
-                            >
-                              {blog.title}
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                            {blog.date && (
-                              <div className="text-xs text-muted-foreground mt-0.5">{blog.date}</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {perplexityResponse.data.blogs.length > 5 && (
-                      <div className="text-xs text-muted-foreground pt-1">
-                        +{perplexityResponse.data.blogs.length - 5} more posts
-                      </div>
-                    )}
-                  </DataSection>
-                )}
-
-                {/* Competitors */}
-                {perplexityResponse.data.competitors && Array.isArray(perplexityResponse.data.competitors) && perplexityResponse.data.competitors.length > 0 && (
-                  <DataSection title={`Competitors (${perplexityResponse.data.competitors.length})`}>
-                    {perplexityResponse.data.competitors.map((competitor: any, idx: number) => (
-                      <div key={idx} className="py-1.5">
-                        <div className="font-medium text-sm">{competitor.name}</div>
-                        {competitor.comparison && (
-                          <div className="text-xs text-muted-foreground mt-0.5">{competitor.comparison}</div>
-                        )}
-                      </div>
-                    ))}
-                  </DataSection>
-                )}
-
-                {/* Pain Points */}
-                {perplexityResponse.data.painPoints && Array.isArray(perplexityResponse.data.painPoints) && perplexityResponse.data.painPoints.length > 0 && (
-                  <DataSection title={`Pain Points (${perplexityResponse.data.painPoints.length})`}>
-                    {perplexityResponse.data.painPoints.map((point: string, idx: number) => (
-                      <div key={idx} className="text-sm py-1">• {point}</div>
-                    ))}
-                  </DataSection>
-                )}
-
-                {/* Goals */}
-                <DataSection title="Goals">
-                  <DataField label="Short-term Goals" value={perplexityResponse.data.shortTermGoals} icon={<Target className="h-4 w-4" />} />
-                  <DataField label="Long-term Goals" value={perplexityResponse.data.longTermGoals} icon={<Target className="h-4 w-4" />} />
-                </DataSection>
-
-                {/* Action Button */}
-                <Button
-                  variant={recommended === 'perplexity' ? 'primary' : 'outline'}
-                  className="w-full mt-4"
-                  onClick={() => onSelectResponse('perplexity')}
-                >
-                  {recommended === 'perplexity' ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Use This Response
-                    </>
-                  ) : (
-                    'I Prefer This Response'
-                  )}
-                </Button>
-              </div>
-            ) : perplexityResponse?.error ? (
-              <div className="text-center py-8">
-                <XCircle className="h-8 w-8 text-red-600 mx-auto mb-2" />
-                <p className="text-red-600">{perplexityResponse.error}</p>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No data available</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Response 2 - Full Data */}
-        <Card className={recommended === 'openai' ? 'border-2 border-green-500 shadow-lg' : ''}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                Response 2
-                {comparison && (
-                  <Badge variant="outline" className="ml-2">
-                    {comparison.score.openai}/100
-                  </Badge>
-                )}
-                {recommended === 'openai' && (
-                  <Badge variant="default" className="bg-green-500 text-white flex items-center gap-1 ml-2">
-                    <Star className="h-3 w-3 fill-white" />
-                    Recommended
-                  </Badge>
-                )}
-              </CardTitle>
-              {openaiResponse && !openaiResponse.error && (
-                <div className="text-sm text-muted-foreground">
-                  {openaiResponse.metadata.completenessScore}% complete
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {openaiResponse?.data ? (
-              <div className="space-y-4">
-                {/* Status */}
-                <div className="flex items-center gap-2 text-green-600 pb-2 border-b">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span className="text-sm font-medium">Complete</span>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {openaiResponse.metadata.processingTime}ms
-                  </span>
-                </div>
-
-                {/* Company Information */}
-                <DataSection title="Company Information" defaultExpanded={true}>
-                  <DataField label="Company" value={openaiResponse.data.company} icon={<Building2 className="h-4 w-4" />} />
-                  <DataField label="Industry" value={openaiResponse.data.industry} />
-                  <DataField label="Description" value={openaiResponse.data.description} />
-                  <DataField label="Founded" value={openaiResponse.data.founded} icon={<Calendar className="h-4 w-4" />} />
-                  <DataField label="Company Size" value={openaiResponse.data.companySize} icon={<Users className="h-4 w-4" />} />
-                  <DataField label="Employees" value={openaiResponse.data.employeeCount} />
-                  <DataField label="Revenue" value={openaiResponse.data.annualRevenue} icon={<TrendingUp className="h-4 w-4" />} />
-                </DataSection>
-
-                {/* Location */}
-                <DataSection title="Location">
-                  <DataField label="City" value={openaiResponse.data.city} icon={<MapPin className="h-4 w-4" />} />
-                  <DataField label="Country" value={openaiResponse.data.country} />
-                  <DataField label="ZIP Code" value={openaiResponse.data.zipCode} />
-                </DataSection>
-
-                {/* Contact Information */}
-                <DataSection title="Contact Information">
-                  <DataField label="Contact Name" value={openaiResponse.data.contactName} />
-                  <DataField label="Job Title" value={openaiResponse.data.jobTitle} />
-                  <DataField label="Email" value={openaiResponse.data.primaryEmail} icon={<Mail className="h-4 w-4" />} />
-                  <DataField label="Phone" value={openaiResponse.data.primaryPhone} icon={<Phone className="h-4 w-4" />} />
-                </DataSection>
-
-                {/* Social Media */}
-                <DataSection title="Social Media">
-                  <DataField label="LinkedIn" value={openaiResponse.data.linkedinUrl} icon={<Globe className="h-4 w-4" />} />
-                  <DataField label="Twitter/X" value={openaiResponse.data.twitterUrl} icon={<Globe className="h-4 w-4" />} />
-                  <DataField label="Facebook" value={openaiResponse.data.facebookUrl} icon={<Globe className="h-4 w-4" />} />
-                  <DataField label="Instagram" value={openaiResponse.data.instagramUrl} icon={<Globe className="h-4 w-4" />} />
-                </DataSection>
-
-                {/* Services */}
-                {openaiResponse.data.services && Array.isArray(openaiResponse.data.services) && openaiResponse.data.services.length > 0 && (
-                  <DataSection title={`Services (${openaiResponse.data.services.length})`}>
-                    {openaiResponse.data.services.map((service: any, idx: number) => (
-                      <div key={idx} className="py-1.5 border-l-2 border-primary pl-2">
-                        <div className="font-medium text-sm">{service.name}</div>
-                        {service.description && (
-                          <div className="text-xs text-muted-foreground mt-0.5">{service.description}</div>
-                        )}
-                      </div>
-                    ))}
-                  </DataSection>
-                )}
-
-                {/* Technologies */}
-                {openaiResponse.data.technologies && Array.isArray(openaiResponse.data.technologies) && openaiResponse.data.technologies.length > 0 && (
-                  <DataSection title={`Technologies (${openaiResponse.data.technologies.length})`}>
-                    <div className="flex flex-wrap gap-2">
-                      {openaiResponse.data.technologies.map((tech: any, idx: number) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs"
-                        >
-                          <Code className="h-3 w-3" />
-                          <span>{tech.name}</span>
-                          {tech.category && (
-                            <span className="text-muted-foreground">({tech.category})</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  </DataSection>
-                )}
-
-                {/* Blogs */}
-                {openaiResponse.data.blogs && Array.isArray(openaiResponse.data.blogs) && openaiResponse.data.blogs.length > 0 && (
-                  <DataSection title={`Blog Posts (${openaiResponse.data.blogs.length})`}>
-                    {openaiResponse.data.blogs.slice(0, 5).map((blog: any, idx: number) => (
-                      <div key={idx} className="py-1.5">
-                        <div className="flex items-start gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <a
-                              href={blog.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-medium hover:text-primary flex items-center gap-1"
-                            >
-                              {blog.title}
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                            {blog.date && (
-                              <div className="text-xs text-muted-foreground mt-0.5">{blog.date}</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {openaiResponse.data.blogs.length > 5 && (
-                      <div className="text-xs text-muted-foreground pt-1">
-                        +{openaiResponse.data.blogs.length - 5} more posts
-                      </div>
-                    )}
-                  </DataSection>
-                )}
-
-                {/* Competitors */}
-                {openaiResponse.data.competitors && Array.isArray(openaiResponse.data.competitors) && openaiResponse.data.competitors.length > 0 && (
-                  <DataSection title={`Competitors (${openaiResponse.data.competitors.length})`}>
-                    {openaiResponse.data.competitors.map((competitor: any, idx: number) => (
-                      <div key={idx} className="py-1.5">
-                        <div className="font-medium text-sm">{competitor.name}</div>
-                        {competitor.comparison && (
-                          <div className="text-xs text-muted-foreground mt-0.5">{competitor.comparison}</div>
-                        )}
-                      </div>
-                    ))}
-                  </DataSection>
-                )}
-
-                {/* Pain Points */}
-                {openaiResponse.data.painPoints && Array.isArray(openaiResponse.data.painPoints) && openaiResponse.data.painPoints.length > 0 && (
-                  <DataSection title={`Pain Points (${openaiResponse.data.painPoints.length})`}>
-                    {openaiResponse.data.painPoints.map((point: string, idx: number) => (
-                      <div key={idx} className="text-sm py-1">• {point}</div>
-                    ))}
-                  </DataSection>
-                )}
-
-                {/* Goals */}
-                <DataSection title="Goals">
-                  <DataField label="Short-term Goals" value={openaiResponse.data.shortTermGoals} icon={<Target className="h-4 w-4" />} />
-                  <DataField label="Long-term Goals" value={openaiResponse.data.longTermGoals} icon={<Target className="h-4 w-4" />} />
-                </DataSection>
-
-                {/* Action Button */}
-                <Button
-                  variant={recommended === 'openai' ? 'primary' : 'outline'}
-                  className="w-full mt-4"
-                  onClick={() => onSelectResponse('openai')}
-                >
-                  {recommended === 'openai' ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Use This Response
-                    </>
-                  ) : (
-                    'I Prefer This Response'
-                  )}
-                </Button>
-              </div>
-            ) : openaiResponse?.error ? (
-              <div className="text-center py-8">
-                <XCircle className="h-8 w-8 text-red-600 mx-auto mb-2" />
-                <p className="text-red-600">{openaiResponse.error}</p>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No data available</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {renderResponseCard(perplexityResponse, 'Response 1 (Perplexity)', 'perplexity', 'blue')}
+        {renderResponseCard(openaiResponse, 'Response 2 (OpenAI)', 'openai', 'purple')}
+        {renderResponseCard(geminiResponse || null, 'Response 3 (Gemini)', 'gemini', 'green')}
       </div>
 
-      {/* Recommendation Card - Below Both Responses */}
+      {/* Recommendation Card - Below Responses */}
       {comparison ? (
         <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-2 border-blue-200 dark:border-blue-800 shadow-lg">
           <CardHeader>
@@ -488,7 +311,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
           <CardContent className="space-y-4">
             {/* First Row: KPIs on Left, Reasoning on Right */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b">
-              {/* Left Side: Two KPIs stacked */}
+              {/* Left Side: KPIs stacked (2 or 3 depending on Gemini) */}
               <div className="space-y-3">
                 <div className={`p-4 rounded-lg relative ${
                   recommended === 'perplexity' 
@@ -503,7 +326,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                       </Badge>
                     </div>
                   )}
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Response 1</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Response 1 (Perplexity)</p>
                   <p className="text-3xl font-bold text-blue-600 inline">{comparison.score.perplexity}</p>
                   <span className="text-sm text-muted-foreground ml-1">/100 points</span>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -523,13 +346,35 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                       </Badge>
                     </div>
                   )}
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Response 2</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Response 2 (OpenAI)</p>
                   <p className="text-3xl font-bold text-purple-600 inline">{comparison.score.openai}</p>
                   <span className="text-sm text-muted-foreground ml-1">/100 points</span>
                   <p className="text-xs text-muted-foreground mt-1">
                     {comparison.completeness.openai}% complete
                   </p>
                 </div>
+                {comparison.score.gemini !== undefined && (
+                  <div className={`p-4 rounded-lg relative ${
+                    recommended === 'gemini' 
+                      ? 'bg-green-100 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-700' 
+                      : 'bg-white dark:bg-gray-800'
+                  }`}>
+                    {recommended === 'gemini' && (
+                      <div className="absolute -top-2 -right-2">
+                        <Badge className="bg-green-500 text-white flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-white" />
+                          Recommended
+                        </Badge>
+                      </div>
+                    )}
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Response 3 (Gemini)</p>
+                    <p className="text-3xl font-bold text-green-600 inline">{comparison.score.gemini}</p>
+                    <span className="text-sm text-muted-foreground ml-1">/100 points</span>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {comparison.completeness.gemini}% complete
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Right Side: Reasoning */}
@@ -547,7 +392,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
             {/* Strengths and Weaknesses Side by Side */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Strengths */}
-              {comparison.strengths && (comparison.strengths.perplexity.length > 0 || comparison.strengths.openai.length > 0) && (
+              {comparison.strengths && (comparison.strengths.perplexity.length > 0 || comparison.strengths.openai.length > 0 || (comparison.strengths.gemini && comparison.strengths.gemini.length > 0)) && (
                 <div className="border rounded-lg overflow-hidden">
                   <div className="p-4 bg-white dark:bg-gray-800 border-b">
                     <div className="flex items-center gap-2">
@@ -558,7 +403,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                   <div className="p-4 space-y-4 bg-gray-50 dark:bg-gray-900/50">
                     {comparison.strengths.perplexity.length > 0 && (
                       <div>
-                        <p className="font-medium text-sm mb-2 text-blue-600">Response 1:</p>
+                        <p className="font-medium text-sm mb-2 text-blue-600">Response 1 (Perplexity):</p>
                         <ul className="space-y-1">
                           {comparison.strengths.perplexity.map((strength, idx) => (
                             <li key={idx} className="text-sm flex items-start gap-2">
@@ -571,11 +416,24 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                     )}
                     {comparison.strengths.openai.length > 0 && (
                       <div>
-                        <p className="font-medium text-sm mb-2 text-purple-600">Response 2:</p>
+                        <p className="font-medium text-sm mb-2 text-purple-600">Response 2 (OpenAI):</p>
                         <ul className="space-y-1">
                           {comparison.strengths.openai.map((strength, idx) => (
                             <li key={idx} className="text-sm flex items-start gap-2">
                               <ArrowRight className="h-4 w-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                              <span>{strength}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {comparison.strengths.gemini && comparison.strengths.gemini.length > 0 && (
+                      <div>
+                        <p className="font-medium text-sm mb-2 text-green-600">Response 3 (Gemini):</p>
+                        <ul className="space-y-1">
+                          {comparison.strengths.gemini.map((strength, idx) => (
+                            <li key={idx} className="text-sm flex items-start gap-2">
+                              <ArrowRight className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
                               <span>{strength}</span>
                             </li>
                           ))}
@@ -587,7 +445,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
               )}
 
               {/* Weaknesses */}
-              {comparison.weaknesses && (comparison.weaknesses.perplexity.length > 0 || comparison.weaknesses.openai.length > 0) && (
+              {comparison.weaknesses && (comparison.weaknesses.perplexity.length > 0 || comparison.weaknesses.openai.length > 0 || (comparison.weaknesses.gemini && comparison.weaknesses.gemini.length > 0)) && (
                 <div className="border rounded-lg overflow-hidden">
                   <div className="p-4 bg-white dark:bg-gray-800 border-b">
                     <div className="flex items-center gap-2">
@@ -598,7 +456,7 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                   <div className="p-4 space-y-4 bg-gray-50 dark:bg-gray-900/50">
                     {comparison.weaknesses.perplexity.length > 0 && (
                       <div>
-                        <p className="font-medium text-sm mb-2 text-blue-600">Response 1:</p>
+                        <p className="font-medium text-sm mb-2 text-blue-600">Response 1 (Perplexity):</p>
                         <ul className="space-y-1">
                           {comparison.weaknesses.perplexity.map((weakness, idx) => (
                             <li key={idx} className="text-sm flex items-start gap-2">
@@ -611,9 +469,22 @@ export const AIResponseComparison: React.FC<AIResponseComparisonProps> = ({
                     )}
                     {comparison.weaknesses.openai.length > 0 && (
                       <div>
-                        <p className="font-medium text-sm mb-2 text-purple-600">Response 2:</p>
+                        <p className="font-medium text-sm mb-2 text-purple-600">Response 2 (OpenAI):</p>
                         <ul className="space-y-1">
                           {comparison.weaknesses.openai.map((weakness, idx) => (
+                            <li key={idx} className="text-sm flex items-start gap-2">
+                              <ArrowRight className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                              <span>{weakness}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {comparison.weaknesses.gemini && comparison.weaknesses.gemini.length > 0 && (
+                      <div>
+                        <p className="font-medium text-sm mb-2 text-green-600">Response 3 (Gemini):</p>
+                        <ul className="space-y-1">
+                          {comparison.weaknesses.gemini.map((weakness, idx) => (
                             <li key={idx} className="text-sm flex items-start gap-2">
                               <ArrowRight className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
                               <span>{weakness}</span>

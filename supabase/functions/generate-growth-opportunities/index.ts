@@ -8,6 +8,161 @@ const corsHeaders = {
 
 interface GenerateOpportunitiesRequest {
   clientId: string;
+  models?: ('openai' | 'gemini' | 'perplexity')[]; // Optional: specify which models to use
+}
+
+// Helper function to calculate text similarity using embeddings
+async function calculateSimilarity(
+  text1: string,
+  text2: string,
+  apiKey: string
+): Promise<number> {
+  try {
+    // Generate embeddings for both texts
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: [text1, text2],
+      }),
+    });
+
+    if (!embeddingResponse.ok) {
+      return 0; // Return 0 similarity if embedding fails
+    }
+
+    const embeddingData = await embeddingResponse.json();
+    const embedding1 = embeddingData.data[0].embedding;
+    const embedding2 = embeddingData.data[1].embedding;
+
+    // Calculate cosine similarity
+    let dotProduct = 0;
+    let norm1 = 0;
+    let norm2 = 0;
+
+    for (let i = 0; i < embedding1.length; i++) {
+      dotProduct += embedding1[i] * embedding2[i];
+      norm1 += embedding1[i] * embedding1[i];
+      norm2 += embedding2[i] * embedding2[i];
+    }
+
+    const similarity = dotProduct / (Math.sqrt(norm1) * Math.sqrt(norm2));
+    return similarity;
+  } catch (error) {
+    console.error('Error calculating similarity:', error);
+    return 0;
+  }
+}
+
+// Smart deduplication: Check against all existing opportunities using semantic similarity
+async function checkForDuplicates(
+  newOpportunity: { title: string; description: string },
+  existingOpportunities: any[],
+  openaiKey: string,
+  similarityThreshold: number = 0.85 // 85% similarity = duplicate
+): Promise<{ isDuplicate: boolean; similarOpportunity?: any; similarity?: number }> {
+  if (!existingOpportunities || existingOpportunities.length === 0) {
+    return { isDuplicate: false };
+  }
+
+  const newText = `${newOpportunity.title} ${newOpportunity.description}`.toLowerCase();
+
+  for (const existing of existingOpportunities) {
+    const existingText = `${existing.title} ${existing.description || ''}`.toLowerCase();
+    
+    // Quick text-based check first (exact match)
+    if (newText === existingText) {
+      return { isDuplicate: true, similarOpportunity: existing, similarity: 1.0 };
+    }
+
+    // Semantic similarity check using embeddings
+    const similarity = await calculateSimilarity(newText, existingText, openaiKey);
+    
+    if (similarity >= similarityThreshold) {
+      return { isDuplicate: true, similarOpportunity: existing, similarity };
+    }
+  }
+
+  return { isDuplicate: false };
+}
+
+// Calculate quality score for an opportunity
+function calculateQualityScore(
+  opportunity: any,
+  client: any,
+  marketIntelligence: string,
+  companyProfile: any
+): number {
+  let score = 0;
+  const maxScore = 100;
+
+  // 1. Data Quality (30 points)
+  let dataQualityScore = 0;
+  if (client.ai_insights) dataQualityScore += 10;
+  if (marketIntelligence && marketIntelligence.length > 100) dataQualityScore += 10;
+  if (companyProfile?.services && companyProfile.services.length > 0) dataQualityScore += 10;
+  score += dataQualityScore;
+
+  // 2. Specificity (25 points)
+  let specificityScore = 0;
+  const titleLength = opportunity.title?.length || 0;
+  const descLength = opportunity.description?.length || 0;
+  if (titleLength > 20 && titleLength < 80) specificityScore += 10;
+  if (descLength > 100 && descLength < 500) specificityScore += 15;
+  score += specificityScore;
+
+  // 3. Personalization (25 points)
+  let personalizationScore = 0;
+  const desc = (opportunity.description || '').toLowerCase();
+  if (client.name && desc.includes(client.name.toLowerCase())) personalizationScore += 5;
+  if (client.industry && desc.includes(client.industry.toLowerCase())) personalizationScore += 5;
+  if (client.pain_points && client.pain_points.length > 0) {
+    const painPointMentioned = client.pain_points.some((pp: string) => 
+      desc.includes(pp.toLowerCase().substring(0, 20))
+    );
+    if (painPointMentioned) personalizationScore += 10;
+  }
+  if (companyProfile?.company_name && desc.includes(companyProfile.company_name.toLowerCase())) {
+    personalizationScore += 5;
+  }
+  score += personalizationScore;
+
+  // 4. Capability Match (20 points)
+  let capabilityScore = 0;
+  if (companyProfile?.services && companyProfile.services.length > 0) {
+    const serviceMentioned = companyProfile.services.some((s: any) => {
+      const serviceName = (s.name || s.title || '').toLowerCase();
+      return desc.includes(serviceName.substring(0, 15));
+    });
+    if (serviceMentioned) capabilityScore += 20;
+  }
+  score += capabilityScore;
+
+  return Math.min(score, maxScore);
+}
+
+// Calculate data quality level
+function calculateDataQuality(
+  client: any,
+  marketIntelligence: string,
+  companyProfile: any
+): 'high' | 'medium' | 'low' {
+  let score = 0;
+  
+  if (client.ai_insights) score += 3;
+  if (marketIntelligence && marketIntelligence.length > 200) score += 2;
+  if (companyProfile?.services && companyProfile.services.length > 0) score += 2;
+  if (client.pain_points && client.pain_points.length > 0) score += 1;
+  if (client.technologies && client.technologies.length > 0) score += 1;
+  if (companyProfile?.case_studies && companyProfile.case_studies.length > 0) score += 1;
+  
+  if (score >= 7) return 'high';
+  if (score >= 4) return 'medium';
+  return 'low';
 }
 
 Deno.serve(async (req: Request) => {
@@ -32,7 +187,7 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unauthorized');
     }
 
-    const { clientId }: GenerateOpportunitiesRequest = await req.json();
+    const { clientId, models }: GenerateOpportunitiesRequest = await req.json();
 
     if (!clientId) {
       throw new Error('clientId is required');
@@ -40,12 +195,13 @@ Deno.serve(async (req: Request) => {
 
     const { data: apiKeys } = await supabase
       .from('api_keys')
-      .select('openai_api_key, perplexity_api_key')
+      .select('openai_api_key, perplexity_api_key, gemini_api_key')
       .eq('user_id', user.id)
       .maybeSingle();
 
     const openaiKey = apiKeys?.openai_api_key || Deno.env.get('OPENAI_API_KEY');
     const perplexityKey = apiKeys?.perplexity_api_key || Deno.env.get('PERPLEXITY_API_KEY');
+    const geminiKey = apiKeys?.gemini_api_key || Deno.env.get('GEMINI_API_KEY');
 
     if (!openaiKey) {
       throw new Error('OpenAI API key is not configured. Please add your API key in Settings.');
@@ -98,14 +254,13 @@ Deno.serve(async (req: Request) => {
       .order('meeting_date', { ascending: false })
       .limit(5);
 
-    // Fetch existing opportunities to avoid generating similar ones
+    // Fetch existing opportunities to avoid generating similar ones (get all, not just recent)
     const { data: existingOpportunities } = await supabase
       .from('opportunities')
       .select('id, title, description, created_at')
       .eq('client_id', clientId)
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(20); // Get recent opportunities to avoid duplicates
+      .order('created_at', { ascending: false });
 
     let marketIntelligence = '';
     let marketIntelligenceError: string | null = null;
@@ -126,15 +281,21 @@ Deno.serve(async (req: Request) => {
           searchComponents.push('Find recent company news, announcements, and leadership updates');
         }
 
-        if (clientBlogs !== 'Not specified') {
+        // Check if client has blogs
+        const hasBlogs = client.blogs && Array.isArray(client.blogs) && client.blogs.length > 0;
+        if (hasBlogs) {
           searchComponents.push('Analyze their content themes and thought leadership focus areas');
         }
 
-        if (clientTechnologies !== 'Not specified') {
+        // Check if client has technologies
+        const hasTechnologies = client.technologies && Array.isArray(client.technologies) && client.technologies.length > 0;
+        if (hasTechnologies) {
           searchComponents.push('Identify integration and technology modernization opportunities based on their current tech stack');
         }
 
-        if (clientCompetitors !== 'Not specified') {
+        // Check if client has competitors
+        const hasCompetitors = client.competitors && Array.isArray(client.competitors) && client.competitors.length > 0;
+        if (hasCompetitors) {
           searchComponents.push('Compare their competitive positioning and identify differentiation opportunities');
         }
 
@@ -370,7 +531,7 @@ ${companyProfile?.ai_insights?.frameworks && Array.isArray(companyProfile.ai_ins
 ${companyProfile?.ai_insights?.approach ? `Approach: ${companyProfile.ai_insights.approach}` : ''}
 `;
 
-    const opportunityPrompt = `You are an elite business development strategist with deep expertise in opportunity identification, strategic selling, and capability matching.
+    const opportunityPrompt = `You are an elite business development strategist with deep expertise in opportunity identification, strategic selling, and capability matching. Your role is to analyze comprehensive client intelligence, market data, and company capabilities to generate highly accurate, personalized growth opportunities.
 
 ${intelligenceContext}
 
@@ -386,7 +547,7 @@ The following opportunities have already been identified for this client. You MU
 Existing Opportunities:
 ${existingOpportunities.map((opp: any, idx: number) => `
 ${idx + 1}. "${opp.title}"
-   Description: ${opp.description.substring(0, 200)}${opp.description.length > 200 ? '...' : ''}
+   Description: ${opp.description?.substring(0, 200) || ''}${opp.description && opp.description.length > 200 ? '...' : ''}
 `).join('\n')}
 
 CRITICAL: Your new opportunity MUST be substantially different from ALL of the above. Do NOT suggest similar solutions, similar areas, or similar approaches. Think creatively and identify a NEW angle, NEW need, or NEW opportunity that hasn't been covered yet.
@@ -394,76 +555,100 @@ CRITICAL: Your new opportunity MUST be substantially different from ALL of the a
 
 ## YOUR TASK
 
-Analyze the 3 intelligence layers above and generate EXACTLY 1 (ONE) HIGH-QUALITY, PERSONALIZED, INSIGHT-DRIVEN growth opportunity that:
+Analyze the 3 intelligence layers above with EXTREME ATTENTION TO DETAIL and generate EXACTLY 1 (ONE) HIGH-QUALITY, PERSONALIZED, INSIGHT-DRIVEN growth opportunity that:
 
 1. **Addresses a SPECIFIC client need or gap** identified in their profile (Layer 1: Client Intelligence)
+   - Cross-reference their pain points with their technology stack
+   - Match their goals with their current services/products
+   - Connect meeting transcripts with their stated challenges
+   - Use their blog content to understand their focus areas
+
 2. **Aligns with relevant market trends or challenges** (Layer 2: Market & External Intelligence)
+   - Reference specific market intelligence data provided
+   - Connect industry trends to their business context
+   - Consider competitive pressures mentioned in market research
+   - Factor in timing based on recent company news/announcements
+
 3. **Matches directly with your company's documented services, capabilities, or case studies** (Layer 3: Company Knowledge Base)
-4. **Is TIMELY and STRATEGICALLY RELEVANT** based on client's readiness, behavior, sentiment, and market context
-5. **Feels personalized** - reference specific client data points, pain points, or goals
-6. **Is realistic** given the relationship health, trust level, and client's decision-making patterns
+   - Reference SPECIFIC service names from your offerings
+   - Cite SPECIFIC case studies that demonstrate similar success
+   - Highlight proven ROI areas that apply to their situation
+   - Connect your unique value propositions to their challenges
 
-## CRITICAL REQUIREMENTS
+4. **Is TIMELY and STRATEGICALLY RELEVANT** based on:
+   - Client's readiness to engage (from AI insights)
+   - Relationship health and trust level
+   - Decision-making patterns and speed
+   - Budget capacity and spending patterns
+   - Innovation appetite and risk tolerance
 
-### 1. Match Client Need to Company Capability (CRITICAL)
-The opportunity MUST logically connect and COMPARE:
-- **Client Need**: A specific pain point, goal, challenge, or technology gap from Layer 1 (Client Intelligence)
-  * Analyze their current services/products they use - can we provide better alternatives?
-  * Review their technology stack - are there integration or modernization opportunities?
-  * Examine their pain points - which ones directly align with our solutions?
-  * Study their blog content - what topics are they focused on that we can help with?
-  * Consider their competitors - how can we help them differentiate or compete better?
-  * Review meeting transcripts - what concerns or needs were expressed?
-- **Market Context**: A relevant industry trend, competitive pressure, or market opportunity from Layer 2
-  * Recent news or announcements about the client
-  * Industry shifts affecting their business
-  * Technology trends they should adopt
-- **Your Capability**: A specific service, strength, case study, or expertise from Layer 3 (Company Knowledge Base)
-  * Reference SPECIFIC services from your knowledge base that match their needs
-  * Cite SPECIFIC case studies that demonstrate similar success
-  * Highlight proven ROI areas that apply to their situation
-  * Connect your unique value propositions to their challenges
+5. **Feels HIGHLY PERSONALIZED** - MUST reference:
+   - Specific client data points (company name, industry, size)
+   - Actual pain points from their profile
+   - Real goals mentioned in their profile
+   - Specific technologies they use
+   - Actual meeting topics or action items
 
-### 2. Consider Readiness & Timing
-- Account for client's decision-making speed, risk tolerance, innovation appetite
-- Consider relationship health, trust level, and enthusiasm
-- Factor in budget capacity, spending patterns, and maturity level
-- Ensure the opportunity matches their sophistication level
+6. **Is realistic and actionable** given:
+   - Relationship health and trust level
+   - Client's decision-making patterns
+   - Budget constraints mentioned
+   - Maturity level and sophistication
 
-### 3. Be Specific & Insight-Driven (USE THE DATA)
-- **DON'T**: Suggest generic opportunities like "Cloud Migration" or "Digital Transformation"
-- **DO**: Suggest specific, personalized opportunities that reference actual client data:
-  * Example 1: "Integrate Salesforce with their current tech stack (React, Node.js) to automate lead management, addressing their pain point of 'manual data entry taking 10 hours/week' mentioned in the client profile"
-  * Example 2: "Based on their recent blog posts about AI adoption challenges, offer our AI Strategy Workshop (Case Study: FinTech Inc - 35% efficiency gain)"
-  * Example 3: "Help differentiate from competitor HubSpot by implementing custom automation workflows using our low-code platform (mentioned in their competitive analysis)"
-  * Example 4: "Following up on action item from March 15 meeting about 'exploring analytics solutions', propose our Business Intelligence Dashboard service (proven ROI: RetailCorp case study)"
+## CRITICAL REQUIREMENTS FOR ACCURACY
 
-### 4. Reference Your Knowledge Base
-- Reference specific services from your offerings
-- Mention relevant case studies or success stories that demonstrate similar work
-- Highlight your unique strengths or proven ROI areas that apply
-- Connect to your frameworks or methodologies if relevant
+### 1. Data-Driven Analysis (MANDATORY)
+You MUST use the actual data provided:
+- If client uses specific technologies, reference them by name
+- If they have specific pain points, quote or reference them
+- If meetings mentioned specific topics, incorporate them
+- If market intelligence provided recent news, reference it
+- If case studies exist, reference specific ones by name/client
 
-### 5. Avoid Irrelevant Suggestions
-- If client is risk-averse, don't suggest bleeding-edge tech
-- If they're cost-focused, emphasize ROI and efficiency
-- If relationship is new/weak, suggest smaller engagement first
-- If client lacks innovation appetite, focus on proven solutions
+### 2. Logical Connection (MANDATORY)
+The opportunity MUST show clear logical flow:
+- Client Need → Market Context → Your Capability → Opportunity
+- Example: "Client's pain point X (from profile) + Market trend Y (from intelligence) + Our service Z (from knowledge base) = Opportunity"
 
-### 6. Personalization Requirements
-- Reference specific client data: industry, size, goals, pain points
-- Mention behavioral insights: decision patterns, communication style, priorities
-- Consider sentiment: trust level, enthusiasm, relationship health
-- Factor in psychographics: motivations, risk tolerance, value orientation
+### 3. Specificity Over Generality (MANDATORY)
+- ❌ BAD: "Digital transformation services"
+- ✅ GOOD: "Migrate their legacy PHP system (mentioned in tech stack) to modern Node.js architecture using our proven migration framework (Case Study: TechCorp - 50% performance improvement)"
+
+### 4. Evidence-Based Reasoning (MANDATORY)
+Every claim must be traceable to the data:
+- "Based on their Q3 meeting notes mentioning..."
+- "Given their pain point of 'X' stated in profile..."
+- "Leveraging our Y service (documented in knowledge base)..."
+- "Following market intelligence showing Z trend..."
+
+### 5. Timing and Readiness (MANDATORY)
+Consider ALL behavioral signals:
+- If relationship health is high → suggest larger engagement
+- If innovation appetite is low → suggest proven solutions
+- If decision-making is slow → suggest phased approach
+- If budget is constrained → emphasize ROI
 
 ## OUTPUT FORMAT
 
-CRITICAL: You MUST return EXACTLY 1 opportunity. Return ONLY valid JSON in this exact structure (Title + Description only):
+CRITICAL: You MUST return EXACTLY 1 opportunity. Return ONLY valid JSON in this exact structure:
 
 {
-  \"opportunity\": {
-    \"title\": \"Compelling, personalized opportunity title (60 chars max)\",
-    \"description\": \"2-4 sentence personalized description that: (1) identifies the specific client need/gap, (2) explains how your service/capability addresses it, (3) references relevant case studies or strengths when applicable, (4) explains why this is timely and relevant for this specific client. Make it feel insight-driven and personalized, not generic.\"
+  "opportunity": {
+    "title": "Compelling, personalized opportunity title (60 chars max)",
+    "description": "3-5 sentence personalized description that: (1) identifies the SPECIFIC client need/gap with data references, (2) explains how your SPECIFIC service/capability addresses it with service/case study names, (3) references relevant market context when applicable, (4) explains why this is timely and relevant for this SPECIFIC client using behavioral/sentiment data. Make it feel highly insight-driven and personalized, not generic.",
+    "reasoning": {
+      "clientNeed": "Specific need identified from Layer 1 data (quote or reference actual data)",
+      "marketContext": "Relevant market trend or context from Layer 2 (reference specific intelligence)",
+      "capabilityMatch": "How your specific service/capability matches (name the service/case study)",
+      "timing": "Why this is timely (reference readiness, relationship health, sentiment data)",
+      "valueProposition": "Specific value this opportunity provides (quantify if possible)"
+    },
+    "estimatedValue": "Estimated value range (e.g., '$50K - $100K' or 'High/Medium/Low')",
+    "successProbability": 75,
+    "urgency": "high|medium|low",
+    "confidence": 85,
+    "recommendedApproach": "Specific approach recommendation based on client's decision-making style",
+    "successFactors": ["Factor 1", "Factor 2", "Factor 3"]
   }
 }
 
@@ -472,9 +657,22 @@ DO NOT return an array. DO NOT return multiple opportunities. Return ONLY the si
 ## EXAMPLE OUTPUT
 
 {
-  \"opportunity\": {
-    \"title\": \"E-commerce Platform Migration for Scalability\",
-    \"description\": \"Based on TechCorp's Q3 meeting notes mentioning inventory system bottlenecks during peak seasons and their goal to scale 3x by next year, our proven e-commerce migration framework (successfully deployed for RetailCorp with 40% performance improvement) directly addresses their scalability pain point. Given their high innovation appetite and strong relationship health, this is an ideal time to propose a phased migration that aligns with their growth trajectory.\"
+  "opportunity": {
+    "title": "Salesforce-React Integration for Lead Automation",
+    "description": "Based on TechCorp's Q3 meeting notes mentioning 'manual data entry taking 10 hours/week' and their current tech stack (React, Node.js, Salesforce), our proven integration framework (Case Study: FinTech Inc - 35% efficiency gain, $200K annual savings) directly addresses their automation pain point. Given their high innovation appetite (85/100) and strong relationship health (90/100), this is an ideal time to propose a phased integration that aligns with their goal to 'scale operations 3x by next year' mentioned in their profile.",
+    "reasoning": {
+      "clientNeed": "Manual data entry pain point (10 hours/week) from Q3 meeting + goal to scale 3x",
+      "marketContext": "Industry trend toward automation in SaaS sector (from market intelligence)",
+      "capabilityMatch": "Our Salesforce Integration Service (Case Study: FinTech Inc)",
+      "timing": "High innovation appetite (85/100) + Strong relationship (90/100) + Active scaling phase",
+      "valueProposition": "35% efficiency gain, $200K annual savings, 10 hours/week time savings"
+    },
+    "estimatedValue": "$75K - $125K",
+    "successProbability": 80,
+    "urgency": "high",
+    "confidence": 88,
+    "recommendedApproach": "Phased implementation starting with MVP, given their methodical decision-making style",
+    "successFactors": ["Strong relationship health", "Clear pain point", "Proven case study match", "High innovation appetite"]
   }
 }
 
@@ -482,145 +680,252 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
 1. You MUST generate EXACTLY 1 (ONE) opportunity - NOT 2, NOT 3, NOT multiple, NOT an array
 2. Do NOT return an array of opportunities - this will cause an error
 3. Do NOT use the format {"opportunities": [...]} - this is WRONG
-4. Return ONLY the format {"opportunity": {"title": "...", "description": "..."}} - this is CORRECT
-5. If you generate multiple opportunities, your response will be REJECTED and you will need to regenerate
-6. Think carefully and choose THE SINGLE BEST opportunity - do not list multiple options
-
-VALID OUTPUT FORMAT (copy this structure exactly):
-{
-  "opportunity": {
-    "title": "Your opportunity title here",
-    "description": "Your opportunity description here"
-  }
-}
-
-INVALID OUTPUT FORMATS (DO NOT USE THESE):
-- {"opportunities": [...]} ❌ WRONG
-- Multiple opportunity objects ❌ WRONG
-- An array of opportunities ❌ WRONG
+4. Return ONLY the format shown above with all reasoning fields
+5. If you generate multiple opportunities, your response will be REJECTED
+6. Think carefully and choose THE SINGLE BEST opportunity based on ALL available data
+7. Reference SPECIFIC data points from the intelligence layers
+8. Use actual names, numbers, and quotes from the provided data
 
 Analyze deeply across all 3 intelligence layers and provide THE SINGLE BEST, MOST STRATEGIC, HIGH-VALUE, PERSONALIZED opportunity that will drive real business growth. 
 
 CRITICAL REMINDER: If there are existing opportunities listed above, your new opportunity MUST be COMPLETELY DIFFERENT and UNIQUE from all of them. Think creatively and find a NEW angle, NEW need, or NEW opportunity that hasn't been suggested yet.
 
-Remember: ONE opportunity only, in the exact format shown above.`;
+Remember: ONE opportunity only, in the exact format shown above, with ALL reasoning fields populated.`;
 
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an elite business development strategist specializing in opportunity identification and strategic selling. You analyze 3 intelligence layers (Client Intelligence, Market Intelligence, Company Knowledge Base) to generate EXACTLY 1 personalized, insight-driven growth opportunity. You MUST return only 1 opportunity, never multiple. You match specific client needs with company capabilities, reference case studies when relevant, and ensure opportunities are timely and strategically relevant. CRITICAL: When existing opportunities are provided, you MUST generate a COMPLETELY DIFFERENT and UNIQUE opportunity that addresses different needs, uses different approaches, and explores new angles. Always respond with valid JSON only in the format: {"opportunity": {"title": "...", "description": "..."}}. Never return an array of opportunities.',
-          },
-          {
-            role: 'user',
-            content: opportunityPrompt,
-          },
-        ],
-        temperature: 0.9, // Higher temperature for more variation and creativity between generations
-        max_tokens: 1500, // Limit tokens to prevent multiple opportunities
-      }),
-    });
+    // Determine which models to use
+    const modelsToUse = models || ['openai', 'gemini']; // Default to OpenAI and Gemini
 
-     if (!openaiResponse.ok) {
-       const errorText = await openaiResponse.text();
-       throw new Error(`OpenAI API error: ${openaiResponse.statusText}`);
-     }
+    const opportunities: any[] = [];
+    const modelResults: any = {};
 
-    const openaiData = await openaiResponse.json();
-    let responseText = openaiData.choices[0].message.content;
+    // Generate opportunities from multiple AI models in parallel
+    const generationPromises: Promise<any>[] = [];
 
-    let result;
-    try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        responseText = jsonMatch[0];
-      }
-      result = JSON.parse(responseText);
-    } catch (e) {
-      throw new Error('Failed to parse AI opportunities response');
-    }
+    // OpenAI Generation
+    if (modelsToUse.includes('openai') && openaiKey) {
+      generationPromises.push(
+        (async () => {
+          try {
+            const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openaiKey}`,
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o',
+                messages: [
+                  {
+                    role: 'system',
+                    content: 'You are an elite business development strategist specializing in opportunity identification and strategic selling. You analyze 3 intelligence layers (Client Intelligence, Market Intelligence, Company Knowledge Base) to generate EXACTLY 1 personalized, insight-driven growth opportunity. You MUST return only 1 opportunity, never multiple. You match specific client needs with company capabilities, reference case studies when relevant, and ensure opportunities are timely and strategically relevant. CRITICAL: When existing opportunities are provided, you MUST generate a COMPLETELY DIFFERENT and UNIQUE opportunity that addresses different needs, uses different approaches, and explores new angles. Always respond with valid JSON only in the format specified in the user prompt. Never return an array of opportunities.',
+                  },
+                  {
+                    role: 'user',
+                    content: opportunityPrompt,
+                  },
+                ],
+                temperature: 0.8,
+                max_tokens: 2000,
+                response_format: { type: "json_object" }
+              }),
+            });
 
-    // Extract single opportunity - handle both formats
-    let singleOpportunity;
-    if (result.opportunity) {
-      // Correct format: single opportunity
-      singleOpportunity = result.opportunity;
-    } else if (result.opportunities && Array.isArray(result.opportunities) && result.opportunities.length > 0) {
-      // Wrong format: array - take only the first one
-      singleOpportunity = result.opportunities[0];
-    } else {
-      throw new Error('Invalid response format from AI - expected single opportunity');
-    }
-
-    if (!singleOpportunity || !singleOpportunity.title || !singleOpportunity.description) {
-      throw new Error('Opportunity missing required fields: title or description');
-    }
-
-    // Check for duplicate opportunities created in the last 5 minutes for this client
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data: recentOpportunities } = await supabase
-      .from('opportunities')
-      .select('id, title, description, created_at')
-      .eq('client_id', clientId)
-      .eq('user_id', user.id)
-      .eq('is_ai_generated', true)
-      .gte('created_at', fiveMinutesAgo)
-      .order('created_at', { ascending: false });
-
-    // Check if this exact opportunity was recently created
-    if (recentOpportunities && recentOpportunities.length > 0) {
-      const isDuplicate = recentOpportunities.some(
-        opp => opp.title === singleOpportunity.title && opp.description === singleOpportunity.description
+            if (openaiResponse.ok) {
+              const openaiData = await openaiResponse.json();
+              let responseText = openaiData.choices[0].message.content;
+              
+              let result;
+              try {
+                const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  responseText = jsonMatch[0];
+                }
+                result = JSON.parse(responseText);
+                
+                if (result.opportunity) {
+                  return { model: 'openai', opportunity: result.opportunity, raw: result };
+                }
+              } catch (e) {
+                console.error('OpenAI parse error:', e);
+              }
+            }
+            return { model: 'openai', error: 'Failed to generate' };
+          } catch (error: any) {
+            console.error('OpenAI generation error:', error);
+            return { model: 'openai', error: error.message };
+          }
+        })()
       );
-      if (isDuplicate) {
-        throw new Error('This opportunity was recently generated. Please wait a moment before generating again.');
+    }
+
+    // Gemini Generation
+    if (modelsToUse.includes('gemini') && geminiKey) {
+      generationPromises.push(
+        (async () => {
+          try {
+            const modelName = 'gemini-1.5-flash';
+            const apiVersion = 'v1beta';
+            const apiUrl = `https://generativelanguage.googleapis.com/${apiVersion}/models/${modelName}:generateContent`;
+            
+            const response = await fetch(
+              `${apiUrl}?key=${geminiKey}`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  contents: [{
+                    parts: [{
+                      text: `You are an elite business development strategist. ${opportunityPrompt}\n\nCRITICAL: Return ONLY valid JSON in this exact format: {"opportunity": {"title": "...", "description": "...", "reasoning": {...}, "estimatedValue": "...", "successProbability": 75, "urgency": "high|medium|low", "confidence": 85, "recommendedApproach": "...", "successFactors": [...]}}`
+                    }]
+                  }],
+                  generationConfig: {
+                    temperature: 0.8,
+                    maxOutputTokens: 2000,
+                    responseMimeType: "application/json",
+                  },
+                }),
+              }
+            );
+
+            if (response.ok) {
+              const geminiData = await response.json();
+              const candidate = geminiData.candidates?.[0];
+              const content = candidate?.content?.parts?.[0]?.text || '';
+              
+              if (content) {
+                try {
+                  const result = JSON.parse(content);
+                  if (result.opportunity) {
+                    return { model: 'gemini', opportunity: result.opportunity, raw: result };
+                  }
+                } catch (e) {
+                  console.error('Gemini parse error:', e);
+                }
+              }
+            }
+            return { model: 'gemini', error: 'Failed to generate' };
+          } catch (error: any) {
+            console.error('Gemini generation error:', error);
+            return { model: 'gemini', error: error.message };
+          }
+        })()
+      );
+    }
+
+    // Wait for all generations to complete
+    const results = await Promise.allSettled(generationPromises);
+
+    // Process results
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value.opportunity) {
+        modelResults[result.value.model] = result.value.opportunity;
+        
+        // Check for duplicates using smart deduplication
+        const duplicateCheck = await checkForDuplicates(
+          result.value.opportunity,
+          existingOpportunities || [],
+          openaiKey
+        );
+        
+        if (!duplicateCheck.isDuplicate) {
+          // Calculate quality score
+          const qualityScore = calculateQualityScore(
+            result.value.opportunity,
+            client,
+            marketIntelligence,
+            companyProfile
+          );
+          
+          // Add quality score and model info to opportunity
+          result.value.opportunity.qualityScore = qualityScore;
+          result.value.opportunity.generatedBy = result.value.model;
+          
+          opportunities.push(result.value.opportunity);
+        } else {
+          console.log(`Duplicate opportunity detected from ${result.value.model}, similarity: ${duplicateCheck.similarity}`);
+        }
       }
     }
 
-    // Create exactly 1 opportunity object (not array)
-    const opportunityToInsert = {
-      client_id: clientId,
-      user_id: user.id,
-      title: singleOpportunity.title.trim(),
-      description: singleOpportunity.description.trim(),
-      is_ai_generated: true,
-      ai_analysis: singleOpportunity.reasoning || {
-        clientNeed: singleOpportunity.clientNeed,
-        marketContext: singleOpportunity.marketContext,
-        capabilityMatch: singleOpportunity.capabilityMatch,
-        timing: singleOpportunity.timing,
-        valueProposition: singleOpportunity.valueProposition
-      },
-      created_at: new Date().toISOString()
-    };
-
-    // Insert single opportunity (not array)
-    const { data: insertedOpportunity, error: insertError } = await supabase
-      .from('opportunities')
-      .insert(opportunityToInsert)
-      .select()
-      .single();
-
-    if (insertError) {
-      throw new Error('Failed to save opportunity to database');
+    // If no opportunities generated, throw error
+    if (opportunities.length === 0) {
+      throw new Error('Failed to generate opportunities from any AI model, or all were duplicates');
     }
 
-    if (!insertedOpportunity) {
-      throw new Error('No opportunity was inserted');
+    // Sort by quality score (highest first)
+    opportunities.sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0));
+
+    // Insert all generated opportunities
+    const insertedOpportunities = [];
+
+    for (const opp of opportunities) {
+      // Check for duplicates again before inserting (against all existing, not just recent)
+      const allExistingCheck = await checkForDuplicates(
+        opp,
+        existingOpportunities || [],
+        openaiKey,
+        0.80 // Slightly lower threshold for final check
+      );
+      
+      if (allExistingCheck.isDuplicate) {
+        console.log(`Skipping duplicate opportunity: ${opp.title}`);
+        continue;
+      }
+      
+      const opportunityToInsert = {
+        client_id: clientId,
+        user_id: user.id,
+        title: opp.title.trim(),
+        description: opp.description.trim(),
+        is_ai_generated: true,
+        ai_analysis: {
+          reasoning: opp.reasoning || {},
+          estimatedValue: opp.estimatedValue,
+          urgency: opp.urgency,
+          confidence: opp.confidence || opp.qualityScore,
+          recommendedApproach: opp.recommendedApproach,
+          successFactors: opp.successFactors || [],
+          qualityScore: opp.qualityScore,
+          generatedBy: opp.generatedBy,
+          successProbability: opp.successProbability
+        },
+        value: opp.estimatedValue ? parseFloat(opp.estimatedValue.replace(/[^0-9.]/g, '')) : null,
+        created_at: new Date().toISOString()
+      };
+
+      const { data: insertedOpportunity, error: insertError } = await supabase
+        .from('opportunities')
+        .insert(opportunityToInsert)
+        .select()
+        .single();
+
+      if (!insertError && insertedOpportunity) {
+        insertedOpportunities.push(insertedOpportunity);
+      }
+    }
+
+    if (insertedOpportunities.length === 0) {
+      throw new Error('All generated opportunities were duplicates or failed to save');
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        opportunities: [insertedOpportunity], // Return as array for compatibility
-        analysisMetadata: result.analysisMetadata,
+        opportunities: insertedOpportunities,
+        modelResults: modelResults, // Show which models generated what
+        qualityScores: insertedOpportunities.map(opp => ({
+          id: opp.id,
+          title: opp.title,
+          qualityScore: opp.ai_analysis?.qualityScore,
+          generatedBy: opp.ai_analysis?.generatedBy
+        })),
+        analysisMetadata: {
+          dataQuality: calculateDataQuality(client, marketIntelligence, companyProfile),
+          totalModelsUsed: Object.keys(modelResults).length,
+          duplicatesFiltered: opportunities.length - insertedOpportunities.length
+        },
         intelligenceLayers: {
           clientIntelligence: !!client.ai_insights,
           marketIntelligence: !!marketIntelligence,

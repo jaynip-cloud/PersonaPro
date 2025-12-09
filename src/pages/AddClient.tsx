@@ -102,9 +102,10 @@ export const AddClient: React.FC = () => {
   const [aiResponses, setAiResponses] = useState<{
     perplexity: any | null;
     openai: any | null;
-  }>({ perplexity: null, openai: null });
+    gemini: any | null;
+  }>({ perplexity: null, openai: null, gemini: null });
   const [comparison, setComparison] = useState<any | null>(null);
-  const [selectedModel, setSelectedModel] = useState<'perplexity' | 'openai' | null>(null);
+  const [selectedModel, setSelectedModel] = useState<'perplexity' | 'openai' | 'gemini' | null>(null);
 
   const [formData, setFormData] = useState<ClientFormData>({
     company: '',
@@ -526,19 +527,75 @@ export const AddClient: React.FC = () => {
     }
   };
 
-  const fetchComparison = async (perplexityResult?: any, openaiResult?: any) => {
+  const fetchGeminiData = async () => {
+    console.log('[FRONTEND] 🚀 Starting Gemini fetch', inputData);
+    const startTime = Date.now();
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-client-gemini`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(inputData),
+        }
+      );
+
+      const duration = Date.now() - startTime;
+      console.log(`[FRONTEND] ✅ Gemini response received`, { 
+        status: response.status, 
+        duration: `${duration}ms` 
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Gemini fetch failed');
+      }
+
+      const result = await response.json();
+      console.log('[FRONTEND] 📊 Gemini data received', {
+        success: result.success,
+        completeness: result.metadata?.completenessScore,
+      });
+
+      return {
+        model: 'gemini' as const,
+        data: result.data,
+        metadata: result.metadata,
+      };
+    } catch (error: any) {
+      console.error('[FRONTEND] ❌ Gemini fetch error', error);
+      return {
+        model: 'gemini' as const,
+        data: null,
+        metadata: { completenessScore: 0, processingTime: 0, timestamp: '' },
+        error: error.message,
+      };
+    }
+  };
+
+  const fetchComparison = async (perplexityResult?: any, openaiResult?: any, geminiResult?: any) => {
     console.log('[FRONTEND] 🔍 Starting comparison fetch');
     
     // Use passed results or fall back to state
     const perplexityData = perplexityResult?.data || aiResponses.perplexity?.data;
     const openaiData = openaiResult?.data || aiResponses.openai?.data;
+    const geminiData = geminiResult?.data || aiResponses.gemini?.data;
     
     if (!perplexityData || !openaiData) {
       console.error('[FRONTEND] ❌ Cannot compare - missing responses', {
         hasPerplexity: !!perplexityData,
         hasOpenAI: !!openaiData,
+        hasGemini: !!geminiData,
         perplexityResult: !!perplexityResult,
         openaiResult: !!openaiResult,
+        geminiResult: !!geminiResult,
         aiResponsesState: aiResponses,
       });
       return;
@@ -548,6 +605,17 @@ export const AddClient: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
+      const requestBody: any = {
+        perplexityResponse: perplexityData,
+        openaiResponse: openaiData,
+        clientName: inputData.clientName,
+      };
+
+      // Include Gemini if available
+      if (geminiData) {
+        requestBody.geminiResponse = geminiData;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compare-ai-responses`,
         {
@@ -556,11 +624,7 @@ export const AddClient: React.FC = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({
-            perplexityResponse: perplexityData,
-            openaiResponse: openaiData,
-            clientName: inputData.clientName,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
@@ -607,35 +671,43 @@ export const AddClient: React.FC = () => {
       return;
     }
 
-    console.log('[FRONTEND] === STARTING DUAL AI FETCH ===');
+    console.log('[FRONTEND] === STARTING TRIPLE AI FETCH ===');
     setCreateFlowStep('fetching');
-    setAiResponses({ perplexity: null, openai: null });
+    setAiResponses({ perplexity: null, openai: null, gemini: null });
     setComparison(null);
     setSelectedModel(null);
 
-    // Fetch both in parallel
-    const [perplexityResult, openaiResult] = await Promise.all([
+    // Fetch all three in parallel
+    const [perplexityResult, openaiResult, geminiResult] = await Promise.all([
       fetchPerplexityData(),
       fetchOpenAIData(),
+      fetchGeminiData(),
     ]);
 
-    console.log('[FRONTEND] ✅ Both fetches completed', {
+    console.log('[FRONTEND] ✅ All fetches completed', {
       perplexitySuccess: !!perplexityResult.data,
       openaiSuccess: !!openaiResult.data,
+      geminiSuccess: !!geminiResult.data,
     });
 
     setAiResponses({
       perplexity: perplexityResult,
       openai: openaiResult,
+      gemini: geminiResult,
     });
 
-    // If both succeeded, fetch comparison (pass results directly to avoid state timing issues)
+    // If at least two succeeded, fetch comparison (pass results directly to avoid state timing issues)
     if (perplexityResult.data && openaiResult.data) {
-      await fetchComparison(perplexityResult, openaiResult);
+      await fetchComparison(perplexityResult, openaiResult, geminiResult);
     } else {
-      // If one failed, show what we have
+      // If some failed, show what we have
       setCreateFlowStep('comparing');
-      showToast('warning', 'One or both AI responses failed. Showing available results.');
+      const successCount = [perplexityResult.data, openaiResult.data, geminiResult.data].filter(Boolean).length;
+      if (successCount > 0) {
+        showToast('warning', `${successCount} of 3 AI responses succeeded. Showing available results.`);
+      } else {
+        showToast('error', 'All AI responses failed. Please check your API keys and try again.');
+      }
     }
   };
 
@@ -644,7 +716,7 @@ export const AddClient: React.FC = () => {
     handleFetchData();
   };
 
-  const handleSelectResponse = (model: 'perplexity' | 'openai') => {
+  const handleSelectResponse = (model: 'perplexity' | 'openai' | 'gemini') => {
     console.log('[FRONTEND] 👤 User selected response', { model });
     const selectedResponse = aiResponses[model];
     
@@ -1116,6 +1188,7 @@ export const AddClient: React.FC = () => {
           <AIFetchProgress
             perplexityResponse={aiResponses.perplexity}
             openaiResponse={aiResponses.openai}
+            geminiResponse={aiResponses.gemini}
           />
         </div>
       );
@@ -1128,6 +1201,7 @@ export const AddClient: React.FC = () => {
           <AIResponseComparison
             perplexityResponse={aiResponses.perplexity}
             openaiResponse={aiResponses.openai}
+            geminiResponse={aiResponses.gemini}
             comparison={comparison}
             onSelectResponse={handleSelectResponse}
             onRegenerate={handleRegenerate}

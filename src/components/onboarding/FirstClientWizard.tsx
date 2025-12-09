@@ -56,9 +56,10 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
   const [aiResponses, setAiResponses] = useState<{
     perplexity: any | null;
     openai: any | null;
-  }>({ perplexity: null, openai: null });
+    gemini: any | null;
+  }>({ perplexity: null, openai: null, gemini: null });
   const [comparison, setComparison] = useState<any | null>(null);
-  const [selectedModel, setSelectedModel] = useState<'perplexity' | 'openai' | null>(null);
+  const [selectedModel, setSelectedModel] = useState<'perplexity' | 'openai' | 'gemini' | null>(null);
   const [hasAutoFetched, setHasAutoFetched] = useState(false);
   const { user } = useAuth();
   const { refreshClients } = useApp();
@@ -108,7 +109,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     if (currentStep === 2 && !hasAutoFetched) {
       const hasAllFields = formData.company.trim() && formData.website.trim() && formData.linkedinUrl.trim();
       
-      if (hasAllFields && !aiPrefilling && !aiResponses.perplexity && !aiResponses.openai) {
+      if (hasAllFields && !aiPrefilling && !aiResponses.perplexity && !aiResponses.openai && !aiResponses.gemini) {
         console.log('[FIRST-CLIENT-WIZARD] Triggering AI fetch on Step 2');
         setHasAutoFetched(true);
         handleAIPrefill();
@@ -224,12 +225,57 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     }
   };
 
-  const fetchComparison = async (perplexityResult?: any, openaiResult?: any) => {
+  const fetchGeminiData = async () => {
+    console.log('[FIRST-CLIENT-WIZARD] 🚀 Starting Gemini fetch');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-client-gemini`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            clientName: formData.company,
+            websiteUrl: formData.website,
+            linkedinUrl: formData.linkedinUrl,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Gemini fetch failed');
+      }
+
+      const result = await response.json();
+      return {
+        model: 'gemini' as const,
+        data: result.data,
+        metadata: result.metadata,
+      };
+    } catch (error: any) {
+      console.error('[FIRST-CLIENT-WIZARD] ❌ Gemini error', error);
+      return {
+        model: 'gemini' as const,
+        data: null,
+        metadata: { completenessScore: 0, processingTime: 0, timestamp: '' },
+        error: error.message,
+      };
+    }
+  };
+
+  const fetchComparison = async (perplexityResult?: any, openaiResult?: any, geminiResult?: any) => {
     console.log('[FIRST-CLIENT-WIZARD] 🔍 Starting comparison');
     
     // Use passed results or fall back to state
     const perplexityData = perplexityResult?.data || aiResponses.perplexity?.data;
     const openaiData = openaiResult?.data || aiResponses.openai?.data;
+    const geminiData = geminiResult?.data || aiResponses.gemini?.data;
     
     if (!perplexityData || !openaiData) {
       console.error('[FIRST-CLIENT-WIZARD] ❌ Cannot compare - missing responses');
@@ -240,6 +286,17 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
+      const requestBody: any = {
+        perplexityResponse: perplexityData,
+        openaiResponse: openaiData,
+        clientName: formData.company,
+      };
+
+      // Include Gemini if available
+      if (geminiData) {
+        requestBody.geminiResponse = geminiData;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compare-ai-responses`,
         {
@@ -248,11 +305,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({
-            perplexityResponse: perplexityData,
-            openaiResponse: openaiData,
-            clientName: formData.company,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
@@ -284,31 +337,39 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
 
     if (!user) return;
 
-    console.log('[FIRST-CLIENT-WIZARD] === STARTING DUAL AI FETCH ===');
+    console.log('[FIRST-CLIENT-WIZARD] === STARTING TRIPLE AI FETCH ===');
     setAiPrefilling(true);
-    setAiResponses({ perplexity: null, openai: null });
+    setAiResponses({ perplexity: null, openai: null, gemini: null });
     setComparison(null);
     setSelectedModel(null);
 
-    // Fetch both in parallel
-    const [perplexityResult, openaiResult] = await Promise.all([
+    // Fetch all three in parallel
+    const [perplexityResult, openaiResult, geminiResult] = await Promise.all([
       fetchPerplexityData(),
       fetchOpenAIData(),
+      fetchGeminiData(),
     ]);
 
-    console.log('[FIRST-CLIENT-WIZARD] ✅ Both fetches completed', {
+    console.log('[FIRST-CLIENT-WIZARD] ✅ All fetches completed', {
       perplexitySuccess: !!perplexityResult.data,
       openaiSuccess: !!openaiResult.data,
+      geminiSuccess: !!geminiResult.data,
     });
 
     setAiResponses({
       perplexity: perplexityResult,
       openai: openaiResult,
+      gemini: geminiResult,
     });
 
-    // If both succeeded, fetch comparison (pass results directly to avoid state timing issues)
-    if (perplexityResult.data && openaiResult.data) {
-      await fetchComparison(perplexityResult, openaiResult);
+      // If at least two succeeded, fetch comparison (pass results directly to avoid state timing issues)
+      if (perplexityResult.data && openaiResult.data) {
+        await fetchComparison(perplexityResult, openaiResult, geminiResult);
+      } else {
+      const successCount = [perplexityResult.data, openaiResult.data, geminiResult.data].filter(Boolean).length;
+      if (successCount === 0) {
+        console.error('[FIRST-CLIENT-WIZARD] ❌ All AI responses failed');
+      }
     }
 
     setAiPrefilling(false);
@@ -320,7 +381,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
     handleAIPrefill();
   };
 
-  const handleSelectResponse = (model: 'perplexity' | 'openai') => {
+  const handleSelectResponse = (model: 'perplexity' | 'openai' | 'gemini') => {
     console.log('[FIRST-CLIENT-WIZARD] 👤 User selected response', { model });
     const selectedResponse = aiResponses[model];
     
@@ -645,7 +706,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
           {currentStep === 2 && (
             <div className="space-y-4">
               <div className="flex items-center justify-end mb-4">
-                {!aiPrefilling && (aiResponses.perplexity || aiResponses.openai) && (
+                {!aiPrefilling && (aiResponses.perplexity || aiResponses.openai || aiResponses.gemini) && (
                   <Button
                     variant="outline"
                     onClick={handleRegenerate}
@@ -659,7 +720,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
               </div>
 
               {/* Show button to trigger fetch if not started yet */}
-              {!aiPrefilling && !aiResponses.perplexity && !aiResponses.openai && (
+              {!aiPrefilling && !aiResponses.perplexity && !aiResponses.openai && !aiResponses.gemini && (
                 <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-900 mb-3 font-medium">
                     <Sparkles className="h-4 w-4 inline mr-2" />
@@ -683,24 +744,26 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
                   <AIFetchProgress
                     perplexityResponse={aiResponses.perplexity}
                     openaiResponse={aiResponses.openai}
+                    geminiResponse={aiResponses.gemini}
                   />
                 </div>
               )}
 
-              {/* Show Comparison after both responses are received - keep visible even after selection */}
-              {!aiPrefilling && (aiResponses.perplexity || aiResponses.openai) && (
+              {/* Show Comparison after responses are received - keep visible even after selection */}
+              {!aiPrefilling && (aiResponses.perplexity || aiResponses.openai || aiResponses.gemini) && (
                 <div className="mb-4">
                   {selectedModel && (
                     <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
                       <span className="text-sm text-green-900">
-                        Using {selectedModel === 'perplexity' ? 'Perplexity' : 'OpenAI'} response. Click "Next" to view details.
+                        Using {selectedModel === 'perplexity' ? 'Perplexity' : selectedModel === 'openai' ? 'OpenAI' : 'Gemini'} response. Click "Next" to view details.
                       </span>
                     </div>
                   )}
                   <AIResponseComparison
                     perplexityResponse={aiResponses.perplexity}
                     openaiResponse={aiResponses.openai}
+                    geminiResponse={aiResponses.gemini}
                     comparison={comparison}
                     onSelectResponse={handleSelectResponse}
                     onRegenerate={handleRegenerate}
@@ -709,7 +772,7 @@ export const FirstClientWizard: React.FC<FirstClientWizardProps> = ({ isOpen, on
               )}
 
               {/* Show waiting message if no responses yet */}
-              {!aiPrefilling && !aiResponses.perplexity && !aiResponses.openai && !selectedModel && (
+              {!aiPrefilling && !aiResponses.perplexity && !aiResponses.openai && !aiResponses.gemini && !selectedModel && (
                 <div className="text-center py-8">
                   <Sparkles className="h-8 w-8 text-blue-600 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">

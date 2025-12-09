@@ -28,6 +28,7 @@ export const Settings: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [openaiKey, setOpenaiKey] = useState('');
   const [perplexityKey, setPerplexityKey] = useState('');
+  const [geminiKey, setGeminiKey] = useState('');
   const [fathomKey, setFathomKey] = useState('');
   const [apolloKey, setApolloKey] = useState('');
   const [pineconeApiKey, setPineconeApiKey] = useState('');
@@ -35,6 +36,7 @@ export const Settings: React.FC = () => {
   const [pineconeIndexName, setPineconeIndexName] = useState('');
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [showPerplexityKey, setShowPerplexityKey] = useState(false);
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showFathomKey, setShowFathomKey] = useState(false);
   const [showApolloKey, setShowApolloKey] = useState(false);
   const [showPineconeKey, setShowPineconeKey] = useState(false);
@@ -58,14 +60,14 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     if (!user || activeTab !== 'api' || !keysLoaded) return;
-    if (!openaiKey && !perplexityKey && !fathomKey && !apolloKey && !pineconeApiKey && !pineconeEnvironment && !pineconeIndexName) return;
+    if (!openaiKey && !perplexityKey && !geminiKey && !fathomKey && !apolloKey && !pineconeApiKey && !pineconeEnvironment && !pineconeIndexName) return;
 
     const timeoutId = setTimeout(() => {
       saveApiKeys();
     }, 1500);
 
     return () => clearTimeout(timeoutId);
-  }, [openaiKey, perplexityKey, fathomKey, apolloKey, pineconeApiKey, pineconeEnvironment, pineconeIndexName, keysLoaded]);
+  }, [openaiKey, perplexityKey, geminiKey, fathomKey, apolloKey, pineconeApiKey, pineconeEnvironment, pineconeIndexName, keysLoaded]);
 
   const loadApiKeys = async () => {
     if (!user) return;
@@ -75,7 +77,7 @@ export const Settings: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('api_keys')
-        .select('openai_api_key, perplexity_api_key, fathom_api_key, apollo_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
+        .select('openai_api_key, perplexity_api_key, gemini_api_key, fathom_api_key, apollo_api_key, pinecone_api_key, pinecone_environment, pinecone_index_name')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -84,6 +86,7 @@ export const Settings: React.FC = () => {
       if (data) {
         setOpenaiKey(data.openai_api_key || '');
         setPerplexityKey(data.perplexity_api_key || '');
+        setGeminiKey(data.gemini_api_key || '');
         setFathomKey(data.fathom_api_key || '');
         setApolloKey(data.apollo_api_key || '');
         setPineconeApiKey(data.pinecone_api_key || '');
@@ -115,6 +118,7 @@ export const Settings: React.FC = () => {
           .update({
             openai_api_key: openaiKey || null,
             perplexity_api_key: perplexityKey || null,
+            gemini_api_key: geminiKey || null,
             fathom_api_key: fathomKey || null,
             apollo_api_key: apolloKey || null,
             pinecone_api_key: pineconeApiKey || null,
@@ -131,6 +135,7 @@ export const Settings: React.FC = () => {
             user_id: user.id,
             openai_api_key: openaiKey || null,
             perplexity_api_key: perplexityKey || null,
+            gemini_api_key: geminiKey || null,
             fathom_api_key: fathomKey || null,
             apollo_api_key: apolloKey || null,
             pinecone_api_key: pineconeApiKey || null,
@@ -589,7 +594,56 @@ export const Settings: React.FC = () => {
 
                       <div className="border-t border-border pt-6">
                         <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                          <span className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">3</span>
+                          <span className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-sm">3</span>
+                          Gemini API Key (Optional)
+                        </h3>
+                        <div className="pl-10 space-y-3">
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <p className="text-sm text-slate-700 mb-2">
+                              <strong>Used for:</strong> Client Information Enrichment, Company Data Extraction
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              Google Gemini 2.5 Flash provides fast and cost-effective AI-powered client data extraction alongside Perplexity and OpenAI.
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-foreground mb-2">
+                              Gemini API Key
+                            </label>
+                            <div className="flex gap-2">
+                              <Input
+                                type={showGeminiKey ? 'text' : 'password'}
+                                value={geminiKey}
+                                onChange={(e) => setGeminiKey(e.target.value)}
+                                placeholder="AIza..."
+                                className="font-mono text-sm"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={() => setShowGeminiKey(!showGeminiKey)}
+                              >
+                                {showGeminiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1.5">
+                              Get your API key from{' '}
+                              <a
+                                href="https://aistudio.google.com/"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline font-medium"
+                              >
+                                Google AI Studio →
+                              </a>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-border pt-6">
+                        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                          <span className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-sm">4</span>
                           Fathom API Key (Optional)
                         </h3>
                         <div className="pl-10 space-y-3">
@@ -770,7 +824,7 @@ export const Settings: React.FC = () => {
                     <div className="flex items-center justify-between pt-4 border-t border-border">
                       <div className="flex items-center gap-4">
                         <div className="text-sm text-muted-foreground">
-                          {openaiKey && perplexityKey && fathomKey && apolloKey ? (
+                          {openaiKey && perplexityKey && geminiKey && fathomKey && apolloKey ? (
                             <span className="text-green-600 flex items-center gap-1">
                               <CheckCircle className="h-4 w-4" />
                               All keys configured (Full features)
@@ -778,7 +832,7 @@ export const Settings: React.FC = () => {
                           ) : openaiKey ? (
                             <span className="text-green-600 flex items-center gap-1">
                               <CheckCircle className="h-4 w-4" />
-                              OpenAI configured + {[perplexityKey && 'Perplexity', fathomKey && 'Fathom', apolloKey && 'Apollo'].filter(Boolean).join(', ')}
+                              OpenAI configured + {[perplexityKey && 'Perplexity', geminiKey && 'Gemini', fathomKey && 'Fathom', apolloKey && 'Apollo'].filter(Boolean).join(', ')}
                             </span>
                           ) : (
                             <span className="text-orange-600 flex items-center gap-1">
@@ -798,7 +852,7 @@ export const Settings: React.FC = () => {
                               <CheckCircle className="h-3 w-3 text-green-600" />
                               <span className="text-green-600">Saved automatically</span>
                             </>
-                          ) : keysLoaded && (openaiKey || perplexityKey || fathomKey || apolloKey) ? (
+                          ) : keysLoaded && (openaiKey || perplexityKey || geminiKey || fathomKey || apolloKey) ? (
                             <span className="text-slate-400">Changes save automatically</span>
                           ) : null}
                         </div>
@@ -806,7 +860,7 @@ export const Settings: React.FC = () => {
                       <Button
                         variant="outline"
                         onClick={handleSave}
-                        disabled={isSavingKeys || (!openaiKey && !perplexityKey && !fathomKey && !apolloKey)}
+                        disabled={isSavingKeys || (!openaiKey && !perplexityKey && !geminiKey && !fathomKey && !apolloKey)}
                         className="text-sm"
                       >
                         {isSavingKeys ? (

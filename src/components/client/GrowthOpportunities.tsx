@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Input } from '../ui/Input';
 import { Modal } from '../ui/Modal';
-import { Plus, Sparkles, ArrowRight, Loader2, TrendingUp, AlertCircle } from 'lucide-react';
+import { Plus, Sparkles, ArrowRight, Loader2, TrendingUp, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -29,6 +29,9 @@ interface Opportunity {
     recommendedApproach?: string;
     expectedBudgetRange?: string;
     successFactors?: string[];
+    qualityScore?: number;
+    generatedBy?: string;
+    successProbability?: number;
   };
 }
 
@@ -45,6 +48,7 @@ export const GrowthOpportunities: React.FC<GrowthOpportunitiesProps> = ({ client
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newOpportunity, setNewOpportunity] = useState({ title: '', description: '' });
   const [error, setError] = useState<string | null>(null);
+  const [expandedOpportunities, setExpandedOpportunities] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user && clientId) {
@@ -142,6 +146,18 @@ export const GrowthOpportunities: React.FC<GrowthOpportunitiesProps> = ({ client
     alert('Converting to project - this will be implemented in the project creation flow');
   };
 
+  const toggleExpand = (opportunityId: string) => {
+    setExpandedOpportunities(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(opportunityId)) {
+        newSet.delete(opportunityId);
+      } else {
+        newSet.add(opportunityId);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -218,16 +234,6 @@ export const GrowthOpportunities: React.FC<GrowthOpportunitiesProps> = ({ client
                             AI
                           </Badge>
                         )}
-                        {opp.ai_analysis?.estimatedValue && (
-                          <Badge variant="outline" size="sm">
-                            Value: {opp.ai_analysis.estimatedValue}
-                          </Badge>
-                        )}
-                        {opp.ai_analysis?.urgency === 'High' && (
-                          <Badge variant="warning" size="sm">
-                            High Urgency
-                          </Badge>
-                        )}
                         {opp.converted_to_project_id && (
                           <Badge variant="success" size="sm">
                             Converted to Project
@@ -236,30 +242,80 @@ export const GrowthOpportunities: React.FC<GrowthOpportunitiesProps> = ({ client
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">{opp.description}</p>
 
-                      {opp.ai_analysis?.reasoning && (
-                        <div className="mt-3 pt-3 border-t border-border space-y-2">
-                          {opp.ai_analysis.reasoning.clientNeed && (
-                            <div>
-                              <span className="text-xs font-medium text-foreground">Client Need: </span>
-                              <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.clientNeed}</span>
+                      {(opp.ai_analysis?.reasoning || opp.ai_analysis?.successFactors || opp.ai_analysis?.recommendedApproach) && (
+                        <button
+                          onClick={() => toggleExpand(opp.id)}
+                          className="mt-2 flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                        >
+                          {expandedOpportunities.has(opp.id) ? (
+                            <>
+                              <ChevronUp className="h-3 w-3" />
+                              Hide Details
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-3 w-3" />
+                              Show Details
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      {expandedOpportunities.has(opp.id) && (
+                        <div className="mt-3 pt-3 border-t border-border space-y-3">
+                          {opp.ai_analysis?.reasoning && (
+                            <div className="space-y-2">
+                              <h5 className="text-xs font-semibold text-foreground mb-2">Reasoning</h5>
+                              {opp.ai_analysis.reasoning.clientNeed && (
+                                <div>
+                                  <span className="text-xs font-medium text-foreground">Client Need: </span>
+                                  <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.clientNeed}</span>
+                                </div>
+                              )}
+                              {opp.ai_analysis.reasoning.marketContext && (
+                                <div>
+                                  <span className="text-xs font-medium text-foreground">Market Context: </span>
+                                  <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.marketContext}</span>
+                                </div>
+                              )}
+                              {opp.ai_analysis.reasoning.capabilityMatch && (
+                                <div>
+                                  <span className="text-xs font-medium text-foreground">Solution Match: </span>
+                                  <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.capabilityMatch}</span>
+                                </div>
+                              )}
+                              {opp.ai_analysis.reasoning.timing && (
+                                <div>
+                                  <span className="text-xs font-medium text-foreground">Timing: </span>
+                                  <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.timing}</span>
+                                </div>
+                              )}
+                              {opp.ai_analysis.reasoning.valueProposition && (
+                                <div>
+                                  <span className="text-xs font-medium text-foreground">Value Proposition: </span>
+                                  <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.valueProposition}</span>
+                                </div>
+                              )}
                             </div>
                           )}
-                          {opp.ai_analysis.reasoning.capabilityMatch && (
+
+                          {opp.ai_analysis?.successFactors && opp.ai_analysis.successFactors.length > 0 && (
                             <div>
-                              <span className="text-xs font-medium text-foreground">Solution: </span>
-                              <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.capabilityMatch}</span>
+                              <h5 className="text-xs font-semibold text-foreground mb-2">Success Factors</h5>
+                              <div className="flex flex-wrap gap-1.5">
+                                {opp.ai_analysis.successFactors.map((factor: string, idx: number) => (
+                                  <Badge key={idx} variant="outline" size="sm" className="text-xs">
+                                    {factor}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
                           )}
-                          {opp.ai_analysis.reasoning.valueProposition && (
+
+                          {opp.ai_analysis?.recommendedApproach && (
                             <div>
-                              <span className="text-xs font-medium text-foreground">Value: </span>
-                              <span className="text-xs text-muted-foreground">{opp.ai_analysis.reasoning.valueProposition}</span>
-                            </div>
-                          )}
-                          {opp.ai_analysis.expectedBudgetRange && (
-                            <div>
-                              <span className="text-xs font-medium text-foreground">Budget: </span>
-                              <span className="text-xs text-muted-foreground">{opp.ai_analysis.expectedBudgetRange}</span>
+                              <h5 className="text-xs font-semibold text-foreground mb-1">Recommended Approach</h5>
+                              <p className="text-xs text-muted-foreground">{opp.ai_analysis.recommendedApproach}</p>
                             </div>
                           )}
                         </div>

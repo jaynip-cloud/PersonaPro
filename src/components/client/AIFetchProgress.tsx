@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Loader2, CheckCircle2, XCircle, ChevronDown, ChevronUp, ExternalLink, Mail, Phone, MapPin, Building2, Users, Calendar, Target, TrendingUp, Code, Globe, FileText } from 'lucide-react';
 
 interface AIResponse {
-  model: 'perplexity' | 'openai';
+  model: 'perplexity' | 'openai' | 'gemini';
   data: any;
   metadata: {
     completenessScore: number;
@@ -16,6 +16,7 @@ interface AIResponse {
 interface AIFetchProgressProps {
   perplexityResponse: AIResponse | null;
   openaiResponse: AIResponse | null;
+  geminiResponse?: AIResponse | null;
 }
 
 const DataField: React.FC<{ label: string; value: string | null | undefined; icon?: React.ReactNode }> = ({ label, value, icon }) => {
@@ -50,7 +51,7 @@ const DataSection: React.FC<{ title: string; children: React.ReactNode; defaultE
 const ResponseCard: React.FC<{ 
   title: string; 
   response: AIResponse | null; 
-  color: 'blue' | 'purple';
+  color: 'blue' | 'purple' | 'green';
 }> = ({ title, response, color }) => {
   const data = response?.data;
   const isLoading = !response;
@@ -65,7 +66,9 @@ const ResponseCard: React.FC<{
           {isComplete && (
             <div className="flex items-center gap-2 text-sm">
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                color === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                color === 'blue' ? 'bg-blue-100 text-blue-700' : 
+                color === 'purple' ? 'bg-purple-100 text-purple-700' : 
+                'bg-green-100 text-green-700'
               }`}>
                 {response.metadata.completenessScore}% complete
               </span>
@@ -237,28 +240,45 @@ const ResponseCard: React.FC<{
 export const AIFetchProgress: React.FC<AIFetchProgressProps> = ({
   perplexityResponse,
   openaiResponse,
+  geminiResponse,
 }) => {
-  const allComplete = perplexityResponse && !perplexityResponse.error && openaiResponse && !openaiResponse.error;
+  const allComplete = perplexityResponse && !perplexityResponse.error && 
+                      openaiResponse && !openaiResponse.error && 
+                      geminiResponse && !geminiResponse.error;
+  const successCount = [perplexityResponse, openaiResponse, geminiResponse]
+    .filter(r => r && !r.error).length;
   
   return (
     <div className="space-y-6">
       {allComplete && (
         <div className="flex items-center justify-end">
           <div className="text-sm text-muted-foreground">
-            Both responses completed successfully
+            All three responses completed successfully
           </div>
         </div>
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {!allComplete && successCount > 0 && (
+        <div className="flex items-center justify-end">
+          <div className="text-sm text-muted-foreground">
+            {successCount} of 3 responses completed
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <ResponseCard 
-          title="Response 1" 
+          title="Response 1 (Perplexity)" 
           response={perplexityResponse} 
           color="blue"
         />
         <ResponseCard 
-          title="Response 2" 
+          title="Response 2 (OpenAI)" 
           response={openaiResponse} 
           color="purple"
+        />
+        <ResponseCard 
+          title="Response 3 (Gemini)" 
+          response={geminiResponse} 
+          color="green"
         />
       </div>
     </div>

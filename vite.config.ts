@@ -13,6 +13,6 @@ export default defineConfig({
     strictPort: false,
 
     // 👇 use the exact host shown in the error
-    allowedHosts: ['4b6fbe6a0a3f.ngrok-free.app'],
+    allowedHosts: ['.ngrok-free.app'],
   },
 });
