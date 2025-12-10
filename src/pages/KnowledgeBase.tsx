@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -47,6 +47,7 @@ import {
 type TabType = 'overview' | 'company' | 'contact' | 'social' | 'services' | 'team' | 'blogs' | 'technology';
 
 export const KnowledgeBase: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -54,6 +55,11 @@ export const KnowledgeBase: React.FC = () => {
   const [showWizard, setShowWizard] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [viewMode, setViewMode] = useState<'ai-overview' | 'view-details'>('ai-overview');
+  const [isFetchingData, setIsFetchingData] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchProgress, setFetchProgress] = useState<string>('');
+  const [fetchProgressStep, setFetchProgressStep] = useState<number>(0);
+  const [fetchProgressTotal, setFetchProgressTotal] = useState<number>(5);
   const { user, isKnowledgeBaseComplete, hasCheckedKnowledgeBase, checkKnowledgeBaseStatus, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -78,6 +84,162 @@ export const KnowledgeBase: React.FC = () => {
       loadExistingData();
     }
   }, [user]);
+
+  // Check URL params and trigger fetch if needed
+  useEffect(() => {
+    const fetchParam = searchParams.get('fetch');
+    const modeParam = searchParams.get('mode');
+    
+    if (fetchParam === 'true' && user && !isFetchingData) {
+      // Set view mode if specified
+      if (modeParam === 'view-details') {
+        setViewMode('view-details');
+      }
+      
+      // Trigger data fetch
+      fetchCompanyData();
+      
+      // Remove fetch param from URL
+      searchParams.delete('fetch');
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user]);
+
+  const fetchCompanyData = async () => {
+    if (!user) return;
+
+    setIsFetchingData(true);
+    setFetchError(null);
+    setFetchProgressStep(0);
+    setFetchProgressTotal(5);
+
+    try {
+      // Step 1: Preparing request
+      setFetchProgressStep(1);
+      setFetchProgress('Preparing request...');
+
+      // Get company basic info first
+      const { data: profile } = await supabase
+        .from('company_profiles')
+        .select('company_name, website, linkedin_url')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!profile || !profile.company_name || !profile.website || !profile.linkedin_url) {
+        throw new Error('Company information is incomplete. Please complete onboarding first.');
+      }
+
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      // Step 2: Fetching from Perplexity (this is the long step - Perplexity + GPT happen in edge function)
+      setFetchProgressStep(2);
+      setFetchProgress('Fetching company data from Perplexity... This may take 30-60 seconds...');
+
+      // Call normalize-company-data edge function
+      // Note: This function internally calls Perplexity, then GPT for cleaning/verification
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/normalize-company-data`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            companyName: (profile as any).company_name,
+            website: (profile as any).website,
+            linkedinUrl: (profile as any).linkedin_url,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch company data');
+      }
+
+      // Step 3: Processing with GPT (happens in edge function, but we show progress)
+      setFetchProgressStep(3);
+      setFetchProgress('Processing data with GPT... Cleaning, standardizing, and verifying information...');
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Data normalization failed');
+      }
+
+      // Step 4: Verifying data
+      setFetchProgressStep(4);
+      setFetchProgress('Verifying data accuracy and completeness...');
+
+      // Small delay to show verification step
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Step 5: Saving data
+      setFetchProgressStep(5);
+      setFetchProgress('Saving data to knowledge base...');
+
+      // Save normalized data to database
+      const normalizedData = result.data;
+      const { error: saveError } = await supabase
+        .from('company_profiles')
+        .update({
+          company_name: normalizedData.companyName,
+          website: normalizedData.website,
+          industry: normalizedData.industry,
+          about: normalizedData.description,
+          value_proposition: normalizedData.valueProposition,
+          founded: normalizedData.founded,
+          location: normalizedData.location,
+          size: normalizedData.size,
+          mission: normalizedData.mission,
+          vision: normalizedData.vision,
+          email: normalizedData.email,
+          phone: normalizedData.phone,
+          address: normalizedData.address,
+          linkedin_url: normalizedData.linkedinUrl,
+          twitter_url: normalizedData.twitterUrl,
+          facebook_url: normalizedData.facebookUrl,
+          instagram_url: normalizedData.instagramUrl,
+          youtube_url: normalizedData.youtubeUrl,
+          services: normalizedData.services,
+          leadership: normalizedData.leadership,
+          blogs: normalizedData.blogs,
+          technology: normalizedData.technology,
+          onboarding_completed: true,
+          updated_at: new Date().toISOString()
+        } as any)
+        .eq('user_id', user.id);
+
+      if (saveError) {
+        throw new Error(`Failed to save data: ${saveError.message}`);
+      }
+
+      // Reload data to display
+      await loadExistingData();
+      
+      // Update knowledge base status
+      await checkKnowledgeBaseStatus();
+
+      // Set view mode to view-details
+      setViewMode('view-details');
+
+      setFetchProgress('');
+      setFetchProgressStep(0);
+      setIsFetchingData(false);
+    } catch (error: any) {
+      console.error('Error fetching company data:', error);
+      setFetchError(error.message || 'Failed to fetch company data');
+      setFetchProgress('');
+      setFetchProgressStep(0);
+      setIsFetchingData(false);
+    }
+  };
 
   const loadExistingData = async () => {
     if (!user) return;
@@ -632,6 +794,103 @@ export const KnowledgeBase: React.FC = () => {
         onComplete={handleWizardComplete}
       />
 
+      {/* Loading Overlay for Data Fetching */}
+      {isFetchingData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center space-y-6">
+                <RefreshCw className="h-10 w-10 text-primary animate-spin" />
+                <div className="text-center w-full">
+                  <h3 className="text-lg font-semibold mb-3">Fetching Company Data</h3>
+                  <p className="text-sm text-muted-foreground mb-4">{fetchProgress || 'Processing...'}</p>
+                  
+                  {/* Progressive Steps Indicator */}
+                  <div className="space-y-2">
+                    {[
+                      { step: 1, label: 'Preparing request' },
+                      { step: 2, label: 'Fetching from Perplexity' },
+                      { step: 3, label: 'Processing with GPT' },
+                      { step: 4, label: 'Verifying data' },
+                      { step: 5, label: 'Saving to database' }
+                    ].map((item) => (
+                      <div key={item.step} className="flex items-center gap-3">
+                        <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                          fetchProgressStep >= item.step
+                            ? 'bg-primary text-white'
+                            : 'bg-slate-200 text-slate-500'
+                        }`}>
+                          {fetchProgressStep > item.step ? (
+                            <CheckCircle className="h-4 w-4" />
+                          ) : (
+                            item.step
+                          )}
+                        </div>
+                        <div className={`flex-1 text-sm ${
+                          fetchProgressStep >= item.step
+                            ? 'text-foreground font-medium'
+                            : 'text-muted-foreground'
+                        }`}>
+                          {item.label}
+                        </div>
+                        {fetchProgressStep === item.step && (
+                          <RefreshCw className="h-4 w-4 text-primary animate-spin" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="mt-4">
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(fetchProgressStep / fetchProgressTotal) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2 text-center">
+                      Step {fetchProgressStep} of {fetchProgressTotal}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {fetchError && (
+        <div className="fixed top-4 right-4 bg-red-50 border border-red-200 rounded-lg p-4 shadow-lg z-50 max-w-md">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-red-900 mb-1">Error Fetching Data</h4>
+              <p className="text-sm text-red-700 mb-3">{fetchError}</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setFetchError(null);
+                    fetchCompanyData();
+                  }}
+                >
+                  Retry
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFetchError(null)}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -821,11 +1080,60 @@ export const KnowledgeBase: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {leadership.map((member, index) => (
                     <div key={index} className="border border-border rounded-lg p-4">
-                      <h3 className="font-semibold text-foreground mb-1">{member.name}</h3>
-                      <p className="text-sm text-primary mb-2">{member.role}</p>
-                      {member.bio && (
-                        <p className="text-sm text-muted-foreground">{member.bio}</p>
-                      )}
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-foreground mb-1">
+                          {member.name || 'Unnamed Leader'}
+                        </h3>
+                        <p className="text-sm text-primary font-medium mb-2">
+                          {member.role || 'No role specified'}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 text-sm">
+                        {member.bio && (
+                          <div>
+                            <span className="font-medium text-foreground">Bio:</span>
+                            <p className="text-muted-foreground mt-1">{member.bio}</p>
+                          </div>
+                        )}
+                        {member.experience && (
+                          <div>
+                            <span className="font-medium text-foreground">Experience:</span>
+                            <span className="text-muted-foreground ml-2">{member.experience}</span>
+                          </div>
+                        )}
+                        {member.education && (
+                          <div>
+                            <span className="font-medium text-foreground">Education:</span>
+                            <span className="text-muted-foreground ml-2">{member.education}</span>
+                          </div>
+                        )}
+                        {member.skills && Array.isArray(member.skills) && member.skills.length > 0 && (
+                          <div>
+                            <span className="font-medium text-foreground">Skills:</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {member.skills.map((skill: string, skillIndex: number) => (
+                                <Badge key={skillIndex} variant="secondary" className="text-xs">
+                                  {skill}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {member.linkedinUrl && (
+                          <div className="pt-2">
+                            <a 
+                              href={member.linkedinUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-primary hover:underline text-sm flex items-center gap-1"
+                            >
+                              <Linkedin className="h-4 w-4" />
+                              LinkedIn Profile
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

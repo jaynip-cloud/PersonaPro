@@ -269,6 +269,27 @@ export const Settings: React.FC = () => {
 
     setIsDeleting(true);
     try {
+      // Get and verify session before proceeding
+      let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        // Try to refresh the session
+        const refreshResult = await supabase.auth.refreshSession();
+        session = refreshResult.data?.session || null;
+        sessionError = refreshResult.error || null;
+        
+        if (sessionError || !session) {
+          throw new Error('Session expired. Please log in again and try deleting your account.');
+        }
+      }
+
+      // Verify the session is valid by getting the user
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+      if (userError || !currentUser) {
+        throw new Error('Unable to verify authentication. Please log in again and try deleting your account.');
+      }
+
+      // Delete company profile first
       const { error: deleteError } = await supabase
         .from('company_profiles')
         .delete()
@@ -278,16 +299,52 @@ export const Settings: React.FC = () => {
         console.error('Error deleting profile:', deleteError);
       }
 
-      const { error } = await supabase.rpc('delete_user');
+      // Call the RPC function to delete the user
+      // Ensure we're using the latest session by getting it fresh
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession) {
+        throw new Error('Session expired. Please log in again and try deleting your account.');
+      }
 
-      if (error) throw error;
+      // Call the RPC function - Supabase client should automatically include the session token
+      let { error } = await supabase.rpc('delete_user');
+
+      if (error) {
+        console.error('RPC delete_user error:', error);
+        
+        // If the error is "Not authenticated", try calling via REST API directly with session token
+        if (error.message?.includes('Not authenticated') || error.code === 'P0001') {
+          console.log('Attempting to call RPC via REST API with explicit session token...');
+          
+          // Try calling the RPC via REST API with explicit session token
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const restResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/delete_user`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${currentSession.access_token}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+            },
+          });
+
+          if (!restResponse.ok) {
+            const errorData = await restResponse.json().catch(() => ({ message: 'Unknown error' }));
+            throw new Error(`Failed to delete account: ${errorData.message || 'Authentication failed'}. Please log out and log back in, then try again.`);
+          }
+          
+          // If REST API call succeeded, continue with cleanup
+          console.log('Account deleted successfully via REST API');
+        } else {
+          throw new Error(`Failed to delete account: ${error.message}. Please try again or contact support.`);
+        }
+      }
 
       localStorage.clear();
       await signOut();
       navigate('/login');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting account:', error);
-      alert('Failed to delete account. Please try again or contact support.');
+      alert(error.message || 'Failed to delete account. Please try again or contact support.');
       setIsDeleting(false);
     }
   };

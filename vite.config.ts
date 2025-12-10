@@ -13,6 +13,6 @@ export default defineConfig({
     strictPort: false,
 
     // 👇 use the exact host shown in the error
-    allowedHosts: ['.ngrok-free.app'],
+    allowedHosts: ['xylophagous-unprevented-jayla.ngrok-free.dev'],
   },
 });
